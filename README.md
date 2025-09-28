@@ -261,9 +261,38 @@ fn copy_file(src: String, dst: String, io: IO) -> Result[Unit, String] !{io} {
 
 ---
 
-# trying it (prototype parser)
+# Trying It (Prototype Parser)
 
 - Build: `cargo build`
 - Tokens: `cargo run -- --tokens examples/demo.mica`
 - AST: `cargo run -- --ast examples/demo.mica`
 - Extra example: `cargo run -- --ast examples/channels.mica`
+
+## More CLI modes
+
+- Pretty AST: `cargo run -- --ast --pretty examples/adt.mica`
+- Exhaustiveness check: `cargo run -- --check examples/adt.mica`
+- Resolver dump: `cargo run -- --resolve examples/adt.mica`
+- Lower to simple HIR: `cargo run -- --lower examples/methods.mica`
+
+## Included examples
+
+- ADTs: `examples/adt.mica`
+- Using + `?`: `examples/using.mica`
+- Channels: `examples/channels.mica`
+- Impl and bounds: `examples/impls.mica`
+- Casts and patterns: `examples/cast_and_patterns.mica`
+- Methods + self receiver: `examples/methods.mica`
+
+## Tests
+
+Run the test suite: `cargo test`
+
+What’s covered:
+- Lexing of key tokens (`::`, `?`, `using`, `chan`)
+- Parsing of ADTs, `using` + `?`, channel creation, casts, tuple/record patterns
+- Impl blocks with `self` receivers
+- Resolver mapping ADTs and variants
+- Exhaustiveness checking for `match` against in-module ADTs
+- Pretty-printer snapshot sanity checks
+- Lowering method calls to simple HIR

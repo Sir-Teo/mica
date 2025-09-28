@@ -103,3 +103,6 @@ enum Mode {
     Resolve,
     Lower,
 }
+
+#[cfg(test)]
+mod tests;
