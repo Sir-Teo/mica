@@ -1,0 +1,14 @@
+module demo.casts_and_patterns
+
+type Pair = { a: Int, b: Int }
+
+fn work(p: Pair, x: Int) -> Int {
+  match p {
+    { a, b: bb } => (a + bb) as Int,
+  }
+}
+
+fn unit_match(u: ()) {
+  match u { () => () }
+}
+

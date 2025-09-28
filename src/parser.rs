@@ -550,6 +550,10 @@ impl Parser {
                     expr: Box::new(expr),
                     index: Box::new(index),
                 };
+            } else if self.match_keyword(TokenKind::As) {
+                // cast: expr as Type
+                let ty = self.parse_type_expr()?;
+                expr = Expr::Cast { expr: Box::new(expr), ty };
             } else if self.match_symbol(TokenKind::Question) {
                 expr = Expr::Try(Box::new(expr));
             } else {
@@ -734,6 +738,50 @@ impl Parser {
 
     fn parse_pattern(&mut self) -> Result<Pattern> {
         match self.current_kind() {
+            TokenKind::LParen => {
+                // Tuple pattern or unit
+                self.advance();
+                if self.match_symbol(TokenKind::RParen) {
+                    return Ok(Pattern::Tuple(Vec::new()));
+                }
+                let mut items = Vec::new();
+                loop {
+                    items.push(self.parse_pattern()?);
+                    if self.match_symbol(TokenKind::Comma) {
+                        continue;
+                    }
+                    break;
+                }
+                self.expect_symbol(TokenKind::RParen, "expected ')' in tuple pattern")?;
+                if items.len() == 1 {
+                    Ok(items.into_iter().next().unwrap())
+                } else {
+                    Ok(Pattern::Tuple(items))
+                }
+            }
+            TokenKind::LBrace => {
+                // Record pattern: { field: pat, ... }
+                self.advance();
+                let mut fields = Vec::new();
+                if !self.check(TokenKind::RBrace) {
+                    loop {
+                        let name = self.expect_identifier()?;
+                        let pat = if self.match_symbol(TokenKind::Colon) {
+                            self.parse_pattern()?
+                        } else {
+                            // shorthand binding
+                            Pattern::Binding(name.clone())
+                        };
+                        fields.push((name, pat));
+                        if self.match_symbol(TokenKind::Comma) {
+                            continue;
+                        }
+                        break;
+                    }
+                }
+                self.expect_symbol(TokenKind::RBrace, "expected '}' in record pattern")?;
+                Ok(Pattern::Record(fields))
+            }
             TokenKind::Identifier(name) => {
                 if name == "_" {
                     self.advance();

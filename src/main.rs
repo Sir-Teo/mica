@@ -4,6 +4,7 @@ mod error;
 mod lexer;
 mod pretty;
 mod parser;
+mod resolve;
 mod token;
 
 use std::env;
@@ -31,6 +32,7 @@ fn run() -> Result<()> {
             "--ast" => mode = Mode::Ast,
             "--check" => mode = Mode::Check,
             "--pretty" => pretty = true,
+            "--resolve" => mode = Mode::Resolve,
             _ => {
                 path_arg = Some(PathBuf::from(arg));
                 for extra in args {
@@ -73,6 +75,14 @@ fn run() -> Result<()> {
                 for d in diags { println!("warning: {}", d.message); }
             }
         }
+        Mode::Resolve => {
+            let module = parser::parse_module(&source)?;
+            let r = resolve::resolve_module(&module);
+            println!("module: {}", r.module_path.join("."));
+            for (adt, variants) in r.adts.iter() {
+                println!("adt {} = {}", adt, variants.join(" | "));
+            }
+        }
     }
 
     Ok(())
@@ -83,4 +93,5 @@ enum Mode {
     Tokens,
     Ast,
     Check,
+    Resolve,
 }

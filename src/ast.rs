@@ -132,6 +132,10 @@ pub enum Expr {
         expr: Box<Expr>,
         index: Box<Expr>,
     },
+    Cast {
+        expr: Box<Expr>,
+        ty: TypeExpr,
+    },
     If {
         condition: Box<Expr>,
         then_branch: Box<Expr>,
