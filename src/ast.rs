@@ -48,6 +48,7 @@ pub enum TypeExpr {
         return_type: Box<TypeExpr>,
         effect_row: Vec<String>,
     },
+    SelfType,
     Unit,
 }
 

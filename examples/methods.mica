@@ -1,0 +1,15 @@
+module demo.methods
+
+type Vec2 = { x: Int, y: Int }
+
+impl Addable for Vec2 {
+  fn add(self, other: Vec2) -> Vec2 {
+    // toy body; return other for now
+    other
+  }
+}
+
+fn use_method(a: Vec2, b: Vec2) -> Vec2 {
+  a.add(b)
+}
+

@@ -123,5 +123,6 @@ fn fmt_type(s: &mut String, t: &TypeExpr) {
             }
         }
         TypeExpr::Unit => { let _ = write!(s, "()"); }
+        TypeExpr::SelfType => { let _ = write!(s, "Self"); }
     }
 }

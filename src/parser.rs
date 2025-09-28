@@ -210,20 +210,38 @@ impl Parser {
         self.expect_symbol(TokenKind::LParen, "expected '(' in parameter list")?;
         let mut params = Vec::new();
         if !self.check(TokenKind::RParen) {
-            loop {
+            // First parameter: optional self receiver or a normal param
+            if self.check(TokenKind::Ampersand) {
+                self.advance();
+                let is_mut = self.match_keyword(TokenKind::Mut);
+                let ident = self.expect_identifier()?;
+                if ident != "self" {
+                    return Err(self.error_here("expected 'self' after '&' in receiver"));
+                }
+                params.push(Param { name: "self".into(), ty: TypeExpr::Reference { is_mut, inner: Box::new(TypeExpr::SelfType) }, mutable: false });
+            } else if matches!(self.current_kind(), TokenKind::Identifier(s) if s == "self") {
+                self.advance();
+                if self.match_symbol(TokenKind::Colon) {
+                    let ty = self.parse_type_expr()?;
+                    params.push(Param { name: "self".into(), ty, mutable: false });
+                } else {
+                    params.push(Param { name: "self".into(), ty: TypeExpr::SelfType, mutable: false });
+                }
+            } else {
                 let mutable = self.match_keyword(TokenKind::Mut);
                 let param_name = self.expect_identifier()?;
                 self.expect_symbol(TokenKind::Colon, "expected ':' after parameter name")?;
                 let ty = self.parse_type_expr()?;
-                params.push(Param {
-                    name: param_name,
-                    ty,
-                    mutable,
-                });
-                if self.match_symbol(TokenKind::Comma) {
-                    continue;
-                }
-                break;
+                params.push(Param { name: param_name, ty, mutable });
+            }
+
+            // Subsequent parameters: normal params separated by commas
+            while self.match_symbol(TokenKind::Comma) {
+                let mutable = self.match_keyword(TokenKind::Mut);
+                let param_name = self.expect_identifier()?;
+                self.expect_symbol(TokenKind::Colon, "expected ':' after parameter name")?;
+                let ty = self.parse_type_expr()?;
+                params.push(Param { name: param_name, ty, mutable });
             }
         }
         self.expect_symbol(TokenKind::RParen, "expected ')' to close parameter list")?;
@@ -844,7 +862,7 @@ impl Parser {
     }
 
     fn match_path_sep(&mut self) -> bool {
-        if self.check(TokenKind::Dot) || self.check(TokenKind::DoubleColon) {
+        if self.check(TokenKind::DoubleColon) {
             self.advance();
             true
         } else {

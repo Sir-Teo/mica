@@ -4,6 +4,7 @@ mod error;
 mod lexer;
 mod pretty;
 mod parser;
+mod lower;
 mod resolve;
 mod token;
 
@@ -33,6 +34,7 @@ fn run() -> Result<()> {
             "--check" => mode = Mode::Check,
             "--pretty" => pretty = true,
             "--resolve" => mode = Mode::Resolve,
+            "--lower" => mode = Mode::Lower,
             _ => {
                 path_arg = Some(PathBuf::from(arg));
                 for extra in args {
@@ -83,6 +85,11 @@ fn run() -> Result<()> {
                 println!("adt {} = {}", adt, variants.join(" | "));
             }
         }
+        Mode::Lower => {
+            let module = parser::parse_module(&source)?;
+            let h = lower::lower_module(&module);
+            println!("{}", lower::hir_to_string(&h));
+        }
     }
 
     Ok(())
@@ -94,4 +101,5 @@ enum Mode {
     Ast,
     Check,
     Resolve,
+    Lower,
 }
