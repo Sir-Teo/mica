@@ -1,0 +1,13 @@
+module demo.adt
+
+// enum-like ADT
+pub type Option[T] = Some(T) | None
+pub type Result[T,E] = Ok(T) | Err(E)
+
+pub fn map_option[T,U](x: Option[T], f: fn(T) -> U) -> Option[U] {
+  match x {
+    Some(v) => Some(f(v)),
+    None => None,
+  }
+}
+

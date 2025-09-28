@@ -1,0 +1,15 @@
+module demo.using_demo
+
+// using with inline expression
+fn demo1(io: IO) !{io} {
+  using File::open("/tmp/x.txt", io)? {
+    io.println("opened")
+  }
+}
+
+// using with binding
+fn demo2(io: IO) !{io} {
+  using f = File::open("/tmp/y.txt", io)? {
+    io.println("opened2")
+  }
+}
