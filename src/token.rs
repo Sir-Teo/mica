@@ -59,6 +59,7 @@ pub enum TokenKind {
     Percent,
     Ampersand,
     Pipe,
+    DoubleColon,
     Question,
     Bang,
     EqEq,

@@ -47,7 +47,16 @@ impl<'a> Lexer<'a> {
                 '[' => self.simple_token(TokenKind::LBracket),
                 ']' => self.simple_token(TokenKind::RBracket),
                 ',' => self.simple_token(TokenKind::Comma),
-                ':' => self.simple_token(TokenKind::Colon),
+                ':' => {
+                    let span = self.span_start();
+                    self.bump_char();
+                    if self.peek_char() == Some(':') {
+                        self.bump_char();
+                        self.push_token(TokenKind::DoubleColon, span);
+                    } else {
+                        self.push_token(TokenKind::Colon, span);
+                    }
+                }
                 ';' => self.simple_token(TokenKind::Semi),
                 '.' => self.simple_token(TokenKind::Dot),
                 '+' => self.simple_token(TokenKind::Plus),

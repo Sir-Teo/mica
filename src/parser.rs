@@ -458,6 +458,26 @@ impl Parser {
 
     fn parse_primary(&mut self) -> Result<Expr> {
         match self.current_kind() {
+            TokenKind::Chan => {
+                // chan[T](capacity?)
+                self.advance();
+                self.expect_symbol(TokenKind::LBracket, "expected '[' after 'chan'")?;
+                let ty = self.parse_type_expr()?;
+                self.expect_symbol(TokenKind::RBracket, "expected ']' after channel type")?;
+                let capacity = if self.match_symbol(TokenKind::LParen) {
+                    if self.check(TokenKind::RParen) {
+                        self.advance();
+                        None
+                    } else {
+                        let expr = self.parse_expression()?;
+                        self.expect_symbol(TokenKind::RParen, "expected ')' after channel capacity")?;
+                        Some(expr)
+                    }
+                } else {
+                    None
+                };
+                Ok(Expr::Chan { ty: Box::new(ty), capacity: capacity.map(Box::new) })
+            }
             TokenKind::IntLiteral(value) => {
                 let value = *value;
                 self.advance();
@@ -641,10 +661,19 @@ impl Parser {
     fn parse_path_expr(&mut self) -> Result<Path> {
         let mut segments = Vec::new();
         segments.push(self.expect_identifier()?);
-        while self.match_symbol(TokenKind::Dot) {
+        while self.match_path_sep() {
             segments.push(self.expect_identifier()?);
         }
         Ok(Path { segments })
+    }
+
+    fn match_path_sep(&mut self) -> bool {
+        if self.check(TokenKind::Dot) || self.check(TokenKind::DoubleColon) {
+            self.advance();
+            true
+        } else {
+            false
+        }
     }
 
     fn parse_type_expr(&mut self) -> Result<TypeExpr> {

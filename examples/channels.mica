@@ -1,0 +1,7 @@
+module demo.channels
+
+fn make() {
+  let q = chan[Int](10)
+  q
+}
+
