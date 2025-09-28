@@ -1,0 +1,10 @@
+module demo.matching_nx
+
+type Color = Red | Green | Blue
+
+fn to_text(c: Color) -> String {
+  match c {
+    Red => "red",
+  }
+}
+

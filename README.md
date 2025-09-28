@@ -318,3 +318,8 @@ What’s covered:
 - Exhaustiveness checking for `match` against in-module ADTs
 - Pretty-printer snapshot sanity checks
 - Lowering method calls to simple HIR
+
+## Documentation
+
+- Tour: `docs/tour.md` — a quick walkthrough of the core language with examples.
+- CLI Snippets: `docs/snippets.md` — sample outputs for `--ast --pretty`, `--check`, and `--lower`.
