@@ -1,0 +1,14 @@
+module demo.match_guards
+
+type Token = Number(Int) | Word(String) | Symbol(String)
+
+// Classify tokens using pattern guards to refine matches.
+fn classify(token: Token) -> String {
+  match token {
+    Number(n) if n < 0 => "negative",
+    Number(_) => "number",
+    Word(w) if w == "mica" => "keyword",
+    Word(_) => "word",
+    Symbol(_) => "symbol",
+  }
+}

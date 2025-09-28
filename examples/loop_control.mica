@@ -1,0 +1,28 @@
+module demo.loop_control
+
+// Demonstrate `loop`, `break`, and `continue` working together.
+fn factorial(n: Int) -> Int {
+  let mut acc = 1
+  let mut i = 0
+  loop {
+    if i == 0 {
+      i = i + 1
+      continue
+    }
+    if i > n {
+      break
+    }
+    acc = acc * i
+    i = i + 1
+  }
+  acc
+}
+
+// Basic `while` countdown showing mutation inside the loop body.
+fn countdown(start: Int) -> Int {
+  let mut value = start
+  while value > 0 {
+    value = value - 1
+  }
+  value
+}

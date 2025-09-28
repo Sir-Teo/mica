@@ -1,0 +1,21 @@
+module demo.results_try
+
+type Result[T, E] = Ok(T) | Err(E)
+
+// Ensure an integer is strictly positive.
+fn ensure_positive(n: Int) -> Result[Int, String] {
+  if n > 0 { Ok(n) } else { Err("non-positive") }
+}
+
+// Use the `?` operator to propagate failures when doubling values.
+fn double_positive(n: Int) -> Result[Int, String] {
+  let value = ensure_positive(n)?
+  Ok(value * 2)
+}
+
+// Combine two checked values, propagating any error early.
+fn sum_checked(a: Int, b: Int) -> Result[Int, String] {
+  let left = ensure_positive(a)?
+  let right = ensure_positive(b)?
+  Ok(left + right)
+}
