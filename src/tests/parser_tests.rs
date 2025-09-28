@@ -109,6 +109,38 @@ fn parse_cast_and_patterns() {
 }
 
 #[test]
+fn parse_record_literal_expression() {
+    let src = r#"
+      module demo
+      type Row = { id: Int, qty: Int }
+      fn make(id: Int, qty: Int) -> Row { Row { id, qty: qty } }
+    "#;
+    let m = parse(src);
+    let f = match &m.items[1] {
+        Item::Function(f) => f,
+        _ => panic!("expected function"),
+    };
+    match &f.body.statements[0] {
+        Stmt::Expr(Expr::Record { type_path, fields }) => {
+            let ty = type_path.as_ref().expect("type path present");
+            assert_eq!(ty.segments, vec!["Row"]);
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].0, "id");
+            match &fields[0].1 {
+                Expr::Path(p) => assert_eq!(p.segments, vec!["id"]),
+                other => panic!("unexpected shorthand expr: {other:?}"),
+            }
+            assert_eq!(fields[1].0, "qty");
+            match &fields[1].1 {
+                Expr::Path(p) => assert_eq!(p.segments, vec!["qty"]),
+                _ => panic!("expected path expr"),
+            }
+        }
+        other => panic!("unexpected stmt: {other:?}"),
+    }
+}
+
+#[test]
 fn parse_impl_and_self_receiver() {
     let src = r#"
       module demo

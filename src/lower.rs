@@ -38,6 +38,7 @@ pub enum HExpr {
     Call { func: HFuncRef, args: Vec<HExpr> },
     Binary { lhs: Box<HExpr>, op: BinaryOp, rhs: Box<HExpr> },
     Block(HBlock),
+    Record { type_path: Option<Path>, fields: Vec<(String, HExpr)> },
 }
 
 #[derive(Debug, Clone)]
@@ -92,6 +93,16 @@ fn lower_expr(e: &Expr) -> HExpr {
             } else {
                 // Fallback: try to stringify callee by lowering then discarding
                 HExpr::Call { func: HFuncRef::Method("<expr>".into()), args: args.iter().map(lower_expr).collect() }
+            }
+        }
+        Expr::Record { type_path, fields } => {
+            let lowered_fields = fields
+                .iter()
+                .map(|(name, value)| (name.clone(), lower_expr(value)))
+                .collect();
+            HExpr::Record {
+                type_path: type_path.clone(),
+                fields: lowered_fields,
             }
         }
         Expr::Field { expr, name } => {
@@ -179,6 +190,30 @@ fn fmt_expr(e: &HExpr) -> String {
             let mut s = String::from("{");
             for st in &b.stmts { s.push_str(&format!(" {};",&fmt_stmt(st))); }
             s.push_str(" }");
+            s
+        }
+        HExpr::Record { type_path, fields } => {
+            let mut s = String::new();
+            if let Some(path) = type_path {
+                s.push_str(&path.segments.join("::"));
+                s.push(' ');
+            }
+            s.push('{');
+            if !fields.is_empty() {
+                s.push(' ');
+            }
+            for (i, (name, value)) in fields.iter().enumerate() {
+                if i > 0 {
+                    s.push_str(", ");
+                }
+                s.push_str(name);
+                s.push_str(": ");
+                s.push_str(&fmt_expr(value));
+            }
+            if !fields.is_empty() {
+                s.push(' ');
+            }
+            s.push('}');
             s
         }
         HExpr::Call { func, args } => {
