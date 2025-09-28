@@ -1,0 +1,10 @@
+module demo.collections
+
+// Sum a list of integers with a for-loop over an iterator
+fn sum(xs: [Int]) -> Int {
+  let mut s = 0
+  for x in xs {
+    s = s + x
+  }
+  s
+}

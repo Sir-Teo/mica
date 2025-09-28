@@ -1,0 +1,12 @@
+module demo.matching
+
+type Color = Red | Green | Blue
+
+// Exhaustive match returns a string label for each variant
+fn to_text(c: Color) -> String {
+  match c {
+    Red => "red",
+    Green => "green",
+    Blue => "blue",
+  }
+}

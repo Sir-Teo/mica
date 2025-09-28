@@ -1,0 +1,6 @@
+module demo.concurrent
+
+// Demonstrate structured concurrency primitives
+fn fetch(u: String, net: Net) -> Bytes !{net} {
+  await spawn http::get(u, net)
+}

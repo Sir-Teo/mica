@@ -1,0 +1,11 @@
+module demo.generics
+
+type Pair[T] = { a: T, b: T }
+
+// Generic max with a single trait bound
+fn max[T: Ord](a: T, b: T) -> T {
+  if a < b { b } else { a }
+}
+
+// Call with concrete type
+fn use_max() { max(1, 2) }

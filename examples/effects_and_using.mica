@@ -1,0 +1,13 @@
+module demo.effects
+
+fn open_and_print(io: IO) !{io} {
+  using File::open("/tmp/example.txt", io)? {
+    io.println("opened ok")
+  }
+}
+
+// function type with effect row as parameter
+fn run_with(callback: fn(Int) -> Int !{io}, io: IO) !{io} {
+  let _ = callback(42)
+}
+

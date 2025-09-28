@@ -283,6 +283,28 @@ fn copy_file(src: String, dst: String, io: IO) -> Result[Unit, String] !{io} {
 - Impl and bounds: `examples/impls.mica`
 - Casts and patterns: `examples/cast_and_patterns.mica`
 - Methods + self receiver: `examples/methods.mica`
+- Generics + bounds: `examples/generics_bounds.mica`
+- Effects + using + fn type effects: `examples/effects_and_using.mica`
+- Exhaustive ADT match: `examples/adt_match_exhaustive.mica`
+- Spawn + await: `examples/spawn_await.mica`
+- Lists + loops: `examples/lists_and_loops.mica`
+
+## Language Guide (Prototype)
+
+- ADTs and pattern matching
+  - Define sum types with `type T = A(Int) | B(String)`.
+  - Match is exhaustive; the checker warns on missing variants. See `examples/adt_match_exhaustive.mica`.
+- Effects and resources
+  - Functions annotate `!{io, net}`; capabilities are explicit params.
+  - RAII cleanup via `using` blocks; `?` propagates `Result`. See `examples/effects_and_using.mica`.
+- Concurrency primitives
+  - `spawn` returns a task; `await` joins within structure. See `examples/spawn_await.mica`.
+- Generics and trait bounds
+  - Single bound syntax: `fn max[T: Ord](...)` and impl blocks. See `examples/generics_bounds.mica`, `examples/impls.mica`.
+- Collections and loops
+  - List type `[T]` and `for` loops over iterables. See `examples/lists_and_loops.mica`.
+- Methods and receivers
+  - `impl Trait for Type { fn f(self, ...) }`; method calls lower to simple HIR. See `examples/methods.mica` and `--lower`.
 
 ## Tests
 
