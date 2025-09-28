@@ -36,6 +36,9 @@ impl Parser {
         } else if self.match_keyword(TokenKind::Type) {
             let alias = self.parse_type_alias(false)?;
             Ok(Item::TypeAlias(alias))
+        } else if self.match_keyword(TokenKind::Impl) {
+            let ib = self.parse_impl_block()?;
+            Ok(Item::Impl(ib))
         } else if self.match_keyword(TokenKind::Pub) {
             if self.check(TokenKind::Fn) {
                 self.advance();
@@ -45,6 +48,10 @@ impl Parser {
                 self.advance();
                 let alias = self.parse_type_alias(true)?;
                 Ok(Item::TypeAlias(alias))
+            } else if self.check(TokenKind::Impl) {
+                self.advance();
+                let ib = self.parse_impl_block()?;
+                Ok(Item::Impl(ib))
             } else {
                 Err(self.error_here("expected 'fn' or 'type' after 'pub'"))
             }
@@ -54,6 +61,29 @@ impl Parser {
         } else {
             Err(self.error_here("unexpected item"))
         }
+    }
+
+    fn parse_impl_block(&mut self) -> Result<ImplBlock> {
+        // impl TraitPath for TypeExpr { items }
+        let trait_path = self.parse_path_expr()?;
+        self.expect_keyword(TokenKind::For, "expected 'for' in impl header")?;
+        let for_type = self.parse_type_expr()?;
+        self.expect_symbol(TokenKind::LBrace, "expected '{' to start impl body")?;
+        let mut items = Vec::new();
+        while !self.check(TokenKind::RBrace) && !self.check(TokenKind::Eof) {
+            if self.match_keyword(TokenKind::Fn) {
+                let f = self.parse_function(false)?;
+                items.push(ImplItem::Function(f));
+            } else if self.match_keyword(TokenKind::Pub) && self.check(TokenKind::Fn) {
+                self.advance();
+                let f = self.parse_function(true)?;
+                items.push(ImplItem::Function(f));
+            } else {
+                return Err(self.error_here("only functions are allowed in impl blocks for now"));
+            }
+        }
+        self.expect_symbol(TokenKind::RBrace, "expected '}' to close impl block")?;
+        Ok(ImplBlock { trait_path, for_type, items })
     }
 
     fn parse_use_decl(&mut self) -> Result<UseDecl> {
@@ -154,7 +184,14 @@ impl Parser {
             let mut params = Vec::new();
             if !self.check(TokenKind::RBracket) {
                 loop {
-                    params.push(self.expect_identifier()?);
+                    let name = self.expect_identifier()?;
+                    let mut bounds = Vec::new();
+                    if self.match_symbol(TokenKind::Colon) {
+                        // Single bound path like T: Ord or T: a.b.Ord
+                        let path = self.parse_path_expr()?;
+                        bounds.push(path);
+                    }
+                    params.push(GenericParam { name, bounds });
                     if self.match_symbol(TokenKind::Comma) {
                         continue;
                     }
@@ -483,10 +520,23 @@ impl Parser {
                     }
                 }
                 self.expect_symbol(TokenKind::RParen, "expected ')' after call arguments")?;
-                expr = Expr::Call {
-                    callee: Box::new(expr),
-                    args,
-                };
+                // If callee is a path with Capitalized last segment, treat as ADT constructor
+                let is_ctor = matches!(
+                    expr,
+                    Expr::Path(Path { ref segments }) if segments.last().and_then(|s| s.chars().next()).map(|c| c.is_ascii_uppercase()).unwrap_or(false)
+                );
+                if is_ctor {
+                    if let Expr::Path(path) = expr {
+                        expr = Expr::Ctor { path, args };
+                    } else {
+                        unreachable!();
+                    }
+                } else {
+                    expr = Expr::Call {
+                        callee: Box::new(expr),
+                        args,
+                    };
+                }
             } else if self.match_symbol(TokenKind::Dot) {
                 let name = self.expect_identifier()?;
                 expr = Expr::Field {

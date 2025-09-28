@@ -1,6 +1,8 @@
 mod ast;
+mod check;
 mod error;
 mod lexer;
+mod pretty;
 mod parser;
 mod token;
 
@@ -20,12 +22,15 @@ fn main() {
 fn run() -> Result<()> {
     let mut args = env::args().skip(1);
     let mut mode = Mode::Ast;
+    let mut pretty = false;
     let mut path_arg = None;
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--tokens" => mode = Mode::Tokens,
             "--ast" => mode = Mode::Ast,
+            "--check" => mode = Mode::Check,
+            "--pretty" => pretty = true,
             _ => {
                 path_arg = Some(PathBuf::from(arg));
                 for extra in args {
@@ -53,7 +58,20 @@ fn run() -> Result<()> {
         }
         Mode::Ast => {
             let module = parser::parse_module(&source)?;
-            println!("{:#?}", module);
+            if pretty {
+                println!("{}", pretty::module_to_string(&module));
+            } else {
+                println!("{:#?}", module);
+            }
+        }
+        Mode::Check => {
+            let module = parser::parse_module(&source)?;
+            let diags = check::check_exhaustiveness(&module);
+            if diags.is_empty() {
+                println!("ok");
+            } else {
+                for d in diags { println!("warning: {}", d.message); }
+            }
         }
     }
 
@@ -64,4 +82,5 @@ fn run() -> Result<()> {
 enum Mode {
     Tokens,
     Ast,
+    Check,
 }

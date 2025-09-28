@@ -1,0 +1,14 @@
+module demo.impls
+
+type Point = { x: Int, y: Int }
+
+impl Ord for Point {
+  fn cmp(a: Point, b: Point) -> Int {
+    if a.x == b.x { 0 } else { if a.x < b.x { -1 } else { 1 } }
+  }
+}
+
+fn max[T: Ord](a: T, b: T) -> T {
+  if a < b { b } else { a }
+}
+

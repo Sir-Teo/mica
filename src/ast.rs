@@ -14,6 +14,7 @@ pub enum Item {
     Function(Function),
     TypeAlias(TypeAlias),
     Use(UseDecl),
+    Impl(ImplBlock),
 }
 
 #[derive(Debug, Clone)]
@@ -60,11 +61,17 @@ pub struct TypeVariant {
 pub struct Function {
     pub is_public: bool,
     pub name: String,
-    pub generics: Vec<String>,
+    pub generics: Vec<GenericParam>,
     pub params: Vec<Param>,
     pub return_type: Option<TypeExpr>,
     pub effect_row: Vec<String>,
     pub body: Block,
+}
+
+#[derive(Debug, Clone)]
+pub struct GenericParam {
+    pub name: String,
+    pub bounds: Vec<Path>,
 }
 
 #[derive(Debug, Clone)]
@@ -111,6 +118,10 @@ pub enum Expr {
     },
     Call {
         callee: Box<Expr>,
+        args: Vec<Expr>,
+    },
+    Ctor {
+        path: Path,
         args: Vec<Expr>,
     },
     Field {
@@ -163,6 +174,18 @@ pub enum Expr {
 #[derive(Debug, Clone)]
 pub struct Path {
     pub segments: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImplBlock {
+    pub trait_path: Path,
+    pub for_type: TypeExpr,
+    pub items: Vec<ImplItem>,
+}
+
+#[derive(Debug, Clone)]
+pub enum ImplItem {
+    Function(Function),
 }
 
 #[derive(Debug, Clone)]
