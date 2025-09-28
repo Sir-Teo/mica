@@ -555,6 +555,48 @@ impl Parser {
                         args,
                     };
                 }
+            } else if self.check(TokenKind::LBrace) {
+                if let Expr::Path(path) = &expr {
+                    let is_type_like = path
+                        .segments
+                        .last()
+                        .and_then(|s| s.chars().next())
+                        .map(|c| c.is_ascii_uppercase())
+                        .unwrap_or(false);
+                    if !is_type_like {
+                        break;
+                    }
+                    let type_path = path.clone();
+                    self.advance();
+                    let mut fields = Vec::new();
+                    if !self.check(TokenKind::RBrace) {
+                        loop {
+                            let name = self.expect_identifier()?;
+                            let value = if self.match_symbol(TokenKind::Colon) {
+                                self.parse_expression()?
+                            } else {
+                                Expr::Path(Path {
+                                    segments: vec![name.clone()],
+                                })
+                            };
+                            fields.push((name, value));
+                            if self.match_symbol(TokenKind::Comma) {
+                                continue;
+                            }
+                            break;
+                        }
+                    }
+                    self.expect_symbol(
+                        TokenKind::RBrace,
+                        "expected '}' after record fields",
+                    )?;
+                    expr = Expr::Record {
+                        type_path: Some(type_path),
+                        fields,
+                    };
+                } else {
+                    break;
+                }
             } else if self.match_symbol(TokenKind::Dot) {
                 let name = self.expect_identifier()?;
                 expr = Expr::Field {

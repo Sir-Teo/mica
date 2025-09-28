@@ -59,6 +59,11 @@ fn visit_expr(expr: &Expr, adts: &[(String, Vec<String>)], diags: &mut Vec<Diagn
         Expr::Call { callee, args } => { visit_expr(callee, adts, diags); for a in args { visit_expr(a, adts, diags) } }
         Expr::Ctor { args, .. } => { for a in args { visit_expr(a, adts, diags) } }
         Expr::Field { expr, .. } => visit_expr(expr, adts, diags),
+        Expr::Record { fields, .. } => {
+            for (_, value) in fields {
+                visit_expr(value, adts, diags);
+            }
+        }
         Expr::Index { expr, index } => { visit_expr(expr, adts, diags); visit_expr(index, adts, diags) }
         Expr::If { condition, then_branch, else_branch } => { visit_expr(condition, adts, diags); visit_expr(then_branch, adts, diags); if let Some(e) = else_branch { visit_expr(e, adts, diags) } }
         Expr::For { iterable, body, .. } => { visit_expr(iterable, adts, diags); visit_expr(body, adts, diags) }

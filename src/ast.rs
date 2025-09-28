@@ -125,6 +125,10 @@ pub enum Expr {
         path: Path,
         args: Vec<Expr>,
     },
+    Record {
+        type_path: Option<Path>,
+        fields: Vec<(String, Expr)>,
+    },
     Field {
         expr: Box<Expr>,
         name: String,

@@ -107,6 +107,10 @@ fn lower_covers_all_expression_kinds() {
                 path: path(["Option", "Some"]),
                 args: vec![literal_int(12)],
             }),
+            Stmt::Expr(Expr::Record {
+                type_path: Some(path(["Row"])),
+                fields: vec![("value".into(), literal_int(19))],
+            }),
             Stmt::Expr(Expr::Match {
                 scrutinee: Box::new(Expr::Path(path(["value"]))),
                 arms: vec![MatchArm {
@@ -173,6 +177,7 @@ fn lower_covers_all_expression_kinds() {
     assert!(dump.contains("chan()"));
     assert!(dump.contains("using(try(File::open), { true; })"));
     assert!(dump.contains("Option::Some(12)"));
+    assert!(dump.contains("Row { value: 19 }"));
     assert!(dump.contains("match()"));
     assert!(dump.contains("for()"));
     assert!(dump.contains("while()"));
