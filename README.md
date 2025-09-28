@@ -323,3 +323,8 @@ What’s covered:
 
 - Tour: `docs/tour.md` — a quick walkthrough of the core language with examples.
 - CLI Snippets: `docs/snippets.md` — sample outputs for `--ast --pretty`, `--check`, and `--lower`.
+
+### Keeping docs in sync
+
+- Regenerate CLI snippets: `cargo run --bin gen_snippets`
+- Verify snippets are up-to-date (CI does this too): `cargo run --bin gen_snippets -- --check`

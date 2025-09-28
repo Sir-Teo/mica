@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cargo build
+        run: cargo build --locked
+
+      - name: Cargo test
+        run: cargo test --locked
+
+      - name: Check CLI snippets up-to-date
+        run: cargo run --quiet --bin gen_snippets -- --check
+
