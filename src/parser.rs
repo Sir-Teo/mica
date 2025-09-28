@@ -88,13 +88,64 @@ impl Parser {
             Vec::new()
         };
         self.expect_symbol(TokenKind::Assign, "expected '=' in type alias")?;
-        let value = self.parse_type_expr()?;
+        let value = self.parse_type_alias_value()?;
         Ok(TypeAlias {
             is_public,
             name,
             params,
             value,
         })
+    }
+
+    fn parse_type_alias_value(&mut self) -> Result<TypeExpr> {
+        let saved = self.pos;
+        if let Some(first) = self.try_parse_type_variant() {
+            if self.match_symbol(TokenKind::Pipe) {
+                let mut variants = vec![first];
+                loop {
+                    variants.push(self.parse_type_variant()?);
+                    if self.match_symbol(TokenKind::Pipe) {
+                        continue;
+                    }
+                    break;
+                }
+                return Ok(TypeExpr::Sum(variants));
+            } else {
+                // Not actually a sum type; revert and parse as a regular type expression
+                self.pos = saved;
+            }
+        }
+        self.parse_type_expr()
+    }
+
+    fn parse_type_variant(&mut self) -> Result<TypeVariant> {
+        let name = self.expect_identifier()?;
+        let mut fields = Vec::new();
+        if self.match_symbol(TokenKind::LParen) {
+            if !self.check(TokenKind::RParen) {
+                loop {
+                    fields.push(self.parse_type_expr()?);
+                    if self.match_symbol(TokenKind::Comma) {
+                        continue;
+                    }
+                    break;
+                }
+            }
+            self.expect_symbol(TokenKind::RParen, "expected ')' after variant fields")?;
+        }
+        Ok(TypeVariant { name, fields })
+    }
+
+    fn try_parse_type_variant(&mut self) -> Option<TypeVariant> {
+        let saved = self.pos;
+        let parsed = self.parse_type_variant();
+        match parsed {
+            Ok(v) => Some(v),
+            Err(_) => {
+                self.pos = saved;
+                None
+            }
+        }
     }
 
     fn parse_function(&mut self, is_public: bool) -> Result<Function> {
@@ -449,6 +500,8 @@ impl Parser {
                     expr: Box::new(expr),
                     index: Box::new(index),
                 };
+            } else if self.match_symbol(TokenKind::Question) {
+                expr = Expr::Try(Box::new(expr));
             } else {
                 break;
             }
@@ -519,6 +572,26 @@ impl Parser {
             TokenKind::While => self.parse_while_expr(),
             TokenKind::For => self.parse_for_expr(),
             TokenKind::Match => self.parse_match_expr(),
+            TokenKind::Using => {
+                // using IDENT? (= EXPR)? { block }
+                self.advance();
+                let (binding, expr) = if matches!(self.current_kind(), TokenKind::Identifier(_))
+                    && matches!(self.peek_kind(1), Some(TokenKind::Assign))
+                {
+                    // using x = expr { ... }
+                    let name = self.expect_identifier()?;
+                    self.expect_symbol(TokenKind::Assign, "expected '=' after identifier in using")?;
+                    let e = self.parse_expression()?;
+                    (Some(name), e)
+                } else if !self.check(TokenKind::LBrace) {
+                    // using expr { ... }
+                    (None, self.parse_expression()?)
+                } else {
+                    return Err(self.error_here("expected expression after 'using'"));
+                };
+                let body = self.parse_block()?;
+                Ok(Expr::Using { binding, expr: Box::new(expr), body })
+            }
             TokenKind::LBrace => {
                 let block = self.parse_block()?;
                 Ok(Expr::Block(block))
@@ -631,7 +704,12 @@ impl Parser {
                     self.expect_symbol(TokenKind::RParen, "expected ')' in pattern")?;
                     Ok(Pattern::EnumVariant { path, fields })
                 } else if path.segments.len() == 1 {
-                    Ok(Pattern::Binding(path.segments.into_iter().next().unwrap()))
+                    let single = path.segments.into_iter().next().unwrap();
+                    if single.chars().next().map(|c| c.is_ascii_uppercase()).unwrap_or(false) {
+                        Ok(Pattern::EnumVariant { path: Path { segments: vec![single] }, fields: Vec::new() })
+                    } else {
+                        Ok(Pattern::Binding(single))
+                    }
                 } else {
                     Ok(Pattern::EnumVariant {
                         path,
@@ -677,6 +755,12 @@ impl Parser {
     }
 
     fn parse_type_expr(&mut self) -> Result<TypeExpr> {
+        if self.match_symbol(TokenKind::LBracket) {
+            // List type: [T]
+            let inner = self.parse_type_expr()?;
+            self.expect_symbol(TokenKind::RBracket, "expected ']' to close list type")?;
+            return Ok(TypeExpr::List(Box::new(inner)));
+        }
         if self.match_keyword(TokenKind::Fn) {
             self.expect_symbol(
                 TokenKind::LParen,

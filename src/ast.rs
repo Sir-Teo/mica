@@ -35,6 +35,7 @@ pub enum TypeExpr {
     Name(String),
     Generic(String, Vec<TypeExpr>),
     Record(Vec<(String, TypeExpr)>),
+    Sum(Vec<TypeVariant>),
     List(Box<TypeExpr>),
     Tuple(Vec<TypeExpr>),
     Reference {
@@ -47,6 +48,12 @@ pub enum TypeExpr {
         effect_row: Vec<String>,
     },
     Unit,
+}
+
+#[derive(Debug, Clone)]
+pub struct TypeVariant {
+    pub name: String,
+    pub fields: Vec<TypeExpr>,
 }
 
 #[derive(Debug, Clone)]
@@ -145,6 +152,12 @@ pub enum Expr {
         ty: Box<TypeExpr>,
         capacity: Option<Box<Expr>>,
     },
+    Using {
+        binding: Option<String>,
+        expr: Box<Expr>,
+        body: Block,
+    },
+    Try(Box<Expr>),
 }
 
 #[derive(Debug, Clone)]
