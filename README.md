@@ -258,3 +258,12 @@ fn copy_file(src: String, dst: String, io: IO) -> Result[Unit, String] !{io} {
 * No exceptions, reflection, macros, or runtime type erasure in core.
 * No implicit global randomness/time.
 * No hidden threads or green-thread scheduler; concurrency is explicit and structured.
+
+---
+
+# trying it (prototype parser)
+
+- Build: `cargo build`
+- Tokens: `cargo run -- --tokens examples/demo.mica`
+- AST: `cargo run -- --ast examples/demo.mica`
+- Extra example: `cargo run -- --ast examples/channels.mica`
