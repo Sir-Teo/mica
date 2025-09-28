@@ -1,0 +1,152 @@
+use super::*;
+use super::helpers::*;
+
+fn exhaustive_module() -> Module {
+    let match_expr = Expr::Match {
+        scrutinee: Box::new(Expr::Path(path(["state"]))),
+        arms: vec![
+            MatchArm {
+                pattern: Pattern::EnumVariant {
+                    path: path(["State", "Idle"]),
+                    fields: vec![],
+                },
+                guard: None,
+                body: literal_int(1),
+            },
+            MatchArm {
+                pattern: Pattern::Binding("other".into()),
+                guard: None,
+                body: literal_int(2),
+            },
+        ],
+    };
+
+    let body = Block {
+        statements: vec![
+            Stmt::Expr(match_expr),
+            Stmt::Expr(Expr::Block(Block {
+                statements: vec![Stmt::Expr(literal_int(3))],
+            })),
+            Stmt::Expr(Expr::Ctor {
+                path: path(["State", "Busy"]),
+                args: vec![literal_int(4)],
+            }),
+            Stmt::Expr(Expr::Field {
+                expr: Box::new(Expr::Path(path(["value"]))),
+                name: "len".into(),
+            }),
+            Stmt::Expr(Expr::Index {
+                expr: Box::new(Expr::Path(path(["items"]))),
+                index: Box::new(literal_int(0)),
+            }),
+            Stmt::Expr(Expr::If {
+                condition: Box::new(literal_bool(true)),
+                then_branch: Box::new(literal_int(5)),
+                else_branch: Some(Box::new(literal_int(6))),
+            }),
+            Stmt::Expr(Expr::For {
+                binding: "x".into(),
+                iterable: Box::new(Expr::Path(path(["items"]))),
+                body: Box::new(literal_int(7)),
+            }),
+            Stmt::Expr(Expr::While {
+                condition: Box::new(literal_bool(true)),
+                body: Box::new(literal_int(8)),
+            }),
+            Stmt::Expr(Expr::Loop {
+                body: Box::new(literal_int(9)),
+            }),
+            Stmt::Expr(Expr::Assignment {
+                target: Box::new(Expr::Path(path(["value"]))),
+                value: Box::new(literal_int(10)),
+            }),
+            Stmt::Expr(Expr::Spawn(Box::new(Expr::Path(path(["task"]))))),
+            Stmt::Expr(Expr::Await(Box::new(Expr::Path(path(["task"]))))),
+            Stmt::Expr(Expr::Try(Box::new(Expr::Path(path(["task"]))))),
+            Stmt::Expr(Expr::Chan {
+                ty: Box::new(TypeExpr::Name("Int".into())),
+                capacity: Some(Box::new(literal_int(1))),
+            }),
+            Stmt::Expr(Expr::Using {
+                binding: None,
+                expr: Box::new(Expr::Path(path(["guard"]))),
+                body: Block {
+                    statements: vec![Stmt::Let(LetStmt {
+                        mutable: false,
+                        name: "v".into(),
+                        value: literal_int(11),
+                    })],
+                },
+            }),
+        ],
+    };
+
+    Module {
+        name: vec!["demo".into()],
+        items: vec![
+            Item::TypeAlias(TypeAlias {
+                is_public: false,
+                name: "State".into(),
+                params: vec![],
+                value: TypeExpr::Sum(vec![
+                    TypeVariant {
+                        name: "Idle".into(),
+                        fields: vec![],
+                    },
+                    TypeVariant {
+                        name: "Busy".into(),
+                        fields: vec![TypeExpr::Name("Int".into())],
+                    },
+                ]),
+            }),
+            Item::Function(Function {
+                is_public: false,
+                name: "drive".into(),
+                generics: vec![],
+                params: vec![Param {
+                    name: "state".into(),
+                    mutable: false,
+                    ty: TypeExpr::Name("State".into()),
+                }],
+                return_type: Some(TypeExpr::Name("Int".into())),
+                effect_row: vec![],
+                body,
+            }),
+        ],
+    }
+}
+
+#[test]
+fn resolve_adts() {
+    let m = parse("module m\ntype A = X | Y");
+    let r = resolve::resolve_module(&m);
+    assert!(r.adts.contains_key("A"));
+    assert_eq!(r.adts["A"], vec!["X".to_string(), "Y".to_string()]);
+}
+
+#[test]
+fn exhaustiveness_checker() {
+    let m1 = parse("module m\ntype S = A | B\nfn f(x: S) -> Int { match x { A => 1 } }");
+    let diags = check::check_exhaustiveness(&m1);
+    assert!(!diags.is_empty());
+
+    let m2 =
+        parse("module m\ntype S = A | B\nfn f(x: S) -> Int { match x { A => 1, B => 2 } }");
+    let diags2 = check::check_exhaustiveness(&m2);
+    assert!(diags2.is_empty());
+}
+
+#[test]
+fn resolve_and_check_visit_every_path() {
+    let module = exhaustive_module();
+    let resolved = resolve::resolve_module(&module);
+    assert!(resolved.adts.contains_key("State"));
+    let idle = resolved
+        .variant_to_adt
+        .get("Idle")
+        .expect("Idle variant tracked");
+    assert_eq!(idle, &vec![String::from("State")]);
+
+    let diags = check::check_exhaustiveness(&module);
+    assert!(diags.is_empty(), "expected no diagnostics, got {diags:?}");
+}
