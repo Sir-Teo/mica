@@ -11,6 +11,26 @@ here’s a clean, minimal-but-complete language design I think could age well. i
 
 ---
 
+## vision: building blocks for the next wave
+
+Mica is intentionally compact today so we can grow it into something much more ambitious tomorrow. The current design is the
+seed of a language that:
+
+- **Treats reliability as an architectural concern**. Explicit effects and capabilities are the scaffolding for future
+  verifiability work—model checking structured tasks, replayable IO logs, and deterministic deploys.
+- **Balances human-factors and performance**. A small expression-only surface keeps cognitive load low while giving the
+  compiler room for advanced inference, borrow analysis, and eventual auto-tuning of data-parallel sections.
+- **Welcomes polyglot systems**. By locking in C ABI stability and message-based foreign tasks now, we can layer richer
+  interop (e.g., typed Arrow pipelines, GPU capability negotiation) without breaking safety guarantees.
+- **Invites auditable automation**. The same lossless AST and structured diagnostics that power the formatter today enable
+  future refactoring bots, effect-driven code search, and “explainable compiler” tooling.
+
+The roadmap doubles as a research ledger: every concrete milestone is paired with a hypothesis about what the next decade of
+systems programming should feel like. We build the boring-but-essential pieces first so that later experiments—capability-safe
+AI calls, deterministic ML training loops, verified governance modules—land on bedrock.
+
+---
+
 # core model
 
 * **Evaluation**: call-by-value; expressions only (statements are sugar for expressions).
@@ -228,20 +248,60 @@ fn copy_file(src: String, dst: String, io: IO) -> Result[Unit, String] !{io} {
 
 # why this could be “the future”
 
-* **Minimal core + explicit effects** scales from scripts to kernels without changing languages.
-* **Determinism by default** makes parallel programs testable and reproducible (a must for ML/data).
-* **Resource & capability model** gives precise control (files, nets, GPUs) without foot-guns.
-* **Interoperability boundaries** reflect real systems (safe Python/JS embedding; C where it counts).
-* **Row-polymorphic records + ADTs** keep the type system expressive yet entirely inference-friendly.
+The current feature set isn’t nostalgia—it’s a launchpad. Each non-negotiable is chosen because it unlocks a concrete, future
+facing capability:
+
+* **Minimal core + explicit effects** keeps the language teachable today while enabling capability-sensitive scheduling,
+  replay, and formal verification later.
+* **Determinism by default** makes parallel programs testable and reproducible (critical for ML/data and financial workloads);
+  future compiler passes can safely auto-parallelize pure regions without surprising users.
+* **Resource & capability model** gives precise control (files, nets, GPUs) without foot-guns, and sets the stage for
+  capability marketplaces or audited third-party service access.
+* **Interoperability boundaries** mirror real systems (safe Python/JS embedding; C where it counts) so we can explore richer
+  polyglot runtimes, typed data pipes, and progressive migration stories.
+* **Row-polymorphic records + ADTs** keep the type system expressive yet inference-friendly, paving the way for effect-aware
+  macros, synthesis tools, and dependent-like refinements without sacrificing approachability.
+
+Taken together, Mica aims to feel like the missing convergence point between Rust’s safety, Haskell’s purity, Erlang’s
+predictability, and modern data engineering expectations.
 
 ---
 
-# implementation sketch
+# implementation roadmap
 
-* Frontend: parser + HM type inference + effect row unification + borrow checker (lifetime inference only).
-* MIR: SSA-like IR with explicit effects; purity tagging for auto-parallelization of `par` loops.
-* Backend: LLVM; link to libc; thin wrappers for epoll/kqueue/IOCP in `net`.
-* Tooling: LSP server; deterministic build graph; doc generator from types/effects/examples.
+The implementation roadmap now lives in [`docs/roadmap/`](docs/roadmap/). The tables below summarize the highlights; dive into the dedicated files for detailed task breakdowns, dependencies, and exit criteria.
+
+## implementation plan by module
+
+| Module | Primary focus | Near-term deliverables | Detailed plan |
+| --- | --- | --- | --- |
+| Lexer & tokens | Streaming UTF-8 lexing with spans and incremental re-lex hooks. | Token catalogue, zero-copy cursor, snapshot tests for literals/effects. | [`compiler.md`](docs/roadmap/compiler.md#1-lexer--token-infrastructure-srclexerrs-srctokenrs) |
+| Parser & AST | Recursive-descent parser with lossless mode. | Pratt table, recovery hooks, round-trip formatting tests. | [`compiler.md`](docs/roadmap/compiler.md#2-parser--ast-srcparserrs-srcastrs) |
+| Resolver | Module/type/value capability tracking. | Two-phase symbol resolution, IDE lookup tables. | [`compiler.md`](docs/roadmap/compiler.md#3-resolver-srcresolverrs) |
+| Type & effect checker | Hindley–Milner + traits + borrow checker. | Row-polymorphic unification, capability diagnostics, negative tests. | [`compiler.md`](docs/roadmap/compiler.md#4-type--effect-checker-srccheckrs) |
+| Lowering & IR | SSA-like IR with effect metadata. | IR data model, purity analysis, snapshot suite. | [`compiler.md`](docs/roadmap/compiler.md#5-lowering--intermediate-representation-srclowerrs-srcir) |
+| Backend & runtime | LLVM codegen and capability shims. | `mica build/run`, deterministic task runtime. | [`compiler.md`](docs/roadmap/compiler.md#6-backend--runtime-interface-srcbackend-runtime) |
+| Formatter | Deterministic formatting & range support. | CST facade, idempotence tests, CLI integration. | [`compiler.md`](docs/roadmap/compiler.md#7-formatter--pretty-printer-srcprettyrs) |
+| CLI | Unified subcommands + JSON output. | Pipeline caching, structured exit codes, snapshot tests. | [`compiler.md`](docs/roadmap/compiler.md#8-command-line-interface-srcbinmicars-srcmainrs) and [`tooling.md`](docs/roadmap/tooling.md#command-line-interface-enhancements) |
+| Tooling & quality | Formatter, linting, LSP, CI automation. | Formatter/linter rules, LSP server, coverage/fuzzing. | [`tooling.md`](docs/roadmap/tooling.md) |
+| Ecosystem & interop | Standard library waves, package manager, FFI. | `mica.toml` spec, registry prototype, Python/JS adapters. | [`ecosystem.md`](docs/roadmap/ecosystem.md) |
+
+Each detailed module plan lists objectives, concrete tasks, dependencies, exit criteria, and the longer-horizon experiments we
+expect to unlock when the groundwork is finished.
+
+## phased execution guide
+
+| Phase | Goal | Entry criteria | Exit criteria | Reference |
+| --- | --- | --- | --- | --- |
+| 0 — Foundations | Bootstrap lexer + parser and CI skeleton. | Vision + plans ratified. | Parser round-trips examples; CI enforces lint/tests. | [`milestones.md`](docs/roadmap/milestones.md#phase-0--foundations) |
+| 1 — Semantic Core | Resolver + type/effect checker. | Phase 0 exits met. | `mica --check` passes suite; borrow checker blocks misuse. | [`milestones.md`](docs/roadmap/milestones.md#phase-1--semantic-core) |
+| 2 — IR | Lowering pipeline + purity analysis. | Stable checker & diagnostics. | IR snapshots cover major constructs; purity analysis flags effect-free regions. | [`milestones.md`](docs/roadmap/milestones.md#phase-2--intermediate-representation) |
+| 3 — Backend & Runtime | LLVM backend + runtime shims. | IR stable, tests green. | Native binaries for examples; structured runtime errors. | [`milestones.md`](docs/roadmap/milestones.md#phase-3--backend--runtime) |
+| 4 — Tooling & IDE | Formatter, LSP, hardened testing. | Backend shipping binaries. | VS Code demo; CI matrix enforces fmt/lint/tests/docs/coverage. | [`milestones.md`](docs/roadmap/milestones.md#phase-4--tooling--ide) |
+| 5 — Ecosystem Launch | Packages, interop, stdlib waves. | Tooling stable, docs pipeline live. | Public beta; external contributors landing PRs. | [`milestones.md`](docs/roadmap/milestones.md#phase-5--ecosystem-launch) |
+| 6 — Growth | Feedback loops, extended libraries. | Ecosystem launched. | Quarterly roadmap reviews; adoption metrics tracked. | [`milestones.md`](docs/roadmap/milestones.md#phase-6--growth--feedback-loops) |
+
+For tactical task lists, staffing notes, and acceptance tests per milestone, consult [`docs/roadmap/milestones.md`](docs/roadmap/milestones.md).
 
 ---
 
