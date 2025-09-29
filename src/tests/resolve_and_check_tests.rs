@@ -315,6 +315,71 @@ fn type_alias_function_effect_row_records_capabilities() {
 }
 
 #[test]
+fn resolve_across_modules_uses_workspace_exports() {
+    let provider = parse(
+        "module provider\n\
+         pub type Number = Int\n\
+         pub fn zero() -> Number {\n\
+           0\n\
+         }\n",
+    );
+
+    let consumer = parse(
+        "module consumer\n\
+         use provider.Number;\n\
+         fn fetch() -> Number {\n\
+           provider::zero()\n\
+         }\n",
+    );
+
+    let results = resolve::resolve_modules([&provider, &consumer]);
+    let consumer_resolved = results
+        .get(&vec!["consumer".into()])
+        .expect("consumer module resolved");
+
+    assert!(consumer_resolved
+        .imports
+        .iter()
+        .any(|import| import.path == vec!["provider".to_string(), "Number".to_string()]));
+
+    let number_alias = consumer_resolved
+        .resolved_paths
+        .iter()
+        .find(|path| path.segments == vec!["Number".to_string()])
+        .expect("resolved path recorded for imported type alias");
+    let alias_symbol = number_alias
+        .resolved
+        .as_ref()
+        .expect("import alias resolves to symbol info");
+    match &alias_symbol.category {
+        SymbolCategory::ImportAlias { target } => {
+            assert_eq!(
+                target,
+                &vec!["provider".to_string(), "Number".to_string()]
+            )
+        }
+        other => panic!("expected import alias symbol, got {other:?}"),
+    }
+
+    let provider_call = consumer_resolved
+        .resolved_paths
+        .iter()
+        .find(|path| path.segments == vec!["provider".to_string(), "zero".to_string()])
+        .expect("resolved path recorded for cross-module function call");
+    let resolved_symbol = provider_call
+        .resolved
+        .as_ref()
+        .expect("cross-module function resolves to symbol info");
+    match &resolved_symbol.category {
+        SymbolCategory::Function { is_public } => assert!(
+            *is_public,
+            "expected to resolve a public function exported from provider"
+        ),
+        other => panic!("expected function symbol, got {other:?}"),
+    }
+}
+
+#[test]
 fn resolve_variants_in_match_patterns_without_prefix() {
     let module = parse(
         "module demo\n\
