@@ -9,6 +9,7 @@ pub struct Resolved {
     pub symbols: Vec<SymbolInfo>,
     pub resolved_paths: Vec<ResolvedPath>,
     pub capabilities: Vec<CapabilityBinding>,
+    pub diagnostics: Vec<ResolveDiagnostic>,
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +88,14 @@ pub enum CapabilityScope {
         module_path: Vec<String>,
         type_name: String,
     },
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolveDiagnostic {
+    pub path: Vec<String>,
+    pub kind: PathKind,
+    pub scope: SymbolScope,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Default)]
