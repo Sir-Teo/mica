@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crate::lower::{HBlock, HExpr, HFuncRef, HFunction, HItem, HModule, HStmt};
-use crate::syntax::ast::{BinaryOp, Literal, Path};
+use crate::lower::{HBlock, HExpr, HFuncRef, HFunction, HItem, HModule, HParam, HStmt};
+use crate::syntax::ast::{BinaryOp, Literal, Path, TypeExpr};
 
 #[derive(Debug, Clone)]
 pub struct Module {
@@ -15,6 +15,7 @@ pub struct Function {
     pub params: Vec<Param>,
     pub ret_type: Type,
     pub blocks: Vec<BasicBlock>,
+    pub effect_row: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -74,13 +75,14 @@ pub struct ValueId(u32);
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct BlockId(u32);
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     Unit,
     Int,
     Float,
     Bool,
     String,
+    Named(String),
     Unknown,
 }
 
@@ -99,7 +101,11 @@ pub fn lower_module(module: &HModule) -> Module {
 }
 
 fn lower_function(func: &HFunction) -> Function {
-    let mut lowerer = FunctionLower::new(func.name.clone());
+    let mut lowerer = FunctionLower::new(
+        func.name.clone(),
+        func.return_type.as_ref().map(Type::from_type_expr),
+        func.effect_row.clone(),
+    );
     for param in &func.params {
         lowerer.push_param(param);
     }
@@ -116,10 +122,11 @@ struct FunctionLower {
     scopes: Vec<HashMap<String, ValueId>>,
     value_types: HashMap<ValueId, Type>,
     ret_type: Type,
+    effect_row: Vec<String>,
 }
 
 impl FunctionLower {
-    fn new(name: String) -> Self {
+    fn new(name: String, ret_type: Option<Type>, effect_row: Vec<String>) -> Self {
         let entry = BlockBuilder::new(BlockId(0));
         FunctionLower {
             name,
@@ -129,7 +136,8 @@ impl FunctionLower {
             blocks: Vec::new(),
             scopes: vec![HashMap::new()],
             value_types: HashMap::new(),
-            ret_type: Type::Unknown,
+            ret_type: ret_type.unwrap_or(Type::Unknown),
+            effect_row,
         }
     }
 
@@ -146,19 +154,20 @@ impl FunctionLower {
             params: self.params,
             ret_type: self.ret_type,
             blocks: self.blocks,
+            effect_row: self.effect_row,
         }
     }
 
-    fn push_param(&mut self, name: &str) {
+    fn push_param(&mut self, param: &HParam) {
         let id = self.alloc_value();
-        let ty = Type::Unknown;
+        let ty = Type::from_type_expr(&param.ty);
+        self.value_types.insert(id, ty.clone());
         self.scopes
             .last_mut()
             .expect("scope stack")
-            .insert(name.to_string(), id);
-        self.value_types.insert(id, ty);
+            .insert(param.name.clone(), id);
         self.params.push(Param {
-            name: name.to_string(),
+            name: param.name.clone(),
             ty,
             value: id,
         });
@@ -197,7 +206,7 @@ impl FunctionLower {
         let value = expr.map(|e| self.lower_expr(e));
         let value_id = value.as_ref().map(|(id, _)| *id);
         if let Some((_, ty)) = &value {
-            self.merge_return_type(*ty);
+            self.merge_return_type(ty.clone());
         } else {
             self.merge_return_type(Type::Unit);
         }
@@ -212,13 +221,13 @@ impl FunctionLower {
                 let id = self
                     .lookup(name)
                     .unwrap_or_else(|| panic!("unknown variable {name}"));
-                let ty = *self.value_types.get(&id).unwrap_or(&Type::Unknown);
+                let ty = self.value_types.get(&id).cloned().unwrap_or(Type::Unknown);
                 (id, ty)
             }
             HExpr::Path(path) => {
                 if path.segments.len() == 1 {
                     if let Some(id) = self.lookup(&path.segments[0]) {
-                        let ty = *self.value_types.get(&id).unwrap_or(&Type::Unknown);
+                        let ty = self.value_types.get(&id).cloned().unwrap_or(Type::Unknown);
                         return (id, ty);
                     }
                 }
@@ -315,8 +324,13 @@ impl FunctionLower {
             panic!("attempted to emit instruction after block was terminated");
         }
         let id = self.alloc_value();
-        let instr = Instruction { id, ty, kind };
-        self.value_types.insert(id, ty);
+        let stored_ty = ty.clone();
+        let instr = Instruction {
+            id,
+            ty: stored_ty.clone(),
+            kind,
+        };
+        self.value_types.insert(id, stored_ty);
         self.current_block.push_instruction(instr);
         (id, ty)
     }
@@ -347,7 +361,8 @@ impl FunctionLower {
     }
 
     fn merge_return_type(&mut self, ty: Type) {
-        self.ret_type = match (self.ret_type, ty) {
+        let current = self.ret_type.clone();
+        self.ret_type = match (current, ty) {
             (Type::Unknown, other) => other,
             (existing, other) if existing == other => existing,
             _ => Type::Unknown,
@@ -406,6 +421,12 @@ impl Default for ValueId {
     }
 }
 
+impl BlockId {
+    pub fn index(self) -> u32 {
+        self.0
+    }
+}
+
 impl Type {
     fn from_literal(literal: &Literal) -> Type {
         match literal {
@@ -414,6 +435,34 @@ impl Type {
             Literal::Float(_) => Type::Float,
             Literal::Bool(_) => Type::Bool,
             Literal::String(_) => Type::String,
+        }
+    }
+
+    fn from_type_expr(expr: &TypeExpr) -> Type {
+        match expr {
+            TypeExpr::Unit => Type::Unit,
+            TypeExpr::Name(name) => Type::from_builtin_name(name),
+            TypeExpr::Generic(name, _) => Type::from_builtin_name(name),
+            TypeExpr::Tuple(items) => {
+                if items.is_empty() {
+                    Type::Unit
+                } else {
+                    Type::Unknown
+                }
+            }
+            TypeExpr::Function { return_type, .. } => Type::from_type_expr(return_type),
+            _ => Type::Unknown,
+        }
+    }
+
+    fn from_builtin_name(name: &str) -> Type {
+        match name {
+            "Unit" => Type::Unit,
+            "Int" => Type::Int,
+            "Float" => Type::Float,
+            "Bool" => Type::Bool,
+            "String" => Type::String,
+            other => Type::Named(other.to_string()),
         }
     }
 }
