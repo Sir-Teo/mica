@@ -17,8 +17,8 @@ jobs:
       - name: Cargo build
         run: cargo build --locked
 
-      - name: Cargo test
-        run: cargo test --locked
+      - name: Cargo test (all targets)
+        run: cargo test --locked --all-targets
 
       - name: Check CLI snippets up-to-date
         run: cargo run --quiet --bin gen_snippets -- --check
