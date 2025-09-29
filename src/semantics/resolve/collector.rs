@@ -1,11 +1,14 @@
 use crate::syntax::ast::{Function, Item, Module, TypeAlias, TypeExpr, UseDecl};
 
-use super::data::{Resolved, ResolvedImport, SymbolCategory, SymbolInfo, SymbolScope};
+use super::data::{
+    ModuleExports, Resolved, ResolvedImport, SymbolCategory, SymbolInfo, SymbolScope,
+};
 use super::scope::ScopeLayer;
 
 pub(super) struct ModuleSymbols {
     pub(super) module_scope: ScopeLayer,
     pub(super) resolved: Resolved,
+    pub(super) exports: ModuleExports,
 }
 
 pub(super) fn collect_module(module: &Module) -> ModuleSymbols {
@@ -14,6 +17,7 @@ pub(super) fn collect_module(module: &Module) -> ModuleSymbols {
     ModuleSymbols {
         module_scope: collector.module_scope,
         resolved: collector.resolved,
+        exports: collector.exports,
     }
 }
 
@@ -21,6 +25,7 @@ struct Collector<'a> {
     module: &'a Module,
     module_scope: ScopeLayer,
     resolved: Resolved,
+    exports: ModuleExports,
 }
 
 impl<'a> Collector<'a> {
@@ -32,6 +37,7 @@ impl<'a> Collector<'a> {
                 module_path: module.name.clone(),
                 ..Resolved::default()
             },
+            exports: ModuleExports::default(),
         }
     }
 
@@ -56,7 +62,12 @@ impl<'a> Collector<'a> {
             scope: SymbolScope::Module(self.module.name.clone()),
         };
         self.module_scope.insert_type(symbol.clone());
-        self.resolved.symbols.push(symbol);
+        self.resolved.symbols.push(symbol.clone());
+        if ta.is_public {
+            self.exports
+                .types
+                .insert(symbol.name.clone(), symbol.clone());
+        }
 
         if let TypeExpr::Sum(variants) = &ta.value {
             let mut names = Vec::new();
@@ -67,13 +78,19 @@ impl<'a> Collector<'a> {
                     .entry(variant.name.clone())
                     .or_default()
                     .push(ta.name.clone());
-                self.resolved.symbols.push(SymbolInfo {
+                let variant_symbol = SymbolInfo {
                     name: variant.name.clone(),
                     category: SymbolCategory::Variant {
                         parent: ta.name.clone(),
                     },
                     scope: SymbolScope::Module(self.module.name.clone()),
-                });
+                };
+                self.resolved.symbols.push(variant_symbol.clone());
+                if ta.is_public {
+                    self.exports
+                        .variants
+                        .insert(variant_symbol.name.clone(), variant_symbol);
+                }
             }
             self.resolved.adts.insert(ta.name.clone(), names);
         }
@@ -88,7 +105,10 @@ impl<'a> Collector<'a> {
             scope: SymbolScope::Module(self.module.name.clone()),
         };
         self.module_scope.insert_value(symbol.clone());
-        self.resolved.symbols.push(symbol);
+        self.resolved.symbols.push(symbol.clone());
+        if func.is_public {
+            self.exports.values.insert(symbol.name.clone(), symbol);
+        }
     }
 
     fn collect_use(&mut self, import: &UseDecl) {

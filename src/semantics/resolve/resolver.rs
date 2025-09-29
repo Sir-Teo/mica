@@ -5,22 +5,30 @@ use super::data::{
     SymbolInfo, SymbolScope,
 };
 use super::scope::{ScopeLayer, ScopeStack};
+use super::workspace::ModuleGraph;
 
-pub(super) struct Resolver<'a> {
+pub(super) struct Resolver<'a, 'g> {
     module: &'a Module,
     scope: ScopeStack,
     resolved: Resolved,
     current_scope: SymbolScope,
+    workspace: &'g ModuleGraph,
 }
 
-impl<'a> Resolver<'a> {
-    pub(super) fn new(module: &'a Module, module_scope: ScopeLayer, resolved: Resolved) -> Self {
+impl<'a, 'g> Resolver<'a, 'g> {
+    pub(super) fn new(
+        module: &'a Module,
+        module_scope: ScopeLayer,
+        resolved: Resolved,
+        workspace: &'g ModuleGraph,
+    ) -> Self {
         let scope = ScopeStack::new(module_scope);
         Self {
             module,
             scope,
             resolved,
             current_scope: SymbolScope::Module(module.name.clone()),
+            workspace,
         }
     }
 
@@ -374,11 +382,14 @@ impl<'a> Resolver<'a> {
     }
 
     fn resolve_path(&mut self, segments: &[String], kind: PathKind) {
-        let resolved = match kind {
+        let mut resolved = match kind {
             PathKind::Type => self.scope.lookup_type(segments, &self.resolved),
             PathKind::Value => self.scope.lookup_value(segments, &self.resolved),
             PathKind::Variant => self.scope.lookup_variant(segments, &self.resolved),
         };
+        if resolved.is_none() {
+            resolved = self.workspace.lookup(segments, kind);
+        }
         self.resolved.resolved_paths.push(ResolvedPath {
             segments: segments.to_vec(),
             kind,

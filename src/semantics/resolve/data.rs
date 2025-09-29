@@ -88,3 +88,10 @@ pub enum CapabilityScope {
         type_name: String,
     },
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct ModuleExports {
+    pub values: HashMap<String, SymbolInfo>,
+    pub types: HashMap<String, SymbolInfo>,
+    pub variants: HashMap<String, SymbolInfo>,
+}
