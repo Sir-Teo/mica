@@ -1,0 +1,114 @@
+use crate::syntax::ast::{Function, Item, Module, TypeAlias, TypeExpr, UseDecl};
+
+use super::data::{Resolved, ResolvedImport, SymbolCategory, SymbolInfo, SymbolScope};
+use super::scope::ScopeLayer;
+
+pub(super) struct ModuleSymbols {
+    pub(super) module_scope: ScopeLayer,
+    pub(super) resolved: Resolved,
+}
+
+pub(super) fn collect_module(module: &Module) -> ModuleSymbols {
+    let mut collector = Collector::new(module);
+    collector.collect();
+    ModuleSymbols {
+        module_scope: collector.module_scope,
+        resolved: collector.resolved,
+    }
+}
+
+struct Collector<'a> {
+    module: &'a Module,
+    module_scope: ScopeLayer,
+    resolved: Resolved,
+}
+
+impl<'a> Collector<'a> {
+    fn new(module: &'a Module) -> Self {
+        Self {
+            module,
+            module_scope: ScopeLayer::default(),
+            resolved: Resolved {
+                module_path: module.name.clone(),
+                ..Resolved::default()
+            },
+        }
+    }
+
+    fn collect(&mut self) {
+        for item in &self.module.items {
+            match item {
+                Item::TypeAlias(ta) => self.collect_type_alias(ta),
+                Item::Function(func) => self.collect_function(func),
+                Item::Use(import) => self.collect_use(import),
+                Item::Impl(_) => {}
+            }
+        }
+    }
+
+    fn collect_type_alias(&mut self, ta: &TypeAlias) {
+        let symbol = SymbolInfo {
+            name: ta.name.clone(),
+            category: SymbolCategory::Type {
+                is_public: ta.is_public,
+                params: ta.params.clone(),
+            },
+            scope: SymbolScope::Module(self.module.name.clone()),
+        };
+        self.module_scope.insert_type(symbol.clone());
+        self.resolved.symbols.push(symbol);
+
+        if let TypeExpr::Sum(variants) = &ta.value {
+            let mut names = Vec::new();
+            for variant in variants {
+                names.push(variant.name.clone());
+                self.resolved
+                    .variant_to_adt
+                    .entry(variant.name.clone())
+                    .or_default()
+                    .push(ta.name.clone());
+                self.resolved.symbols.push(SymbolInfo {
+                    name: variant.name.clone(),
+                    category: SymbolCategory::Variant {
+                        parent: ta.name.clone(),
+                    },
+                    scope: SymbolScope::Module(self.module.name.clone()),
+                });
+            }
+            self.resolved.adts.insert(ta.name.clone(), names);
+        }
+    }
+
+    fn collect_function(&mut self, func: &Function) {
+        let symbol = SymbolInfo {
+            name: func.name.clone(),
+            category: SymbolCategory::Function {
+                is_public: func.is_public,
+            },
+            scope: SymbolScope::Module(self.module.name.clone()),
+        };
+        self.module_scope.insert_value(symbol.clone());
+        self.resolved.symbols.push(symbol);
+    }
+
+    fn collect_use(&mut self, import: &UseDecl) {
+        let alias = import.alias.clone().or_else(|| import.path.last().cloned());
+        self.resolved.imports.push(ResolvedImport {
+            path: import.path.clone(),
+            alias: alias.clone(),
+        });
+
+        if let Some(name) = alias {
+            let symbol = SymbolInfo {
+                name: name.clone(),
+                category: SymbolCategory::ImportAlias {
+                    target: import.path.clone(),
+                },
+                scope: SymbolScope::Module(self.module.name.clone()),
+            };
+            self.module_scope.insert_value(symbol.clone());
+            self.module_scope.insert_type(symbol.clone());
+            self.resolved.symbols.push(symbol);
+        }
+    }
+}

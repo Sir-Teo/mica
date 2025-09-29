@@ -140,7 +140,7 @@ fn lower_expr(e: &Expr) -> HExpr {
                 fields: lowered_fields,
             }
         }
-        Expr::Field { expr, name } => {
+        Expr::Field { expr, name: _ } => {
             // As value: keep as Path if simple, else ignore
             let base = match &**expr {
                 Expr::Path(p) => HExpr::Path(p.clone()),
