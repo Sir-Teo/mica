@@ -128,12 +128,18 @@ fn resolve_adts() {
 #[test]
 fn exhaustiveness_checker() {
     let m1 = parse("module m\ntype S = A | B\nfn f(x: S) -> Int { match x { A => 1 } }");
-    let diags = check::check_exhaustiveness(&m1);
-    assert!(!diags.is_empty());
+    let diags = check::check_module(&m1);
+    assert!(
+        !diags.diagnostics.is_empty(),
+        "expected diagnostics for non-exhaustive match"
+    );
 
     let m2 = parse("module m\ntype S = A | B\nfn f(x: S) -> Int { match x { A => 1, B => 2 } }");
-    let diags2 = check::check_exhaustiveness(&m2);
-    assert!(diags2.is_empty());
+    let diags2 = check::check_module(&m2);
+    assert!(
+        diags2.diagnostics.is_empty(),
+        "expected exhaustive match to be accepted"
+    );
 }
 
 #[test]
@@ -147,8 +153,12 @@ fn resolve_and_check_visit_every_path() {
         .expect("Idle variant tracked");
     assert_eq!(idle, &vec![String::from("State")]);
 
-    let diags = check::check_exhaustiveness(&module);
-    assert!(diags.is_empty(), "expected no diagnostics, got {diags:?}");
+    let diags = check::check_module(&module);
+    assert!(
+        diags.diagnostics.is_empty(),
+        "expected no diagnostics, got {:?}",
+        diags.diagnostics
+    );
 }
 
 #[test]
@@ -337,10 +347,12 @@ fn resolve_across_modules_uses_workspace_exports() {
         .get(&vec!["consumer".into()])
         .expect("consumer module resolved");
 
-    assert!(consumer_resolved
-        .imports
-        .iter()
-        .any(|import| import.path == vec!["provider".to_string(), "Number".to_string()]));
+    assert!(
+        consumer_resolved
+            .imports
+            .iter()
+            .any(|import| import.path == vec!["provider".to_string(), "Number".to_string()])
+    );
 
     let number_alias = consumer_resolved
         .resolved_paths
@@ -353,10 +365,7 @@ fn resolve_across_modules_uses_workspace_exports() {
         .expect("import alias resolves to symbol info");
     match &alias_symbol.category {
         SymbolCategory::ImportAlias { target } => {
-            assert_eq!(
-                target,
-                &vec!["provider".to_string(), "Number".to_string()]
-            )
+            assert_eq!(target, &vec!["provider".to_string(), "Number".to_string()])
         }
         other => panic!("expected import alias symbol, got {other:?}"),
     }
@@ -621,4 +630,96 @@ fn resolve_cross_module_paths() {
         }
         other => panic!("expected module scope, got {other:?}"),
     }
+}
+
+#[test]
+fn resolver_reports_duplicate_symbols() {
+    let module = parse(
+        "module demo\n\
+         fn run() -> Int { 0 }\n\
+         fn run() -> Int { 1 }\n\
+         type Alias = Int\n\
+         type Alias = Int\n\
+         fn shadow() -> Int {\n\
+           let value = 1;\n\
+           let value = 2;\n\
+           value\n\
+         }\n",
+    );
+
+    let resolved = resolve::resolve_module(&module);
+    assert!(
+        resolved
+            .diagnostics
+            .iter()
+            .any(|diag| diag.message.contains("duplicate function definition")),
+        "expected duplicate function diagnostic: {:?}",
+        resolved.diagnostics
+    );
+    assert!(
+        resolved
+            .diagnostics
+            .iter()
+            .any(|diag| diag.message.contains("duplicate type definition")),
+        "expected duplicate type diagnostic: {:?}",
+        resolved.diagnostics
+    );
+    assert!(
+        resolved
+            .diagnostics
+            .iter()
+            .any(|diag| diag.message.contains("duplicate value")),
+        "expected duplicate local binding diagnostic: {:?}",
+        resolved.diagnostics
+    );
+}
+
+#[test]
+fn type_checker_reports_return_mismatches() {
+    let module = parse(
+        "module demo\n\
+         fn wrong() -> Int {\n\
+           \"oops\"\n\
+         }\n",
+    );
+
+    let result = check::check_module(&module);
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.message.contains("returns 'String'")),
+        "expected return type diagnostic, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn type_checker_validates_capabilities_and_calls() {
+    let module = parse(
+        "module demo\n\
+         fn callee(value: Int) -> Int { value }\n\
+         fn caller() -> Int {\n\
+           callee(\"not an int\")\n\
+         }\n\
+         fn needs_capability(io: IO) !{net} { 0 }\n",
+    );
+
+    let result = check::check_module(&module);
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.message.contains("parameter expects 'Int'")),
+        "expected call argument diagnostic, got {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.message.contains("declares capability 'net'")),
+        "expected capability diagnostic, got {:?}",
+        result.diagnostics
+    );
 }

@@ -63,11 +63,11 @@ fn run() -> Result<()> {
         }
         Mode::Check => {
             let module = parser::parse_module(&source)?;
-            let diags = check::check_exhaustiveness(&module);
-            if diags.is_empty() {
+            let result = check::check_module(&module);
+            if result.diagnostics.is_empty() {
                 println!("ok");
             } else {
-                for d in diags {
+                for d in result.diagnostics {
                     println!("warning: {}", d.message);
                 }
             }

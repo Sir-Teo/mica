@@ -1,57 +1,25 @@
 # Immediate Next Step Recommendation
 
-After reviewing the existing documentation and source layout, the project has
-solid coverage of the Phase 0 goals: the lexer, parser, pretty printer, and CLI
-(`mica --tokens`, `--ast`, `--pretty`, `--resolve`, `--lower`) are implemented
-with snapshot-style tests. The resolver is now split into a declaration
-collection pass and a scoped resolver. The collector seeds module-level symbol
-tables, imports, and algebraic data type metadata, while the resolver walks the
-AST to bind paths and capability annotations into those tables. This gives us
-the groundwork needed for the rest of the Phase 1 semantics. 【F:src/semantics/resolve/collector.rs†L6-L114】【F:src/semantics/resolve/resolver.rs†L9-L205】
+After the recent semantics push, the project now satisfies the Phase 1
+milestones: the resolver builds a cross-module workspace, reports duplicate
+symbols, and records capability metadata for downstream consumers, while the new
+type/effect checker validates function signatures, capability usage, and match
+exhaustiveness through a single CLI entry point. `mica --check` now drives the
+enhanced checker so mismatches surface with actionable diagnostics. 【F:src/semantics/resolve/collector.rs†L6-L145】【F:src/semantics/resolve/resolver.rs†L9-L406】【F:src/semantics/check.rs†L1-L604】
 
-The remaining semantic layer still has notable gaps:
+With Phase 1 complete, the focus shifts to the next tranche of roadmap tasks:
 
-* `resolve_module` only gathers local symbols before resolving in-module
-  references. Unresolved paths simply record `None`, and there is currently no
-  surface for duplicate-definition diagnostics or loading the targets of
-  `use` items from other files. Extending this toward cross-module analysis will
-  be necessary for the compiler CLI and future LSP support to scale. 【F:src/semantics/resolve/mod.rs†L1-L21】【F:src/semantics/resolve/resolver.rs†L206-L314】
-* `check::check_exhaustiveness` is limited to match exhaustiveness warnings and
-  does not yet perform Hindley–Milner inference, borrow checking, or
-  capability/effect validation. 【F:src/semantics/check.rs†L1-L147】
+1. **Design the typed IR for lowering (Phase 2).** Document the SSA-inspired IR
+   layout, encode effect metadata, and begin lowering typed ASTs into this IR so
+   later passes can reason about drops and scheduling. 【F:docs/roadmap/compiler.md†L120-L191】
+2. **Seed backend integration work.** Start sketching the LLVM-oriented backend
+   scaffolding that will eventually consume the IR, ensuring the lowering data
+   model keeps enough provenance for code generation. 【F:docs/roadmap/compiler.md†L193-L245】
+3. **Grow the diagnostics playbook.** Capture the semantics of the new
+   type/effect errors inside the roadmap so LSP and tooling efforts can build on
+   consistent wording and spans, and expand the CLI examples to demonstrate the
+   richer checking pipeline. 【F:docs/roadmap/compiler.md†L60-L118】
 
-## Recommended next steps
-
-1. **Harden the resolver for multi-module work.**
-   * Extend the collector to persist per-module import metadata in a form that
-     other files can consume, building a module graph that feeds follow-up
-     resolution passes. 【F:src/semantics/resolve/collector.rs†L6-L114】
-   * Teach `Resolver::resolve_path` to emit diagnostics when bindings are
-     missing or duplicated once cross-module lookups are wired in; capture spans
-     so the CLI and future LSP consumers can highlight errors precisely.
-     【F:src/semantics/resolve/resolver.rs†L31-L205】【F:src/semantics/resolve/resolver.rs†L206-L314】
-   * Add regression tests (single-file and synthetic multi-module fixtures) that
-     exercise shadowing, duplicate definitions, and `use` re-exports before
-     evolving the type checker.
-
-2. **Bootstrap the type and effect checker.**
-   * Define type environments sourced from the resolver’s symbol tables and
-     begin unification plumbing for expressions, producing placeholder type IDs
-     that later lowering stages can consume. 【F:src/semantics/check.rs†L1-L147】
-   * Add capability validation hooks that reuse the resolver’s capability
-     bindings so exhaustiveness and capability diagnostics flow through a single
-     entry point.
-   * Iterate with golden tests driven via `mica --check` to ensure early
-     regressions are caught and to document the desired diagnostic UX.
-
-3. **Align roadmap artifacts and tooling.**
-   * Update the compiler roadmap once the resolver/type-checker milestones above
-     land so the broader plan reflects real module boundaries and exit criteria.
-     【F:docs/roadmap/compiler.md†L60-L110】
-   * Promote the new resolver and checker stages through the CLI by wiring
-     `--resolve` and `--check` outputs into example fixtures, ensuring people
-     experimenting with the language see up-to-date capabilities.
-
-These steps keep progress focused on Phase 1 priorities while clearing the most
-visible gaps that block richer diagnostics and editor integrations. They also
-feed directly into the roadmap’s planned type-and-effect workstreams.
+Clearing these items transitions the project into Phase 2, setting the stage for
+SSA lowering, backend work, and the optimizer research called out in the
+compiler roadmap.
