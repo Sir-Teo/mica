@@ -9,18 +9,17 @@ fn main() {
     // Ensure the main binary is built
     run(&mut Command::new("cargo").arg("build"));
 
-    let bin = PathBuf::from("target").join("debug").join(if cfg!(windows) { "mica.exe" } else { "mica" });
+    let bin = PathBuf::from("target")
+        .join("debug")
+        .join(if cfg!(windows) { "mica.exe" } else { "mica" });
 
-    let pretty_adt = run_capture(
-        Command::new(&bin)
-            .args(["--ast", "--pretty", "examples/adt.mica"]),
-    );
-    let check_nx = run_capture(
-        Command::new(&bin)
-            .args(["--check", "examples/adt_match_nonexhaustive.mica"]),
-    );
+    let pretty_adt =
+        run_capture(Command::new(&bin).args(["--ast", "--pretty", "examples/adt.mica"]));
+    let check_nx =
+        run_capture(Command::new(&bin).args(["--check", "examples/adt_match_nonexhaustive.mica"]));
     let lower_methods = run_capture(Command::new(&bin).args(["--lower", "examples/methods.mica"]));
-    let lower_spawn = run_capture(Command::new(&bin).args(["--lower", "examples/spawn_await.mica"]));
+    let lower_spawn =
+        run_capture(Command::new(&bin).args(["--lower", "examples/spawn_await.mica"]));
 
     let content = format!(
         "# CLI Snippets\n\nThis page shows short outputs from the CLI for selected examples.\n\n## Pretty AST (`--ast --pretty`)\n\nCommand: `cargo run -- --ast --pretty examples/adt.mica`\n\n```\n{}\n```\n\n## Exhaustiveness Check (`--check`)\n\nCommand: `cargo run -- --check examples/adt_match_nonexhaustive.mica`\n\n```\n{}\n```\n\n## Lowered HIR (`--lower`)\n\nCommand: `cargo run -- --lower examples/methods.mica`\n\n```\n{}\n```\n\nCommand: `cargo run -- --lower examples/spawn_await.mica`\n\n```\n{}\n```\n\n",
@@ -63,4 +62,3 @@ fn run_capture(cmd: &mut Command) -> String {
 fn normalize(s: &str) -> String {
     s.replace("\r\n", "\n")
 }
-

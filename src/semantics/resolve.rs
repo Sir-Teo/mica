@@ -1,11 +1,11 @@
+use crate::syntax::ast::*;
 use std::collections::HashMap;
-use crate::ast::*;
 
 #[derive(Debug, Clone, Default)]
 pub struct Resolved {
     pub module_path: Vec<String>,
-    pub adts: HashMap<String, Vec<String>>,          // ADT name -> variant names
-    pub variant_to_adt: HashMap<String, Vec<String>> // Variant name -> candidate ADT names
+    pub adts: HashMap<String, Vec<String>>, // ADT name -> variant names
+    pub variant_to_adt: HashMap<String, Vec<String>>, // Variant name -> candidate ADT names
 }
 
 pub fn resolve_module(m: &Module) -> Resolved {
@@ -21,11 +21,13 @@ pub fn resolve_module(m: &Module) -> Resolved {
                 let vnames: Vec<String> = vars.iter().map(|v| v.name.clone()).collect();
                 r.adts.insert(ta.name.clone(), vnames.clone());
                 for vn in vnames {
-                    r.variant_to_adt.entry(vn).or_default().push(ta.name.clone());
+                    r.variant_to_adt
+                        .entry(vn)
+                        .or_default()
+                        .push(ta.name.clone());
                 }
             }
         }
     }
     r
 }
-

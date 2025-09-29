@@ -4,7 +4,7 @@ use super::*;
 fn lex_double_colon_and_question() {
     let src = "File::open(\"/tmp/x\")?";
     let toks = lexer::lex(src).expect("lex ok");
-    use crate::token::TokenKind::*;
+    use crate::syntax::token::TokenKind::*;
     assert!(toks.iter().any(|t| matches!(t.kind, DoubleColon)));
     assert!(toks.iter().any(|t| matches!(t.kind, Question)));
 }

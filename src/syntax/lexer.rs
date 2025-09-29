@@ -1,5 +1,5 @@
-use crate::error::{Error, Result};
-use crate::token::{Token, TokenKind};
+use crate::diagnostics::{Error, Result};
+use crate::syntax::token::{Token, TokenKind};
 
 pub fn lex(input: &str) -> Result<Vec<Token>> {
     Lexer::new(input).tokenize()

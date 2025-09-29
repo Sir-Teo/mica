@@ -1,7 +1,7 @@
-use crate::ast::*;
-use crate::error::{Error, Result};
-use crate::lexer;
-use crate::token::{Token, TokenKind};
+use crate::diagnostics::{Error, Result};
+use crate::syntax::ast::*;
+use crate::syntax::lexer;
+use crate::syntax::token::{Token, TokenKind};
 
 pub fn parse_module(source: &str) -> Result<Module> {
     let tokens = lexer::lex(source)?;
@@ -83,7 +83,11 @@ impl Parser {
             }
         }
         self.expect_symbol(TokenKind::RBrace, "expected '}' to close impl block")?;
-        Ok(ImplBlock { trait_path, for_type, items })
+        Ok(ImplBlock {
+            trait_path,
+            for_type,
+            items,
+        })
     }
 
     fn parse_use_decl(&mut self) -> Result<UseDecl> {
@@ -218,21 +222,40 @@ impl Parser {
                 if ident != "self" {
                     return Err(self.error_here("expected 'self' after '&' in receiver"));
                 }
-                params.push(Param { name: "self".into(), ty: TypeExpr::Reference { is_mut, inner: Box::new(TypeExpr::SelfType) }, mutable: false });
+                params.push(Param {
+                    name: "self".into(),
+                    ty: TypeExpr::Reference {
+                        is_mut,
+                        inner: Box::new(TypeExpr::SelfType),
+                    },
+                    mutable: false,
+                });
             } else if matches!(self.current_kind(), TokenKind::Identifier(s) if s == "self") {
                 self.advance();
                 if self.match_symbol(TokenKind::Colon) {
                     let ty = self.parse_type_expr()?;
-                    params.push(Param { name: "self".into(), ty, mutable: false });
+                    params.push(Param {
+                        name: "self".into(),
+                        ty,
+                        mutable: false,
+                    });
                 } else {
-                    params.push(Param { name: "self".into(), ty: TypeExpr::SelfType, mutable: false });
+                    params.push(Param {
+                        name: "self".into(),
+                        ty: TypeExpr::SelfType,
+                        mutable: false,
+                    });
                 }
             } else {
                 let mutable = self.match_keyword(TokenKind::Mut);
                 let param_name = self.expect_identifier()?;
                 self.expect_symbol(TokenKind::Colon, "expected ':' after parameter name")?;
                 let ty = self.parse_type_expr()?;
-                params.push(Param { name: param_name, ty, mutable });
+                params.push(Param {
+                    name: param_name,
+                    ty,
+                    mutable,
+                });
             }
 
             // Subsequent parameters: normal params separated by commas
@@ -241,7 +264,11 @@ impl Parser {
                 let param_name = self.expect_identifier()?;
                 self.expect_symbol(TokenKind::Colon, "expected ':' after parameter name")?;
                 let ty = self.parse_type_expr()?;
-                params.push(Param { name: param_name, ty, mutable });
+                params.push(Param {
+                    name: param_name,
+                    ty,
+                    mutable,
+                });
             }
         }
         self.expect_symbol(TokenKind::RParen, "expected ')' to close parameter list")?;
@@ -586,10 +613,7 @@ impl Parser {
                             break;
                         }
                     }
-                    self.expect_symbol(
-                        TokenKind::RBrace,
-                        "expected '}' after record fields",
-                    )?;
+                    self.expect_symbol(TokenKind::RBrace, "expected '}' after record fields")?;
                     expr = Expr::Record {
                         type_path: Some(type_path),
                         fields,
@@ -613,7 +637,10 @@ impl Parser {
             } else if self.match_keyword(TokenKind::As) {
                 // cast: expr as Type
                 let ty = self.parse_type_expr()?;
-                expr = Expr::Cast { expr: Box::new(expr), ty };
+                expr = Expr::Cast {
+                    expr: Box::new(expr),
+                    ty,
+                };
             } else if self.match_symbol(TokenKind::Question) {
                 expr = Expr::Try(Box::new(expr));
             } else {
@@ -637,13 +664,19 @@ impl Parser {
                         None
                     } else {
                         let expr = self.parse_expression()?;
-                        self.expect_symbol(TokenKind::RParen, "expected ')' after channel capacity")?;
+                        self.expect_symbol(
+                            TokenKind::RParen,
+                            "expected ')' after channel capacity",
+                        )?;
                         Some(expr)
                     }
                 } else {
                     None
                 };
-                Ok(Expr::Chan { ty: Box::new(ty), capacity: capacity.map(Box::new) })
+                Ok(Expr::Chan {
+                    ty: Box::new(ty),
+                    capacity: capacity.map(Box::new),
+                })
             }
             TokenKind::IntLiteral(value) => {
                 let value = *value;
@@ -694,7 +727,10 @@ impl Parser {
                 {
                     // using x = expr { ... }
                     let name = self.expect_identifier()?;
-                    self.expect_symbol(TokenKind::Assign, "expected '=' after identifier in using")?;
+                    self.expect_symbol(
+                        TokenKind::Assign,
+                        "expected '=' after identifier in using",
+                    )?;
                     let e = self.parse_expression()?;
                     (Some(name), e)
                 } else if !self.check(TokenKind::LBrace) {
@@ -704,7 +740,11 @@ impl Parser {
                     return Err(self.error_here("expected expression after 'using'"));
                 };
                 let body = self.parse_block()?;
-                Ok(Expr::Using { binding, expr: Box::new(expr), body })
+                Ok(Expr::Using {
+                    binding,
+                    expr: Box::new(expr),
+                    body,
+                })
             }
             TokenKind::LBrace => {
                 let block = self.parse_block()?;
@@ -863,8 +903,18 @@ impl Parser {
                     Ok(Pattern::EnumVariant { path, fields })
                 } else if path.segments.len() == 1 {
                     let single = path.segments.into_iter().next().unwrap();
-                    if single.chars().next().map(|c| c.is_ascii_uppercase()).unwrap_or(false) {
-                        Ok(Pattern::EnumVariant { path: Path { segments: vec![single] }, fields: Vec::new() })
+                    if single
+                        .chars()
+                        .next()
+                        .map(|c| c.is_ascii_uppercase())
+                        .unwrap_or(false)
+                    {
+                        Ok(Pattern::EnumVariant {
+                            path: Path {
+                                segments: vec![single],
+                            },
+                            fields: Vec::new(),
+                        })
                     } else {
                         Ok(Pattern::Binding(single))
                     }
