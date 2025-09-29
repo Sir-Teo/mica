@@ -1,8 +1,8 @@
 use crate::syntax::ast::*;
 
 use super::data::{
-    CapabilityBinding, CapabilityScope, PathKind, Resolved, ResolvedPath, SymbolCategory,
-    SymbolInfo, SymbolScope,
+    CapabilityBinding, CapabilityScope, PathKind, ResolveDiagnostic, Resolved, ResolvedPath,
+    SymbolCategory, SymbolInfo, SymbolScope,
 };
 use super::scope::{ScopeLayer, ScopeStack};
 use super::workspace::ModuleGraph;
@@ -390,10 +390,30 @@ impl<'a, 'g> Resolver<'a, 'g> {
         if resolved.is_none() {
             resolved = self.workspace.lookup(segments, kind);
         }
+        if resolved.is_none() {
+            self.resolved.diagnostics.push(ResolveDiagnostic {
+                path: segments.to_vec(),
+                kind,
+                scope: self.current_scope.clone(),
+                message: format!(
+                    "unresolved {} path: {}",
+                    path_kind_label(kind),
+                    segments.join("::")
+                ),
+            });
+        }
         self.resolved.resolved_paths.push(ResolvedPath {
             segments: segments.to_vec(),
             kind,
             resolved,
         });
+    }
+}
+
+fn path_kind_label(kind: PathKind) -> &'static str {
+    match kind {
+        PathKind::Type => "type",
+        PathKind::Value => "value",
+        PathKind::Variant => "variant",
     }
 }

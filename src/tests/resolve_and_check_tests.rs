@@ -246,6 +246,54 @@ fn resolve_collects_symbols_and_paths() {
 }
 
 #[test]
+fn resolve_reports_unresolved_paths() {
+    let module = Module {
+        name: vec!["demo".into()],
+        items: vec![Item::Function(Function {
+            is_public: false,
+            name: "broken".into(),
+            generics: vec![],
+            params: vec![],
+            return_type: None,
+            effect_row: vec![],
+            body: Block {
+                statements: vec![
+                    Stmt::Expr(Expr::Path(path(["missing"]))),
+                    Stmt::Expr(Expr::Ctor {
+                        path: path(["Unknown", "Variant"]),
+                        args: vec![],
+                    }),
+                ],
+            },
+        })],
+    };
+
+    let resolved = resolve::resolve_module(&module);
+
+    assert_eq!(resolved.diagnostics.len(), 2, "expected two diagnostics");
+
+    let missing_value = resolved
+        .diagnostics
+        .iter()
+        .find(|diag| diag.path == vec!["missing".to_string()])
+        .expect("missing value path diagnostic");
+    assert_eq!(missing_value.kind, PathKind::Value);
+    match &missing_value.scope {
+        SymbolScope::Function { function, .. } => assert_eq!(function, "broken"),
+        other => panic!("expected function scope, got {other:?}"),
+    }
+    assert!(missing_value.message.contains("unresolved value path"));
+
+    let missing_variant = resolved
+        .diagnostics
+        .iter()
+        .find(|diag| diag.path == vec!["Unknown".to_string(), "Variant".to_string()])
+        .expect("missing variant path diagnostic");
+    assert_eq!(missing_variant.kind, PathKind::Variant);
+    assert!(missing_variant.message.contains("unresolved variant path"));
+}
+
+#[test]
 fn type_alias_function_effect_row_records_capabilities() {
     let module = parse(
         "module demo\n\
