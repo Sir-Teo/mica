@@ -35,11 +35,22 @@ fn check_exhaustiveness(module: &Module) -> Vec<Diagnostic> {
 
     for item in &module.items {
         if let Item::Function(f) = item {
-            visit_expr(&Expr::Block(f.body.clone()), &adts, &mut diags);
+            visit_block(&f.body, &adts, &mut diags);
         }
     }
 
     diags
+}
+
+fn visit_block(block: &Block, adts: &[(String, Vec<String>)], diags: &mut Vec<Diagnostic>) {
+    for stmt in &block.statements {
+        match stmt {
+            Stmt::Expr(expr) => visit_expr(expr, adts, diags),
+            Stmt::Let(binding) => visit_expr(&binding.value, adts, diags),
+            Stmt::Return(Some(expr)) => visit_expr(expr, adts, diags),
+            Stmt::Return(None) | Stmt::Break | Stmt::Continue => {}
+        }
+    }
 }
 
 fn visit_expr(expr: &Expr, adts: &[(String, Vec<String>)], diags: &mut Vec<Diagnostic>) {
@@ -83,16 +94,7 @@ fn visit_expr(expr: &Expr, adts: &[(String, Vec<String>)], diags: &mut Vec<Diagn
                 }
             }
         }
-        Expr::Block(b) => {
-            for s in &b.statements {
-                match s {
-                    Stmt::Expr(e) => visit_expr(e, adts, diags),
-                    Stmt::Let(l) => visit_expr(&l.value, adts, diags),
-                    Stmt::Return(Some(e)) => visit_expr(e, adts, diags),
-                    _ => {}
-                }
-            }
-        }
+        Expr::Block(b) => visit_block(b, adts, diags),
         Expr::Binary { lhs, rhs, .. } => {
             visit_expr(lhs, adts, diags);
             visit_expr(rhs, adts, diags)
