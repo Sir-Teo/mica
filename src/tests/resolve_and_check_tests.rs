@@ -1,5 +1,5 @@
-use super::*;
 use super::helpers::*;
+use super::*;
 
 fn exhaustive_module() -> Module {
     let match_expr = Expr::Match {
@@ -130,8 +130,7 @@ fn exhaustiveness_checker() {
     let diags = check::check_exhaustiveness(&m1);
     assert!(!diags.is_empty());
 
-    let m2 =
-        parse("module m\ntype S = A | B\nfn f(x: S) -> Int { match x { A => 1, B => 2 } }");
+    let m2 = parse("module m\ntype S = A | B\nfn f(x: S) -> Int { match x { A => 1, B => 2 } }");
     let diags2 = check::check_exhaustiveness(&m2);
     assert!(diags2.is_empty());
 }

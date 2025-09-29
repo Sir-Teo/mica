@@ -1,14 +1,14 @@
 #![cfg(test)]
 
-use crate::ast::*;
-use crate::error::{Error, ErrorKind};
-use crate::token::TokenKind;
-use crate::{check, lexer, lower, parser, pretty, resolve};
+use crate::diagnostics::error::{Error, ErrorKind};
+use crate::semantics::{check, resolve};
+use crate::syntax::{ast::*, lexer, parser, token::TokenKind};
+use crate::{lower, pretty};
 
+mod display_tests;
 mod helpers;
 mod lexer_tests;
-mod parser_tests;
-mod display_tests;
-mod pretty_tests;
 mod lowering_tests;
+mod parser_tests;
+mod pretty_tests;
 mod resolve_and_check_tests;

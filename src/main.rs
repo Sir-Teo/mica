@@ -1,18 +1,8 @@
-mod ast;
-mod check;
-mod error;
-mod lexer;
-mod pretty;
-mod parser;
-mod lower;
-mod resolve;
-mod token;
-
 use std::env;
 use std::fs;
 use std::path::PathBuf;
 
-use error::Result;
+use mica::{Result, check, error, lexer, lower, parser, pretty, resolve};
 
 fn main() {
     if let Err(err) = run() {
@@ -74,7 +64,9 @@ fn run() -> Result<()> {
             if diags.is_empty() {
                 println!("ok");
             } else {
-                for d in diags { println!("warning: {}", d.message); }
+                for d in diags {
+                    println!("warning: {}", d.message);
+                }
             }
         }
         Mode::Resolve => {
@@ -103,6 +95,3 @@ enum Mode {
     Resolve,
     Lower,
 }
-
-#[cfg(test)]
-mod tests;

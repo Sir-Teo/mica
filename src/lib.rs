@@ -1,0 +1,13 @@
+pub mod diagnostics;
+pub mod lower;
+pub mod pretty;
+pub mod semantics;
+pub mod syntax;
+
+pub use diagnostics::error;
+pub use diagnostics::{Error, ErrorKind, Result};
+pub use semantics::{check, resolve};
+pub use syntax::{ast, lexer, parser, token};
+
+#[cfg(test)]
+mod tests;
