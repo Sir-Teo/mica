@@ -330,15 +330,21 @@ fn resolve_impl_items_and_trait_paths() {
 
     let resolved = resolve::resolve_module(&module);
 
-    assert!(resolved
-        .resolved_paths
-        .iter()
-        .any(|path| path.segments == vec!["Display".to_string()] && matches!(path.kind, PathKind::Type)));
+    assert!(
+        resolved
+            .resolved_paths
+            .iter()
+            .any(|path| path.segments == vec!["Display".to_string()]
+                && matches!(path.kind, PathKind::Type))
+    );
 
-    assert!(resolved
-        .resolved_paths
-        .iter()
-        .any(|path| path.segments == vec!["Option".to_string()] && matches!(path.kind, PathKind::Type)));
+    assert!(
+        resolved
+            .resolved_paths
+            .iter()
+            .any(|path| path.segments == vec!["Option".to_string()]
+                && matches!(path.kind, PathKind::Type))
+    );
 
     let capability = resolved
         .capabilities

@@ -10,5 +10,6 @@ mod helpers;
 mod lexer_tests;
 mod lowering_tests;
 mod parser_tests;
+mod pipeline_tests;
 mod pretty_tests;
 mod resolve_and_check_tests;
