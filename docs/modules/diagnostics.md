@@ -45,3 +45,15 @@ roadmap.
    pipeline remains unified.
 3. Introduce feature flags or categories that downstream tools can filter by,
    paving the way for warning levels and lint passes.
+
+## Phase 2 Diagnostics Playbook
+
+1. **Codify happy-path baselines.** The pipeline regression suite exercises the
+   parser, pretty-printer, lowerer, resolver, and checker together, ensuring
+   “clean” modules stay noise-free as features expand.【F:src/tests/pipeline_tests.rs†L1-L139】
+2. **Enforce negative coverage.** Semantic regression tests purposely miss
+   variants and capability bindings so the checker continues to surface the
+   right diagnostics with actionable messaging.【F:src/tests/pipeline_tests.rs†L106-L139】【F:src/tests/resolve_and_check_tests.rs†L128-L205】
+3. **Track roadmap alignment.** Each milestone documents diagnostic exit
+   criteria so we know when Phase 2’s richer IR and backend hooks are ready to
+   surface structured errors downstream.【F:docs/roadmap/milestones.md†L1-L120】

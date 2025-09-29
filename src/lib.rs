@@ -1,3 +1,4 @@
+pub mod backend;
 pub mod diagnostics;
 pub mod ir;
 pub mod lower;

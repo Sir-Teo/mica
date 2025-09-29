@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use mica::{
-    Result, check, error, lexer, lower, parser, pretty,
+    Result, backend, check, error, ir, lexer, lower, parser, pretty,
     resolve::{self, CapabilityScope, PathKind, SymbolCategory, SymbolScope},
 };
 
@@ -28,6 +28,7 @@ fn run() -> Result<()> {
             "--pretty" => pretty = true,
             "--resolve" => mode = Mode::Resolve,
             "--lower" => mode = Mode::Lower,
+            "--ir" => mode = Mode::Ir,
             _ => {
                 path_arg = Some(PathBuf::from(arg));
                 for extra in args {
@@ -179,6 +180,15 @@ fn run() -> Result<()> {
             let h = lower::lower_module(&module);
             println!("{}", lower::hir_to_string(&h));
         }
+        Mode::Ir => {
+            let module = parser::parse_module(&source)?;
+            let hir = lower::lower_module(&module);
+            let typed = ir::lower_module(&hir);
+            let backend = backend::text::TextBackend::default();
+            let output = backend::run(&backend, &typed, &backend::BackendOptions::default())
+                .map_err(|err| error::Error::parse(None, err.to_string()))?;
+            println!("{}", output);
+        }
     }
 
     Ok(())
@@ -191,4 +201,5 @@ enum Mode {
     Check,
     Resolve,
     Lower,
+    Ir,
 }

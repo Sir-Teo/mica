@@ -72,6 +72,7 @@ cargo run -- --ast --pretty examples/adt.mica # Pretty-print the AST
 cargo run -- --resolve examples/adt.mica      # Inspect bindings and capabilities
 cargo run -- --check examples/adt.mica        # Exhaustiveness checks
 cargo run -- --lower examples/methods.mica    # Lower to the simple HIR
+cargo run -- --ir examples/methods.mica       # Dump the typed SSA IR via the backend shim
 ```
 
 CLI output snapshots are maintained in [`docs/snippets.md`](docs/snippets.md).
@@ -105,6 +106,7 @@ Use the CLI commands above to inspect each example.
 │   ├── syntax/          # Lexer and parser
 │   ├── semantics/       # Resolver, effect checker, and type utilities
 │   ├── lower/           # Lowering to a simplified HIR
+│   ├── backend/         # Backend traits and textual emitters
 │   ├── diagnostics/     # Shared error and warning types
 │   └── pretty/          # Concrete syntax tree formatter
 ├── docs/

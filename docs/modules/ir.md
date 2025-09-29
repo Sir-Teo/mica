@@ -10,32 +10,32 @@ and Phase 3 roadmap milestones focused on optimization and code generation.
 
 | Type | Purpose |
 | --- | --- |
-| `Module` | Groups lowered functions for a module and preserves the module path for backend consumers.【F:src/ir/mod.rs†L6-L99】 |
-| `Function` | Holds parameter metadata, return type, and the sequence of basic blocks produced by the SSA lowerer.【F:src/ir/mod.rs†L12-L149】 |
-| `BasicBlock` | Represents a control-flow node with instructions and a terminator (currently return).【F:src/ir/mod.rs†L27-L63】 |
-| `Instruction` | Encodes SSA values with IDs, inferred types, and instruction kinds such as literals, binary ops, calls, and records.【F:src/ir/mod.rs†L34-L58】 |
-| `FuncRef` | Distinguishes direct function calls from desugared method calls as they flow through SSA lowering.【F:src/ir/mod.rs†L65-L69】 |
-| `Type` | Tracks coarse static types inferred during lowering to aid diagnostics and future optimization passes.【F:src/ir/mod.rs†L77-L85】 |
+| `Module` | Owns lowered functions alongside shared type/effect tables so backends see a self-contained package of IR plus metadata.【F:src/ir/mod.rs†L8-L169】 |
+| `Function` | Holds parameters, `TypeId` return metadata, basic blocks, and effect identifiers describing capability requirements.【F:src/ir/mod.rs†L17-L225】 |
+| `BasicBlock` | Represents a control-flow node with instructions and a terminator (currently return).【F:src/ir/mod.rs†L32-L68】 |
+| `Instruction` | Encodes SSA values with IDs, referenced types, and instruction kinds such as literals, binary ops, calls, and records.【F:src/ir/mod.rs†L39-L63】【F:src/ir/mod.rs†L407-L416】 |
+| `TypeTable` & `TypeId` | Intern and reuse structural types so large modules share canonical IDs while keeping lookups O(1).【F:src/ir/mod.rs†L100-L170】【F:src/ir/mod.rs†L538-L584】 |
+| `EffectTable` & `EffectId` | Deduplicate effect names, allowing effect rows to scale linearly with references instead of strings.【F:src/ir/mod.rs†L106-L170】【F:src/ir/mod.rs†L586-L600】 |
 
 ## Lowering Process
 
-- `lower_module` walks the HIR and lowers each `HFunction` into a SSA `Function`.
-  Unsupported items are skipped, mirroring the Phase 2 focus on executable code
-  paths.【F:src/ir/mod.rs†L87-L108】【F:docs/roadmap/compiler.md†L126-L170】
-- `FunctionLower` maintains scope stacks, allocates SSA value IDs, and appends
-  instructions as it traverses statements and expressions.【F:src/ir/mod.rs†L110-L200】
-- Literal emission, binary operations, calls, records, and returns are converted
-  into typed instructions, with placeholder `Type::Unknown` until richer typing
-  arrives in later phases.【F:src/ir/mod.rs†L136-L323】【F:docs/roadmap/compiler.md†L170-L215】
+- `lower_module` walks the HIR, interns every referenced type/effect, and then
+  lowers each function so the resulting module is fully self-contained.【F:src/ir/mod.rs†L112-L170】
+- `FunctionLower` maintains scope stacks, allocates SSA value IDs, attaches
+  `TypeId`s to every SSA value, and appends instructions while threading effect
+  metadata through returns.【F:src/ir/mod.rs†L173-L463】
+- Literal emission, binary operations, calls, records, and tail returns produce
+  typed instructions, defaulting to the shared `unknown` slot until inference can
+  refine them in later phases.【F:src/ir/mod.rs†L294-L416】【F:src/ir/mod.rs†L443-L455】
 
 ## Integration Highlights
 
 1. Consumes the HIR structures from the lowering stage, ensuring desugared
-   constructs map cleanly onto SSA building blocks.【F:src/ir/mod.rs†L3-L107】【F:src/lower/mod.rs†L3-L199】
-2. Provides the foundation for future optimization passes, register allocation,
-   and backend code generation described in the roadmap’s Phase 3 milestones.【F:docs/roadmap/compiler.md†L170-L215】
-3. Tests under `src/tests` verify SSA pretty-printing and instruction sequences,
-   preventing regressions as the IR evolves.【F:src/tests/ir_tests.rs†L1-L75】
+   constructs map cleanly onto SSA building blocks.【F:src/ir/mod.rs†L3-L399】【F:src/lower/mod.rs†L3-L320】
+2. Ships canonical type and effect registries that backend integrations (text,
+   LLVM, WASM) can query without re-resolving AST nodes.【F:src/ir/mod.rs†L498-L600】【F:src/backend/text.rs†L1-L129】
+3. Tests under `src/tests` exercise IR typing, effect rows, and backend output,
+   preventing regressions as the IR evolves.【F:src/tests/ir_tests.rs†L1-L132】【F:src/tests/backend_tests.rs†L1-L55】
 
 ## Roadmap Alignment
 

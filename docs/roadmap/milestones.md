@@ -34,12 +34,14 @@ should observe before moving on.
 
 - **Entry**: Type checker stabilizes, diagnostics accepted by DX team.
 - **Work Items**:
-  1. Design SSA-like IR (`src/ir/`); document structure.
-  2. Lower typed AST to IR, tracking drops and effect metadata.
-  3. Implement IR printer + snapshot tests.
+  1. Finalize typed SSA IR with shared type/effect registries and update design docs.
+  2. Hook the IR into a backend interface (`mica --ir` text emitter today, LLVM/WASM tomorrow).
+  3. Expand the diagnostics playbook with positive/negative regression suites.
   4. Prototype purity analysis for `par` loops and structured tasks.
 - **Exit**:
   - Lowering snapshot suite covers control flow, pattern matching, effects, and tasks.
+  - CLI `mica --ir` emits typed IR that backends can consume without extra context.
+  - Diagnostics regression suites stay green across resolver/checker/IR changes.
   - Purity analysis identifies effect-free regions on sample programs.
   - **Future signal**: IR contains enough provenance to correlate with runtime traces.
 
