@@ -35,7 +35,7 @@ Command: `cargo run -- --lower examples/spawn_await.mica`
 
 ```
 hir module demo.concurrent
-fn fetch(u, net)
+fn fetch(u, net) !{net}
   await(spawn(http::get(u, net)))
 ```
 
