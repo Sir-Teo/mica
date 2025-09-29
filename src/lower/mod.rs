@@ -14,8 +14,16 @@ pub enum HItem {
 #[derive(Debug, Clone)]
 pub struct HFunction {
     pub name: String,
-    pub params: Vec<String>,
+    pub params: Vec<HParam>,
+    pub return_type: Option<TypeExpr>,
+    pub effect_row: Vec<String>,
     pub body: HBlock,
+}
+
+#[derive(Debug, Clone)]
+pub struct HParam {
+    pub name: String,
+    pub ty: TypeExpr,
 }
 
 #[derive(Debug, Clone)]
@@ -71,10 +79,19 @@ pub fn lower_module(m: &Module) -> HModule {
 }
 
 fn lower_function(f: &Function) -> HFunction {
-    let params = f.params.iter().map(|p| p.name.clone()).collect();
+    let params = f
+        .params
+        .iter()
+        .map(|p| HParam {
+            name: p.name.clone(),
+            ty: p.ty.clone(),
+        })
+        .collect();
     HFunction {
         name: f.name.clone(),
         params,
+        return_type: f.return_type.clone(),
+        effect_row: f.effect_row.clone(),
         body: lower_block(&f.body),
     }
 }
@@ -245,7 +262,18 @@ pub fn hir_to_string(m: &HModule) -> String {
     for it in &m.items {
         match it {
             HItem::Function(f) => {
-                out.push_str(&format!("fn {}({})\n", f.name, f.params.join(", ")));
+                let params = f
+                    .params
+                    .iter()
+                    .map(|p| p.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let effect_row = if f.effect_row.is_empty() {
+                    String::new()
+                } else {
+                    format!(" !{{{}}}", f.effect_row.join(", "))
+                };
+                out.push_str(&format!("fn {}({}){}\n", f.name, params, effect_row));
                 for s in &f.body.stmts {
                     match s {
                         HStmt::Let { name, value } => {
