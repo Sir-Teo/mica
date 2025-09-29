@@ -95,7 +95,12 @@ fn classify(result: TaskResult) -> Int {
         }
     }
 
-    assert!(check::check_exhaustiveness(&module).is_empty());
+    let check_result = check::check_module(&module);
+    assert!(
+        check_result.diagnostics.is_empty(),
+        "expected no diagnostics, got {:?}",
+        check_result.diagnostics
+    );
 }
 
 #[test]
@@ -117,7 +122,18 @@ fn handle(resp: Response) -> Int {
 "#;
 
     let module = parse(src);
-    let diags = check::check_exhaustiveness(&module);
-    assert_eq!(diags.len(), 1, "expected a single diagnostic: {diags:?}");
-    assert!(diags[0].message.contains("missing variants Failure"));
+    let result = check::check_module(&module);
+    assert_eq!(
+        result.diagnostics.len(),
+        1,
+        "expected a single diagnostic: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        result.diagnostics[0]
+            .message
+            .contains("missing variants Failure"),
+        "unexpected diagnostic {:?}",
+        result.diagnostics[0]
+    );
 }

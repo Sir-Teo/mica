@@ -47,6 +47,15 @@ impl<'a, 'g> Resolver<'a, 'g> {
         }
     }
 
+    fn report_duplicate(&mut self, name: &str, kind: PathKind) {
+        self.resolved.diagnostics.push(ResolveDiagnostic {
+            path: vec![name.to_string()],
+            kind,
+            scope: self.current_scope.clone(),
+            message: format!("duplicate {} '{}'", path_kind_label(kind), name),
+        });
+    }
+
     fn resolve_type_alias(&mut self, ta: &TypeAlias) {
         let prev_scope = self.current_scope.clone();
         self.current_scope = SymbolScope::TypeAlias {
@@ -61,7 +70,9 @@ impl<'a, 'g> Resolver<'a, 'g> {
                 category: SymbolCategory::TypeParam,
                 scope: self.current_scope.clone(),
             };
-            self.scope.insert_type(symbol.clone());
+            if self.scope.insert_type(symbol.clone()).is_some() {
+                self.report_duplicate(&symbol.name, PathKind::Type);
+            }
             self.resolved.symbols.push(symbol);
         }
 
@@ -84,7 +95,9 @@ impl<'a, 'g> Resolver<'a, 'g> {
                 category: SymbolCategory::TypeParam,
                 scope: self.current_scope.clone(),
             };
-            self.scope.insert_type(symbol.clone());
+            if self.scope.insert_type(symbol.clone()).is_some() {
+                self.report_duplicate(&symbol.name, PathKind::Type);
+            }
             self.resolved.symbols.push(symbol);
             for bound in &generic.bounds {
                 self.resolve_path(&bound.segments, PathKind::Type);
@@ -98,7 +111,9 @@ impl<'a, 'g> Resolver<'a, 'g> {
                 category: SymbolCategory::ValueParam,
                 scope: self.current_scope.clone(),
             };
-            self.scope.insert_value(symbol.clone());
+            if self.scope.insert_value(symbol.clone()).is_some() {
+                self.report_duplicate(&symbol.name, PathKind::Value);
+            }
             self.resolved.symbols.push(symbol);
         }
 
@@ -150,7 +165,9 @@ impl<'a, 'g> Resolver<'a, 'g> {
                     category: SymbolCategory::LocalBinding,
                     scope: self.current_scope.clone(),
                 };
-                self.scope.insert_value(symbol.clone());
+                if self.scope.insert_value(symbol.clone()).is_some() {
+                    self.report_duplicate(&symbol.name, PathKind::Value);
+                }
                 self.resolved.symbols.push(symbol);
             }
             Stmt::Expr(expr) => self.resolve_expr(expr),
@@ -235,7 +252,9 @@ impl<'a, 'g> Resolver<'a, 'g> {
                     category: SymbolCategory::LocalBinding,
                     scope: self.current_scope.clone(),
                 };
-                self.scope.insert_value(symbol.clone());
+                if self.scope.insert_value(symbol.clone()).is_some() {
+                    self.report_duplicate(&symbol.name, PathKind::Value);
+                }
                 self.resolved.symbols.push(symbol);
                 self.resolve_expr(body);
                 self.scope.pop_layer();
@@ -269,7 +288,9 @@ impl<'a, 'g> Resolver<'a, 'g> {
                         category: SymbolCategory::LocalBinding,
                         scope: self.current_scope.clone(),
                     };
-                    self.scope.insert_value(symbol.clone());
+                    if self.scope.insert_value(symbol.clone()).is_some() {
+                        self.report_duplicate(&symbol.name, PathKind::Value);
+                    }
                     self.resolved.symbols.push(symbol);
                 }
                 self.resolve_block(body);
@@ -287,7 +308,9 @@ impl<'a, 'g> Resolver<'a, 'g> {
                     category: SymbolCategory::LocalBinding,
                     scope: self.current_scope.clone(),
                 };
-                self.scope.insert_value(symbol.clone());
+                if self.scope.insert_value(symbol.clone()).is_some() {
+                    self.report_duplicate(&symbol.name, PathKind::Value);
+                }
                 self.resolved.symbols.push(symbol);
             }
             Pattern::Tuple(patterns) => {

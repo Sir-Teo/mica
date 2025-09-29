@@ -9,12 +9,12 @@ pub(super) struct ScopeLayer {
 }
 
 impl ScopeLayer {
-    pub(super) fn insert_value(&mut self, symbol: SymbolInfo) {
-        self.values.insert(symbol.name.clone(), symbol);
+    pub(super) fn insert_value(&mut self, symbol: SymbolInfo) -> Option<SymbolInfo> {
+        self.values.insert(symbol.name.clone(), symbol)
     }
 
-    pub(super) fn insert_type(&mut self, symbol: SymbolInfo) {
-        self.types.insert(symbol.name.clone(), symbol);
+    pub(super) fn insert_type(&mut self, symbol: SymbolInfo) -> Option<SymbolInfo> {
+        self.types.insert(symbol.name.clone(), symbol)
     }
 }
 
@@ -35,15 +35,19 @@ impl ScopeStack {
         self.stack.pop();
     }
 
-    pub(super) fn insert_value(&mut self, symbol: SymbolInfo) {
+    pub(super) fn insert_value(&mut self, symbol: SymbolInfo) -> Option<SymbolInfo> {
         if let Some(layer) = self.stack.last_mut() {
-            layer.insert_value(symbol);
+            layer.insert_value(symbol)
+        } else {
+            None
         }
     }
 
-    pub(super) fn insert_type(&mut self, symbol: SymbolInfo) {
+    pub(super) fn insert_type(&mut self, symbol: SymbolInfo) -> Option<SymbolInfo> {
         if let Some(layer) = self.stack.last_mut() {
-            layer.insert_type(symbol);
+            layer.insert_type(symbol)
+        } else {
+            None
         }
     }
 

@@ -1,7 +1,7 @@
 use crate::syntax::ast::{Function, Item, Module, TypeAlias, TypeExpr, UseDecl};
 
 use super::data::{
-    ModuleExports, Resolved, ResolvedImport, SymbolCategory, SymbolInfo, SymbolScope,
+    ModuleExports, PathKind, Resolved, ResolvedImport, SymbolCategory, SymbolInfo, SymbolScope,
 };
 use super::scope::ScopeLayer;
 
@@ -61,7 +61,16 @@ impl<'a> Collector<'a> {
             },
             scope: SymbolScope::Module(self.module.name.clone()),
         };
-        self.module_scope.insert_type(symbol.clone());
+        if let Some(existing) = self.module_scope.insert_type(symbol.clone()) {
+            self.resolved
+                .diagnostics
+                .push(super::data::ResolveDiagnostic {
+                    path: vec![ta.name.clone()],
+                    kind: PathKind::Type,
+                    scope: SymbolScope::Module(self.module.name.clone()),
+                    message: format!("duplicate type definition for '{}'", existing.name),
+                });
+        }
         self.resolved.symbols.push(symbol.clone());
         if ta.is_public {
             self.exports
@@ -104,7 +113,16 @@ impl<'a> Collector<'a> {
             },
             scope: SymbolScope::Module(self.module.name.clone()),
         };
-        self.module_scope.insert_value(symbol.clone());
+        if let Some(existing) = self.module_scope.insert_value(symbol.clone()) {
+            self.resolved
+                .diagnostics
+                .push(super::data::ResolveDiagnostic {
+                    path: vec![func.name.clone()],
+                    kind: PathKind::Value,
+                    scope: SymbolScope::Module(self.module.name.clone()),
+                    message: format!("duplicate function definition for '{}'", existing.name),
+                });
+        }
         self.resolved.symbols.push(symbol.clone());
         if func.is_public {
             self.exports.values.insert(symbol.name.clone(), symbol);
@@ -126,8 +144,26 @@ impl<'a> Collector<'a> {
                 },
                 scope: SymbolScope::Module(self.module.name.clone()),
             };
-            self.module_scope.insert_value(symbol.clone());
-            self.module_scope.insert_type(symbol.clone());
+            if let Some(existing) = self.module_scope.insert_value(symbol.clone()) {
+                self.resolved
+                    .diagnostics
+                    .push(super::data::ResolveDiagnostic {
+                        path: vec![name.clone()],
+                        kind: PathKind::Value,
+                        scope: SymbolScope::Module(self.module.name.clone()),
+                        message: format!("duplicate import alias '{}'", existing.name),
+                    });
+            }
+            if let Some(existing) = self.module_scope.insert_type(symbol.clone()) {
+                self.resolved
+                    .diagnostics
+                    .push(super::data::ResolveDiagnostic {
+                        path: vec![name.clone()],
+                        kind: PathKind::Type,
+                        scope: SymbolScope::Module(self.module.name.clone()),
+                        message: format!("duplicate import alias '{}'", existing.name),
+                    });
+            }
             self.resolved.symbols.push(symbol);
         }
     }
