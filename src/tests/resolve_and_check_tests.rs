@@ -244,3 +244,141 @@ fn resolve_collects_symbols_and_paths() {
             )
     }));
 }
+
+#[test]
+fn type_alias_function_effect_row_records_capabilities() {
+    let module = parse(
+        "module demo\n\
+         type Handler = fn(Int) -> Int !{io}\n",
+    );
+
+    let resolved = resolve::resolve_module(&module);
+
+    let capability = resolved
+        .capabilities
+        .iter()
+        .find(|cap| cap.name == "io")
+        .expect("type alias capability recorded");
+
+    match &capability.scope {
+        CapabilityScope::TypeAlias { type_name, .. } => assert_eq!(type_name, "Handler"),
+        other => panic!("expected type alias capability scope, got {other:?}"),
+    }
+}
+
+#[test]
+fn resolve_variants_in_match_patterns_without_prefix() {
+    let module = parse(
+        "module demo\n\
+         type Option[T] = Some(T) | None\n\
+         fn unwrap(opt: Option[Int]) -> Int {\n\
+           match opt {\n\
+             Some(value) => value,\n\
+             None => 0,\n\
+           }\n\
+         }\n",
+    );
+
+    let resolved = resolve::resolve_module(&module);
+
+    let some_variant = resolved
+        .resolved_paths
+        .iter()
+        .find(|path| path.segments == vec!["Some".to_string()])
+        .expect("expected resolved path for bare Some variant");
+
+    assert!(matches!(some_variant.kind, PathKind::Variant));
+    let variant_symbol = some_variant
+        .resolved
+        .as_ref()
+        .expect("variant should resolve to symbol");
+    match &variant_symbol.category {
+        SymbolCategory::Variant { parent } => assert_eq!(parent, "Option"),
+        other => panic!("expected variant symbol, got {other:?}"),
+    }
+
+    assert!(resolved.symbols.iter().any(|symbol| {
+        matches!(symbol.category, SymbolCategory::LocalBinding)
+            && symbol.name == "value"
+            && matches!(
+                symbol.scope,
+                SymbolScope::Function { ref function, .. } if function == "unwrap"
+            )
+    }));
+}
+
+#[test]
+fn resolve_impl_items_and_trait_paths() {
+    let module = parse(
+        "module demo\n\
+         type Option[T] = Some(T) | None\n\
+         impl Display for Option[Int] {\n\
+           fn fmt(self, other: Int, io: IO) -> Int !{io} {\n\
+             match self {\n\
+               Some(value) => {\n\
+                 let result = other;\n\
+                 result\n\
+               },\n\
+               None => {\n\
+                 let fallback = 0;\n\
+                 fallback\n\
+               },\n\
+             }\n\
+           }\n\
+         }\n",
+    );
+
+    let resolved = resolve::resolve_module(&module);
+
+    assert!(resolved
+        .resolved_paths
+        .iter()
+        .any(|path| path.segments == vec!["Display".to_string()] && matches!(path.kind, PathKind::Type)));
+
+    assert!(resolved
+        .resolved_paths
+        .iter()
+        .any(|path| path.segments == vec!["Option".to_string()] && matches!(path.kind, PathKind::Type)));
+
+    let capability = resolved
+        .capabilities
+        .iter()
+        .find(|cap| cap.name == "io")
+        .expect("function capability recorded");
+    match &capability.scope {
+        CapabilityScope::Function { function, .. } => assert_eq!(function, "fmt"),
+        other => panic!("expected function capability scope, got {other:?}"),
+    }
+
+    let some_variant = resolved
+        .resolved_paths
+        .iter()
+        .find(|path| path.segments == vec!["Some".to_string()])
+        .expect("expected variant resolution inside impl");
+    let symbol = some_variant
+        .resolved
+        .as_ref()
+        .expect("variant symbol present");
+    match &symbol.category {
+        SymbolCategory::Variant { parent } => assert_eq!(parent, "Option"),
+        other => panic!("expected variant symbol, got {other:?}"),
+    }
+
+    assert!(resolved.symbols.iter().any(|symbol| {
+        matches!(symbol.category, SymbolCategory::LocalBinding)
+            && symbol.name == "value"
+            && matches!(
+                symbol.scope,
+                SymbolScope::Function { ref function, .. } if function == "fmt"
+            )
+    }));
+
+    assert!(resolved.symbols.iter().any(|symbol| {
+        matches!(symbol.category, SymbolCategory::LocalBinding)
+            && symbol.name == "fallback"
+            && matches!(
+                symbol.scope,
+                SymbolScope::Function { ref function, .. } if function == "fmt"
+            )
+    }));
+}
