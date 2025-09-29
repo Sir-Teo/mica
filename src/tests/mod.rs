@@ -3,8 +3,9 @@
 use crate::diagnostics::error::{Error, ErrorKind};
 use crate::semantics::{check, resolve};
 use crate::syntax::{ast::*, lexer, parser, token::TokenKind};
-use crate::{ir, lower, pretty};
+use crate::{backend, ir, lower, pretty};
 
+mod backend_tests;
 mod display_tests;
 mod helpers;
 mod ir_tests;

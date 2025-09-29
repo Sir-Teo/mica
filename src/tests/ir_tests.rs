@@ -22,9 +22,9 @@ fn add(x: Int, y: Int) -> Int {
     let func = &ir_module.functions[0];
     assert_eq!(func.name, "add");
     assert_eq!(func.params.len(), 2);
-    assert_eq!(func.effect_row, Vec::<String>::new());
-    assert_eq!(func.params[0].ty, ir::Type::Int);
-    assert_eq!(func.params[1].ty, ir::Type::Int);
+    assert!(func.effect_row.is_empty());
+    assert_eq!(ir_module.type_of(func.params[0].ty), &ir::Type::Int);
+    assert_eq!(ir_module.type_of(func.params[1].ty), &ir::Type::Int);
     assert_eq!(func.blocks.len(), 1);
 
     let block = &func.blocks[0];
@@ -60,11 +60,11 @@ fn forty_two() -> Int {
         .iter()
         .find(|f| f.name == "forty_two")
         .expect("function");
-    assert_eq!(func.ret_type, ir::Type::Int);
+    assert_eq!(ir_module.type_of(func.ret_type), &ir::Type::Int);
 
     let block = &func.blocks[0];
     assert_eq!(block.instructions.len(), 1);
-    assert_eq!(block.instructions[0].ty, ir::Type::Int);
+    assert_eq!(ir_module.type_of(block.instructions[0].ty), &ir::Type::Int);
     match &block.instructions[0].kind {
         ir::InstKind::Literal(Literal::Int(value)) => assert_eq!(*value, 42),
         other => panic!("expected int literal, got {other:?}"),
@@ -100,11 +100,19 @@ fn process(count: Int, data: Data) -> Unit !{io} {
         .find(|f| f.name == "process")
         .expect("function");
 
-    assert_eq!(func.effect_row, vec!["io".to_string()]);
+    let effect_names: Vec<_> = func
+        .effect_row
+        .iter()
+        .map(|id| ir_module.effect_name(*id).to_string())
+        .collect();
+    assert_eq!(effect_names, vec!["io".to_string()]);
     assert_eq!(func.params.len(), 2);
-    assert_eq!(func.params[0].ty, ir::Type::Int);
-    assert_eq!(func.params[1].ty, ir::Type::Named("Data".to_string()));
-    assert_eq!(func.ret_type, ir::Type::Unit);
+    assert_eq!(ir_module.type_of(func.params[0].ty), &ir::Type::Int);
+    assert_eq!(
+        ir_module.type_of(func.params[1].ty),
+        &ir::Type::Named("Data".to_string())
+    );
+    assert_eq!(ir_module.type_of(func.ret_type), &ir::Type::Unit);
 
     let entry_block = func
         .blocks
@@ -118,7 +126,7 @@ fn process(count: Int, data: Data) -> Unit !{io} {
                 .iter()
                 .find(|inst| inst.id == *value)
                 .expect("return instruction");
-            assert_eq!(ret_inst.ty, ir::Type::Unit);
+            assert_eq!(ir_module.type_of(ret_inst.ty), &ir::Type::Unit);
         }
         ir::Terminator::Return(None) => panic!("expected explicit unit return"),
     }
@@ -144,10 +152,10 @@ fn identity(x: Int) -> Int {
         .find(|f| f.name == "identity")
         .expect("function");
 
-    assert_eq!(func.ret_type, ir::Type::Int);
+    assert_eq!(ir_module.type_of(func.ret_type), &ir::Type::Int);
     assert!(func.effect_row.is_empty());
     assert_eq!(func.params.len(), 1);
-    assert_eq!(func.params[0].ty, ir::Type::Int);
+    assert_eq!(ir_module.type_of(func.params[0].ty), &ir::Type::Int);
 
     let entry_block = &func.blocks[0];
     assert!(entry_block.instructions.is_empty());
