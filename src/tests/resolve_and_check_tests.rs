@@ -388,3 +388,124 @@ fn resolve_impl_items_and_trait_paths() {
             )
     }));
 }
+
+#[test]
+fn resolve_cross_module_paths() {
+    let math_module = Module {
+        name: vec!["math".into()],
+        items: vec![Item::Function(Function {
+            is_public: true,
+            name: "add".into(),
+            generics: vec![],
+            params: vec![
+                Param {
+                    name: "lhs".into(),
+                    ty: TypeExpr::Name("Int".into()),
+                    mutable: false,
+                },
+                Param {
+                    name: "rhs".into(),
+                    ty: TypeExpr::Name("Int".into()),
+                    mutable: false,
+                },
+            ],
+            return_type: Some(TypeExpr::Name("Int".into())),
+            effect_row: vec![],
+            body: Block {
+                statements: vec![Stmt::Expr(Expr::Path(path(["lhs"])))],
+            },
+        })],
+    };
+
+    let result_module = Module {
+        name: vec!["util".into(), "result".into()],
+        items: vec![Item::TypeAlias(TypeAlias {
+            is_public: true,
+            name: "Outcome".into(),
+            params: vec![],
+            value: TypeExpr::Sum(vec![
+                TypeVariant {
+                    name: "Success".into(),
+                    fields: vec![TypeExpr::Name("Int".into())],
+                },
+                TypeVariant {
+                    name: "Failure".into(),
+                    fields: vec![],
+                },
+            ]),
+        })],
+    };
+
+    let app_module = Module {
+        name: vec!["app".into()],
+        items: vec![Item::Function(Function {
+            is_public: false,
+            name: "run".into(),
+            generics: vec![],
+            params: vec![],
+            return_type: None,
+            effect_row: vec![],
+            body: Block {
+                statements: vec![
+                    Stmt::Let(LetStmt {
+                        mutable: false,
+                        name: "total".into(),
+                        value: Expr::Call {
+                            callee: Box::new(Expr::Path(path(["math", "add"]))),
+                            args: vec![literal_int(1), literal_int(2)],
+                        },
+                    }),
+                    Stmt::Expr(Expr::Ctor {
+                        path: path(["util", "result", "Outcome", "Success"]),
+                        args: vec![Expr::Path(path(["total"]))],
+                    }),
+                ],
+            },
+        })],
+    };
+
+    let modules = vec![&math_module, &result_module, &app_module];
+    let resolved = resolve::resolve_modules(modules);
+
+    let app_resolved = resolved.get(&app_module.name).expect("app module resolved");
+
+    let add_path = app_resolved
+        .resolved_paths
+        .iter()
+        .find(|path| path.segments == vec!["math".to_string(), "add".to_string()])
+        .expect("math::add path resolved");
+    let add_symbol = add_path.resolved.as_ref().expect("symbol for math::add");
+    match &add_symbol.category {
+        SymbolCategory::Function { is_public } => assert!(*is_public),
+        other => panic!("expected function symbol, got {other:?}"),
+    }
+    match &add_symbol.scope {
+        SymbolScope::Module(path) => assert_eq!(path, &vec!["math".to_string()]),
+        other => panic!("expected module scope, got {other:?}"),
+    }
+
+    let ctor_path = app_resolved
+        .resolved_paths
+        .iter()
+        .find(|path| {
+            path.segments
+                == vec![
+                    "util".to_string(),
+                    "result".to_string(),
+                    "Outcome".to_string(),
+                    "Success".to_string(),
+                ]
+        })
+        .expect("Outcome::Success path resolved");
+    let ctor_symbol = ctor_path.resolved.as_ref().expect("variant symbol present");
+    match &ctor_symbol.category {
+        SymbolCategory::Variant { parent } => assert_eq!(parent, "Outcome"),
+        other => panic!("expected variant symbol, got {other:?}"),
+    }
+    match &ctor_symbol.scope {
+        SymbolScope::Module(path) => {
+            assert_eq!(path, &vec!["util".to_string(), "result".to_string()]);
+        }
+        other => panic!("expected module scope, got {other:?}"),
+    }
+}
