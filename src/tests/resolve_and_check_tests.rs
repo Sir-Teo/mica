@@ -1,5 +1,6 @@
 use super::helpers::*;
 use super::*;
+use crate::semantics::resolve::{CapabilityScope, PathKind, SymbolCategory, SymbolScope};
 
 fn exhaustive_module() -> Module {
     let match_expr = Expr::Match {
@@ -148,4 +149,98 @@ fn resolve_and_check_visit_every_path() {
 
     let diags = check::check_exhaustiveness(&module);
     assert!(diags.is_empty(), "expected no diagnostics, got {diags:?}");
+}
+
+#[test]
+fn resolve_collects_symbols_and_paths() {
+    let module = Module {
+        name: vec!["demo".into()],
+        items: vec![
+            Item::Use(UseDecl {
+                path: vec!["math".into(), "add".into()],
+                alias: Some("plus".into()),
+            }),
+            Item::TypeAlias(TypeAlias {
+                is_public: false,
+                name: "Pair".into(),
+                params: vec!["T".into()],
+                value: TypeExpr::Tuple(vec![
+                    TypeExpr::Name("T".into()),
+                    TypeExpr::Name("T".into()),
+                ]),
+            }),
+            Item::Function(Function {
+                is_public: false,
+                name: "project".into(),
+                generics: vec![GenericParam {
+                    name: "T".into(),
+                    bounds: vec![],
+                }],
+                params: vec![Param {
+                    name: "pair".into(),
+                    ty: TypeExpr::Generic("Pair".into(), vec![TypeExpr::Name("T".into())]),
+                    mutable: false,
+                }],
+                return_type: Some(TypeExpr::Name("T".into())),
+                effect_row: vec!["io".into()],
+                body: Block {
+                    statements: vec![
+                        Stmt::Let(LetStmt {
+                            mutable: false,
+                            name: "first".into(),
+                            value: Expr::Path(Path {
+                                segments: vec!["pair".into()],
+                            }),
+                        }),
+                        Stmt::Expr(Expr::Path(Path {
+                            segments: vec!["first".into()],
+                        })),
+                    ],
+                },
+            }),
+        ],
+    };
+
+    let resolved = resolve::resolve_module(&module);
+
+    assert!(
+        resolved
+            .imports
+            .iter()
+            .any(|import| import.alias.as_deref() == Some("plus"))
+    );
+
+    let type_symbol = resolved
+        .symbols
+        .iter()
+        .find(|symbol| {
+            matches!(symbol.category, SymbolCategory::Type { .. }) && symbol.name == "Pair"
+        })
+        .expect("type symbol recorded");
+    assert!(matches!(type_symbol.scope, SymbolScope::Module(_)));
+
+    assert!(
+        resolved.symbols.iter().any(
+            |symbol| matches!(symbol.category, SymbolCategory::TypeParam) && symbol.name == "T"
+        )
+    );
+
+    let paths: Vec<_> = resolved
+        .resolved_paths
+        .iter()
+        .filter(|path| path.segments == vec!["Pair".to_string()])
+        .collect();
+    assert!(
+        !paths.is_empty(),
+        "expected to see resolved path for Pair, got {paths:?}"
+    );
+    assert!(paths.iter().all(|path| matches!(path.kind, PathKind::Type)));
+
+    assert!(resolved.capabilities.iter().any(|cap| {
+        cap.name == "io"
+            && matches!(
+                cap.scope,
+                CapabilityScope::Function { ref function, .. } if function == "project"
+            )
+    }));
 }
