@@ -51,9 +51,9 @@ Command: `cargo run --bin mica -- --llvm examples/methods.mica`
 ```
 ; ModuleID = 'demo.methods'
 
-define %Vec2 @use_method(%Vec2 %a, %Vec2 %b) {
+define ptr @use_method(ptr %a, ptr %b) {
 bb0:
-  ; %2 : ptr = call %add(%0, %1)
+  %2 = call ptr @add(ptr %0, ptr %1)
   ret ptr %2
 }
 ```
