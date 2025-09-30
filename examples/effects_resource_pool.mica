@@ -1,0 +1,35 @@
+module demo.effects.resource
+
+type Result[T, E] = Ok(T) | Err(E)
+
+fn with_file[T, A](path: String, arg: A, io: IO, callback: fn(File, A) -> Result[T, String] !{io}) -> Result[T, String] !{io} {
+  using file = File::open(path, io)? {
+    let value = callback(file, arg)?
+    Ok(value)
+  }
+}
+
+fn write_lines_into(file: File, lines: [String], io: IO) -> Result[Int, String] !{io} {
+  let mut count = 0
+  for line in lines {
+    io.println(line)
+    count = count + 1
+  }
+  Ok(count)
+}
+
+fn write_lines(path: String, lines: [String], io: IO) -> Result[Int, String] !{io} {
+  with_file(path, lines, io, write_lines_into)
+}
+
+fn read_config(path: String, io: IO) -> Result[String, String] !{io} {
+  using File::open(path, io)? {
+    Ok("config loaded")
+  }
+}
+
+fn sync_logs(path: String, lines: [String], io: IO, net: Net) -> Result[Int, String] !{io, net} {
+  let count = write_lines(path, lines, io)?
+  let _ = await spawn telemetry::publish(count, net)?
+  Ok(count)
+}

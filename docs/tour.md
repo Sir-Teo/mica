@@ -38,6 +38,8 @@ fn to_text(c: Color) -> String {
 ```
 
 - Non-exhaustive matches are flagged (see `examples/adt_match_nonexhaustive.mica`).
+- For a larger pipeline that combines match guards with capability-aware logging,
+  explore [`examples/concurrency_pipeline.mica`](../examples/concurrency_pipeline.mica).
 
 ## Effects and Using
 
@@ -53,6 +55,10 @@ fn run_with(callback: fn(Int) -> Int !{io}, io: IO) !{io} {
 }
 ```
 
+- Nested `using` scopes with higher-order helpers and cross-capability tasks are
+  demonstrated in
+  [`examples/effects_resource_pool.mica`](../examples/effects_resource_pool.mica).
+
 ## Concurrency
 
 - Structured tasks with `spawn` and `await`:
@@ -63,6 +69,9 @@ fn fetch(u: String, net: Net) -> Bytes !{net} {
 }
 ```
 
+- Coordinated fan-out/fan-in pipelines with classification and logging live in
+  [`examples/concurrency_pipeline.mica`](../examples/concurrency_pipeline.mica).
+
 ## Generics and Bounds
 
 - Generic functions with simple bounds:
@@ -70,6 +79,9 @@ fn fetch(u: String, net: Net) -> Bytes !{net} {
 ```mica
 fn max[T: Ord](a: T, b: T) -> T { if a < b { b } else { a } }
 ```
+
+- Recursive ADTs with higher-order traversal helpers are covered in
+  [`examples/generics_tree_algorithms.mica`](../examples/generics_tree_algorithms.mica).
 
 ## Collections and Loops
 
