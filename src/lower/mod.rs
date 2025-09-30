@@ -9,6 +9,7 @@ pub struct HModule {
 #[derive(Debug, Clone)]
 pub enum HItem {
     Function(HFunction),
+    TypeAlias(HTypeAlias),
 }
 
 #[derive(Debug, Clone)]
@@ -18,6 +19,13 @@ pub struct HFunction {
     pub return_type: Option<TypeExpr>,
     pub effect_row: Vec<String>,
     pub body: HBlock,
+}
+
+#[derive(Debug, Clone)]
+pub struct HTypeAlias {
+    pub name: String,
+    pub params: Vec<String>,
+    pub value: TypeExpr,
 }
 
 #[derive(Debug, Clone)]
@@ -68,8 +76,10 @@ pub enum HFuncRef {
 pub fn lower_module(m: &Module) -> HModule {
     let mut items = Vec::new();
     for it in &m.items {
-        if let Item::Function(f) = it {
-            items.push(HItem::Function(lower_function(f)));
+        match it {
+            Item::Function(f) => items.push(HItem::Function(lower_function(f))),
+            Item::TypeAlias(alias) => items.push(HItem::TypeAlias(lower_type_alias(alias))),
+            _ => {}
         }
     }
     HModule {
@@ -93,6 +103,14 @@ fn lower_function(f: &Function) -> HFunction {
         return_type: f.return_type.clone(),
         effect_row: f.effect_row.clone(),
         body: lower_block(&f.body),
+    }
+}
+
+fn lower_type_alias(alias: &TypeAlias) -> HTypeAlias {
+    HTypeAlias {
+        name: alias.name.clone(),
+        params: alias.params.clone(),
+        value: alias.value.clone(),
     }
 }
 
@@ -286,6 +304,9 @@ pub fn hir_to_string(m: &HModule) -> String {
                         HStmt::Return(None) => out.push_str("  return\n"),
                     }
                 }
+            }
+            HItem::TypeAlias(alias) => {
+                out.push_str(&format!("type {} = {:?}\n", alias.name, alias.value));
             }
         }
     }

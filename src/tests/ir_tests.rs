@@ -108,10 +108,14 @@ fn process(count: Int, data: Data) -> Unit !{io} {
     assert_eq!(effect_names, vec!["io".to_string()]);
     assert_eq!(func.params.len(), 2);
     assert_eq!(ir_module.type_of(func.params[0].ty), &ir::Type::Int);
-    assert_eq!(
-        ir_module.type_of(func.params[1].ty),
-        &ir::Type::Named("Data".to_string())
-    );
+    match ir_module.type_of(func.params[1].ty) {
+        ir::Type::Record(record) => {
+            assert_eq!(record.name.as_deref(), Some("Data"));
+            assert_eq!(record.fields.len(), 1);
+            assert_eq!(record.fields[0].name, "value");
+        }
+        other => panic!("expected record type for Data param, got {other:?}"),
+    }
     assert_eq!(ir_module.type_of(func.ret_type), &ir::Type::Unit);
 
     let entry_block = func
@@ -131,6 +135,84 @@ fn process(count: Int, data: Data) -> Unit !{io} {
         ir::Terminator::Return(None) => panic!("expected explicit unit return"),
         other => panic!("unexpected terminator: {other:?}"),
     }
+}
+
+#[test]
+fn record_layout_tracks_offsets_and_size() {
+    let src = r#"
+module demo
+
+type Point = { x: Int, y: Int, flag: Bool }
+
+fn make(flag: Bool) -> Point {
+  Point { x: 1, y: 2, flag }
+}
+"#;
+
+    let module = parse(src);
+    let hir = lower::lower_module(&module);
+    let ir_module = ir::lower_module(&hir);
+
+    let point_id = ir_module
+        .types
+        .lookup_named("Point")
+        .expect("Point type registered");
+    match ir_module.type_of(point_id) {
+        ir::Type::Record(record) => {
+            assert_eq!(record.name.as_deref(), Some("Point"));
+            assert_eq!(record.fields.len(), 3);
+            assert_eq!(record.fields[0].name, "x");
+            assert_eq!(record.fields[0].offset, 0);
+            assert_eq!(record.fields[1].name, "y");
+            assert_eq!(record.fields[1].offset, 8);
+            assert_eq!(record.fields[2].name, "flag");
+            assert_eq!(record.fields[2].offset, 16);
+            assert_eq!(record.size, 24);
+            assert_eq!(record.align, 8);
+        }
+        other => panic!("expected record type, got {other:?}"),
+    }
+}
+
+#[test]
+fn call_instructions_capture_effect_metadata() {
+    let src = r#"
+module demo
+
+fn helper(io: IO) -> Int !{io} {
+  1
+}
+
+fn main(io: IO) -> Int !{io} {
+  helper(io)
+}
+"#;
+
+    let module = parse(src);
+    let hir = lower::lower_module(&module);
+    let ir_module = ir::lower_module(&hir);
+
+    let main_fn = ir_module
+        .functions
+        .iter()
+        .find(|f| f.name == "main")
+        .expect("main function present");
+    let call_inst = main_fn
+        .blocks
+        .iter()
+        .flat_map(|block| block.instructions.iter())
+        .find(|inst| matches!(inst.kind, ir::InstKind::Call { .. }))
+        .expect("call instruction lowered");
+    assert!(
+        !call_inst.effects.is_empty(),
+        "expected call to capture effect metadata"
+    );
+    let effect_names: Vec<_> = call_inst
+        .effects
+        .iter()
+        .map(|id| ir_module.effect_name(*id).to_string())
+        .collect();
+    assert_eq!(effect_names, vec!["io".to_string()]);
 }
 
 #[test]
@@ -248,4 +330,56 @@ fn pick(flag: Bool) -> Int {
         }
         other => panic!("expected return terminator in merge block, got {other:?}"),
     }
+}
+
+#[test]
+fn purity_analysis_identifies_pure_blocks() {
+    let src = r#"
+module demo
+
+fn forty_two() -> Int {
+  42
+}
+
+fn helper(io: IO) -> Int !{io} {
+  1
+}
+
+fn main(io: IO) -> Int !{io} {
+  helper(io)
+}
+"#;
+
+    let module = parse(src);
+    let hir = lower::lower_module(&module);
+    let ir_module = ir::lower_module(&hir);
+
+    let pure_fn = ir_module
+        .functions
+        .iter()
+        .find(|f| f.name == "forty_two")
+        .expect("pure function present");
+    let report = ir::analysis::analyze_function_purity(pure_fn);
+    let entry = pure_fn.blocks[0].id;
+    assert!(report.is_block_pure(entry));
+    assert!(report.effectful_instructions.is_empty());
+
+    let impure_fn = ir_module
+        .functions
+        .iter()
+        .find(|f| f.name == "main")
+        .expect("main function present");
+    let report = ir::analysis::analyze_function_purity(impure_fn);
+    let entry = impure_fn.blocks[0].id;
+    assert!(
+        !report.is_block_pure(entry),
+        "call with effects should mark block impure"
+    );
+    assert!(report.effectful_instructions.iter().any(|id| {
+        impure_fn
+            .blocks
+            .iter()
+            .flat_map(|block| block.instructions.iter())
+            .any(|inst| inst.id == *id && matches!(inst.kind, ir::InstKind::Call { .. }))
+    }));
 }

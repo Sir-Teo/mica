@@ -217,7 +217,8 @@ fn build() -> Data {
     .expect("backend output");
 
     let ir = output.as_str();
-    assert!(ir.contains("define ptr @build()"));
-    assert!(ir.contains("call ptr @__mica_record_stub(i64 %0)"));
-    assert!(ir.contains("ret ptr %1"));
+    assert!(ir.contains("%record.Data = type { i64 }"));
+    assert!(ir.contains("define %record.Data @build()"));
+    assert!(ir.contains("insertvalue %record.Data"));
+    assert!(ir.contains("ret %record.Data %"));
 }
