@@ -1,6 +1,6 @@
 # Project Status — Phase 2 Kickoff
 
-_Last updated: 2025-09-29 23:23 UTC_
+_Last updated: 2025-09-30 00:00 UTC_
 
 ## Current Health Check
 - **Compiler pipeline**: Lexer, parser, resolver, and type checker are implemented and covered by regression tests.
@@ -9,7 +9,7 @@ _Last updated: 2025-09-29 23:23 UTC_
 - **Diagnostics**: Playbook refreshed with backend snapshots and CLI documentation mirrors the expanded surface area, including new IR examples.【F:docs/modules/diagnostics.md†L1-L89】【F:docs/snippets.md†L1-L80】
 
 ## Test & Verification Snapshot
-- `cargo test` (unit + integration) — all 36 suites pass locally.
+- `cargo test` (unit + integration) — all 37 suites pass locally across lexer, parser, lowering, IR, backend, resolver, and diagnostics coverage.【F:src/tests/mod.rs†L1-L17】
 - Doc tests for CLI utilities execute with zero regressions.
 
 ## Near-Term Priorities

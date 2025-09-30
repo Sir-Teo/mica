@@ -99,6 +99,13 @@ fn format_inst(inst: &ir::Instruction) -> String {
             }
         }
         InstKind::Path(path) => format!("path {}", path.segments.join("::")),
+        InstKind::Phi { incomings } => {
+            let mut parts = Vec::new();
+            for (block, value) in incomings {
+                parts.push(format!("bb{}: %{}", block.index(), value.index()));
+            }
+            format!("phi {{ {} }}", parts.join(", "))
+        }
     }
 }
 
@@ -108,6 +115,17 @@ fn format_terminator(block: &ir::BasicBlock) -> String {
             format!("return %{}", value.index())
         }
         Terminator::Return(None) => "return".to_string(),
+        Terminator::Branch {
+            condition,
+            then_block,
+            else_block,
+        } => format!(
+            "branch %{} -> bb{}, bb{}",
+            condition.index(),
+            then_block.index(),
+            else_block.index()
+        ),
+        Terminator::Jump(target) => format!("jump bb{}", target.index()),
     }
 }
 

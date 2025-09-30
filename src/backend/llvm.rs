@@ -158,6 +158,29 @@ fn render_terminator(
         Terminator::Return(None) => {
             writeln!(out, "  ret void").unwrap();
         }
+        Terminator::Branch {
+            condition,
+            then_block,
+            else_block,
+        } => {
+            let ty = value_types
+                .get(condition)
+                .copied()
+                .unwrap_or_else(|| module.unknown_type());
+            let cond_ty = format_type(module, ty);
+            writeln!(
+                out,
+                "  br {} %{}, label %bb{}, label %bb{}",
+                cond_ty,
+                condition.index(),
+                then_block.index(),
+                else_block.index()
+            )
+            .unwrap();
+        }
+        Terminator::Jump(target) => {
+            writeln!(out, "  br label %bb{}", target.index()).unwrap();
+        }
     }
 }
 
@@ -196,6 +219,13 @@ fn format_inst(inst: &ir::Instruction) -> String {
             }
         }
         InstKind::Path(path) => format!("path {}", path.segments.join("::")),
+        InstKind::Phi { incomings } => {
+            let mut parts = Vec::new();
+            for (block, value) in incomings {
+                parts.push(format!("[ %{}, %bb{} ]", value.index(), block.index()));
+            }
+            format!("phi {{{}}}", parts.join(", "))
+        }
     }
 }
 

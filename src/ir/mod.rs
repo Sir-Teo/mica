@@ -58,11 +58,20 @@ pub enum InstKind {
         fields: Vec<(String, ValueId)>,
     },
     Path(Path),
+    Phi {
+        incomings: Vec<(BlockId, ValueId)>,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub enum Terminator {
     Return(Option<ValueId>),
+    Branch {
+        condition: ValueId,
+        then_block: BlockId,
+        else_block: BlockId,
+    },
+    Jump(BlockId),
 }
 
 #[derive(Debug, Clone)]
@@ -168,6 +177,7 @@ struct FunctionLower<'a> {
     name: String,
     params: Vec<Param>,
     next_value: u32,
+    next_block: u32,
     current_block: BlockBuilder,
     blocks: Vec<BasicBlock>,
     scopes: Vec<HashMap<String, ValueId>>,
@@ -191,6 +201,7 @@ impl<'a> FunctionLower<'a> {
             name,
             params: Vec::new(),
             next_value: 0,
+            next_block: 1,
             current_block: entry,
             blocks: Vec::new(),
             scopes: vec![HashMap::new()],
@@ -305,6 +316,11 @@ impl<'a> FunctionLower<'a> {
                 self.emit_instruction(InstKind::Path(path.clone()), self.unknown)
             }
             HExpr::Call { func, args } => {
+                if let HFuncRef::Method(name) = func {
+                    if name == "if" {
+                        return self.lower_if_call(args);
+                    }
+                }
                 let mut lowered_args = Vec::with_capacity(args.len());
                 for arg in args {
                     let (id, _) = self.lower_expr(arg);
@@ -401,6 +417,62 @@ impl<'a> FunctionLower<'a> {
         (id, ty)
     }
 
+    fn lower_if_call(&mut self, args: &[HExpr]) -> (ValueId, TypeId) {
+        if args.len() < 2 {
+            panic!("if call expected at least condition and then branch");
+        }
+        let condition = &args[0];
+        let then_branch = &args[1];
+        let else_branch = args.get(2);
+
+        let (cond_value, _) = self.lower_expr(condition);
+
+        let then_block = self.alloc_block();
+        let then_block_id = then_block.id();
+        let else_block = self.alloc_block();
+        let else_block_id = else_block.id();
+        let merge_block = self.alloc_block();
+        let merge_block_id = merge_block.id();
+
+        self.current_block.set_terminator(Terminator::Branch {
+            condition: cond_value,
+            then_block: then_block_id,
+            else_block: else_block_id,
+        });
+
+        let previous = self.switch_block(then_block);
+        self.blocks.push(previous.finish());
+
+        let (then_value, then_ty) = self.with_scope(|this| this.lower_expr(then_branch));
+        if !self.current_block.has_terminator() {
+            self.current_block
+                .set_terminator(Terminator::Jump(merge_block_id));
+        }
+        let previous_then = self.switch_block(else_block);
+        self.blocks.push(previous_then.finish());
+
+        let (else_value, else_ty) = if let Some(expr) = else_branch {
+            self.with_scope(|this| this.lower_expr(expr))
+        } else {
+            self.emit_literal(Literal::Unit)
+        };
+        if !self.current_block.has_terminator() {
+            self.current_block
+                .set_terminator(Terminator::Jump(merge_block_id));
+        }
+        let previous_else = self.switch_block(merge_block);
+        self.blocks.push(previous_else.finish());
+
+        let ty = self.join_types(then_ty, else_ty);
+        let (phi_value, phi_ty) = self.emit_instruction(
+            InstKind::Phi {
+                incomings: vec![(then_block_id, then_value), (else_block_id, else_value)],
+            },
+            ty,
+        );
+        (phi_value, phi_ty)
+    }
+
     fn define(&mut self, name: String, value: ValueId, ty: TypeId) {
         self.value_types.entry(value).or_insert(ty);
         if let Some(scope) = self.scopes.last_mut() {
@@ -417,13 +489,14 @@ impl<'a> FunctionLower<'a> {
         None
     }
 
-    fn with_scope<F>(&mut self, f: F)
+    fn with_scope<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut Self),
+        F: FnOnce(&mut Self) -> R,
     {
         self.scopes.push(HashMap::new());
-        f(self);
+        let result = f(self);
         self.scopes.pop();
+        result
     }
 
     fn merge_return_type(&mut self, ty: TypeId) {
@@ -446,6 +519,32 @@ impl<'a> FunctionLower<'a> {
         self.next_value += 1;
         id
     }
+
+    fn alloc_block(&mut self) -> BlockBuilder {
+        let id = BlockId(self.next_block);
+        self.next_block += 1;
+        BlockBuilder::new(id)
+    }
+
+    fn switch_block(&mut self, mut next: BlockBuilder) -> BlockBuilder {
+        std::mem::swap(&mut self.current_block, &mut next);
+        next
+    }
+
+    fn join_types(&mut self, lhs: TypeId, rhs: TypeId) -> TypeId {
+        if lhs == rhs {
+            return lhs;
+        }
+        if lhs == self.unknown {
+            return rhs;
+        }
+        if rhs == self.unknown {
+            return lhs;
+        }
+        let lty = self.types.get(lhs).clone();
+        let rty = self.types.get(rhs).clone();
+        if lty == rty { lhs } else { self.unknown }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -464,12 +563,20 @@ impl BlockBuilder {
         }
     }
 
+    fn id(&self) -> BlockId {
+        self.id
+    }
+
     fn push_instruction(&mut self, inst: Instruction) {
         self.instructions.push(inst);
     }
 
     fn set_terminator(&mut self, terminator: Terminator) {
         self.terminator = Some(terminator);
+    }
+
+    fn has_terminator(&self) -> bool {
+        self.terminator.is_some()
     }
 
     fn finish(self) -> BasicBlock {
