@@ -1,0 +1,165 @@
+module demo.comprehensive.deployment
+
+type Result[T, E] = Ok(T) | Err(E)
+
+type Component = { name: String, endpoint: String, retries: Int }
+type Stage = Provision(Component) | Check(Component) | Warm(Component)
+type StageStatus = StageOk(Component, Int) | StageWarn(Component, String) | StageErr(Component, String)
+type StageError = { component: Component, reason: String }
+type Plan = { run_id: Int, stages: [Stage] }
+type Audit = { run_id: Int, ok: Int, warn: Int, err: Int }
+
+fn component(stage: Stage) -> Component {
+  match stage {
+    Provision(component) => component,
+    Check(component) => component,
+    Warm(component) => component,
+  }
+}
+
+fn describe(stage: Stage) -> String {
+  match stage {
+    Provision(_) => "provision",
+    Check(_) => "check",
+    Warm(_) => "warm",
+  }
+}
+
+fn compute_backoff(attempt: Int) -> Int {
+  let mut delay = 1
+  let mut i = 0
+  while i < attempt {
+    delay = delay * 2
+    i = i + 1
+  }
+  delay
+}
+
+fn log_attempt(stage: Stage, attempt: Int, io: IO) -> Result[(), String] !{io} {
+  using File::open("/tmp/plan.log", io)? {
+    io.println(describe(stage))
+    if attempt == 0 {
+      io.println("initial attempt")
+    } else {
+      io.println("retrying stage")
+    }
+  }
+  Ok(())
+}
+
+fn log_backoff(stage: Stage, delay: Int, io: IO) -> Result[(), String] !{io} {
+  using File::open("/tmp/plan.backoff", io)? {
+    io.println(describe(stage))
+    if delay > 1 {
+      io.println("extended delay applied")
+    } else {
+      io.println("minimal delay applied")
+    }
+  }
+  Ok(())
+}
+
+fn escalate(stage: Stage, component: Component, reason: String, io: IO) -> Result[(), String] !{io} {
+  using File::open("/tmp/plan.escalations", io)? {
+    io.println(component.name)
+    io.println(reason)
+    using File::open("/tmp/plan.context", io)? {
+      io.println(describe(stage))
+      io.println(component.endpoint)
+    }
+  }
+  Ok(())
+}
+
+fn log_failure(error: StageError, io: IO) -> Result[(), String] !{io} {
+  using File::open("/tmp/plan.failures", io)? {
+    io.println(error.component.name)
+    io.println(error.reason)
+  }
+  Ok(())
+}
+
+fn log_warning(reason: String, io: IO) -> Result[(), String] !{io} {
+  using File::open("/tmp/plan.warnings", io)? {
+    io.println(reason)
+  }
+  Ok(())
+}
+
+fn execute_stage(stage: Stage, net: Net, io: IO) -> Result[StageStatus, StageError] !{net, io} {
+  let comp = component(stage)
+  let mut attempt = 0
+
+  while attempt < comp.retries {
+    log_attempt(stage, attempt, io)?
+    let _ = await spawn http::get(comp.endpoint, net)
+
+    if attempt == comp.retries - 1 && comp.retries > 1 {
+      using File::open("/tmp/plan.threshold", io)? {
+        io.println(comp.name)
+        io.println("exceeded retry budget")
+      }
+      return Ok(StageErr(comp, "exceeded retry budget"))
+    }
+
+    if attempt >= 1 {
+      using File::open("/tmp/plan.success", io)? {
+        io.println(comp.name)
+        using File::open("/tmp/plan.traces", io)? {
+          io.println(describe(stage))
+        }
+      }
+      return Ok(StageOk(comp, attempt + 1))
+    }
+
+    attempt = attempt + 1
+    if attempt < comp.retries {
+      let delay = compute_backoff(attempt)
+      log_backoff(stage, delay, io)?
+    }
+  }
+
+  if comp.retries == 1 {
+    Ok(StageWarn(comp, "executed with single attempt"))
+  } else {
+    Err(StageError { component: comp, reason: "no healthy response" })
+  }
+}
+
+fn summarize(audit: Audit, status: StageStatus) -> Audit {
+  match status {
+    StageOk(_, _) => Audit { run_id: audit.run_id, ok: audit.ok + 1, warn: audit.warn, err: audit.err },
+    StageWarn(_, _) => Audit { run_id: audit.run_id, ok: audit.ok, warn: audit.warn + 1, err: audit.err },
+    StageErr(_, _) => Audit { run_id: audit.run_id, ok: audit.ok, warn: audit.warn, err: audit.err + 1 },
+  }
+}
+
+fn execute_plan(plan: Plan, net: Net, io: IO) -> Result[Audit, String] !{net, io} {
+  let mut audit = Audit { run_id: plan.run_id, ok: 0, warn: 0, err: 0 }
+
+  for stage in plan.stages {
+    match execute_stage(stage, net, io) {
+      Ok(status) => {
+        match status {
+          StageWarn(_, reason) => {
+            log_warning(reason, io)?
+            audit = summarize(audit, status)
+          },
+          StageErr(component, reason) => {
+            escalate(stage, component, reason, io)?
+            audit = summarize(audit, status)
+          },
+          _ => {
+            audit = summarize(audit, status)
+          },
+        }
+      },
+      Err(error) => {
+        log_failure(error, io)?
+        return Err(error.reason)
+      },
+    }
+  }
+
+  Ok(audit)
+}

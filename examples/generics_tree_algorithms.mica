@@ -1,0 +1,44 @@
+module demo.generics.trees
+
+type Tree[T] = Leaf(T) | Branch(Tree[T], Tree[T])
+
+fn size[T](tree: Tree[T]) -> Int {
+  match tree {
+    Leaf(_) => 1,
+    Branch(left, right) => size(left) + size(right),
+  }
+}
+
+fn map_tree[T, U](tree: Tree[T], f: fn(T) -> U) -> Tree[U] {
+  match tree {
+    Leaf(value) => Leaf(f(value)),
+    Branch(left, right) => Branch(map_tree(left, f), map_tree(right, f)),
+  }
+}
+
+fn fold_tree[T, U](tree: Tree[T], seed: U, combine: fn(U, T) -> U) -> U {
+  match tree {
+    Leaf(value) => combine(seed, value),
+    Branch(left, right) => {
+      let left_acc = fold_tree(left, seed, combine)
+      fold_tree(right, left_acc, combine)
+    }
+  }
+}
+
+fn double(value: Int) -> Int { value * 2 }
+fn add(acc: Int, value: Int) -> Int { acc + value }
+
+fn double_all(tree: Tree[Int]) -> Tree[Int] { map_tree(tree, double) }
+fn sum(tree: Tree[Int]) -> Int { fold_tree(tree, 0, add) }
+
+fn depth[T](tree: Tree[T]) -> Int {
+  match tree {
+    Leaf(_) => 1,
+    Branch(left, right) => {
+      let left_depth = depth(left)
+      let right_depth = depth(right)
+      if left_depth < right_depth { right_depth + 1 } else { left_depth + 1 }
+    }
+  }
+}
