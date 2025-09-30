@@ -129,6 +129,7 @@ fn process(count: Int, data: Data) -> Unit !{io} {
             assert_eq!(ir_module.type_of(ret_inst.ty), &ir::Type::Unit);
         }
         ir::Terminator::Return(None) => panic!("expected explicit unit return"),
+        other => panic!("unexpected terminator: {other:?}"),
     }
 }
 
@@ -164,5 +165,87 @@ fn identity(x: Int) -> Int {
             assert_eq!(*value, func.params[0].value);
         }
         other => panic!("expected tail expression return, got {other:?}"),
+    }
+}
+
+#[test]
+fn lowering_if_expression_produces_branches_and_phi() {
+    let src = r#"
+module demo
+
+fn pick(flag: Bool) -> Int {
+  if flag {
+    1
+  } else {
+    2
+  }
+}
+"#;
+
+    let module = parse(src);
+    let hir = lower::lower_module(&module);
+    let ir_module = ir::lower_module(&hir);
+
+    let func = ir_module
+        .functions
+        .iter()
+        .find(|f| f.name == "pick")
+        .expect("function");
+
+    assert_eq!(
+        func.blocks.len(),
+        4,
+        "expected entry, then, else, merge blocks"
+    );
+
+    let entry = &func.blocks[0];
+    match &entry.terminator {
+        ir::Terminator::Branch {
+            condition,
+            then_block,
+            else_block,
+        } => {
+            assert_eq!(*condition, func.params[0].value);
+            assert_eq!(then_block.index(), 1);
+            assert_eq!(else_block.index(), 2);
+        }
+        other => panic!("expected branch terminator, got {other:?}"),
+    }
+
+    let then_block = &func.blocks[1];
+    assert_eq!(then_block.id.index(), 1);
+    assert_eq!(then_block.instructions.len(), 1);
+    match &then_block.terminator {
+        ir::Terminator::Jump(target) => assert_eq!(target.index(), 3),
+        other => panic!("expected jump terminator for then block, got {other:?}"),
+    }
+
+    let else_block = &func.blocks[2];
+    assert_eq!(else_block.instructions.len(), 1);
+    match &else_block.terminator {
+        ir::Terminator::Jump(target) => assert_eq!(target.index(), 3),
+        other => panic!("expected jump terminator for else block, got {other:?}"),
+    }
+
+    let merge_block = &func.blocks[3];
+    assert_eq!(merge_block.instructions.len(), 1);
+    match &merge_block.instructions[0].kind {
+        ir::InstKind::Phi { incomings } => {
+            assert_eq!(incomings.len(), 2);
+            let mut blocks: Vec<_> = incomings.iter().map(|(block, _)| block.index()).collect();
+            blocks.sort_unstable();
+            assert_eq!(blocks, vec![1, 2]);
+        }
+        other => panic!("expected phi instruction, got {other:?}"),
+    }
+    match &merge_block.terminator {
+        ir::Terminator::Return(Some(value)) => {
+            assert_eq!(*value, merge_block.instructions[0].id);
+            assert_eq!(
+                ir_module.type_of(merge_block.instructions[0].ty),
+                &ir::Type::Int
+            );
+        }
+        other => panic!("expected return terminator in merge block, got {other:?}"),
     }
 }

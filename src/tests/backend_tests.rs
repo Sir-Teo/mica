@@ -65,6 +65,16 @@ fn build(flag: Bool) {
     assert!(output.contains("record Data"));
     assert!(output.contains("fn build(flag: Bool)"));
     assert!(output.contains("return %"));
+    assert!(
+        output.contains("branch %"),
+        "expected conditional branch in text backend output: {}",
+        output
+    );
+    assert!(
+        output.contains("phi"),
+        "expected phi node in merge block output: {}",
+        output
+    );
 }
 
 #[test]
