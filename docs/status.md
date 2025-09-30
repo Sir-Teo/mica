@@ -4,9 +4,9 @@ _Last updated: 2025-09-29 23:23 UTC_
 
 ## Current Health Check
 - **Compiler pipeline**: Lexer, parser, resolver, and type checker are implemented and covered by regression tests.
-- **Typed IR**: Lowerer assigns stable `TypeId`s with shared registries; CLI exposes `mica --ir` for inspection.
-- **Backend**: Text emitter backend renders typed IR for validation and future backend adapters.
-- **Diagnostics**: Playbook refreshed with Phase 2 criteria; CLI documentation mirrors current surface area.
+- **Typed IR**: Lowerer assigns stable `TypeId`s with shared registries; design notes now describe backend expectations and helpers like `Module::unknown_type` for consumers.【F:docs/modules/ir.md†L1-L70】
+- **Backend**: Text emitter plus the new LLVM scaffolding backend render typed IR with effect metadata for validation and future native code generation.【F:src/backend/llvm.rs†L1-L226】【F:src/tests/backend_tests.rs†L1-L96】
+- **Diagnostics**: Playbook refreshed with backend snapshots and CLI documentation mirrors the expanded surface area, including new IR examples.【F:docs/modules/diagnostics.md†L1-L89】【F:docs/snippets.md†L1-L80】
 
 ## Test & Verification Snapshot
 - `cargo test` (unit + integration) — all 36 suites pass locally.
@@ -14,8 +14,8 @@ _Last updated: 2025-09-29 23:23 UTC_
 
 ## Near-Term Priorities
 1. Flesh out typed IR coverage for control-flow joins, pattern destructuring, and effect polymorphism.
-2. Design backend trait abstractions that can target LLVM and WASM while reusing registries.
-3. Extend diagnostics regression matrix with IR-specific failure fixtures.
+2. Harden the LLVM scaffolding into a codegen pipeline that lowers SSA blocks into real LLVM IR instructions.
+3. Extend diagnostics regression matrix with IR-specific failure fixtures and backend error cases.
 4. Explore purity analysis for structured concurrency primitives ahead of runtime work.
 
 ## Risks & Watch Items

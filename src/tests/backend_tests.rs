@@ -66,3 +66,31 @@ fn build(flag: Bool) {
     assert!(output.contains("fn build(flag: Bool)"));
     assert!(output.contains("return %"));
 }
+
+#[test]
+fn llvm_backend_emits_scaffolded_ir() {
+    let src = r#"
+module backend.llvm
+
+fn transform(x: Int, io: IO) -> Int !{io} {
+  let bumped = x + 1
+  return bumped
+}
+"#;
+
+    let module = parse(src);
+    let hir = lower::lower_module(&module);
+    let ir_module = ir::lower_module(&hir);
+    let llvm_backend = backend::llvm::LlvmBackend::default();
+    let output = backend::run(
+        &llvm_backend,
+        &ir_module,
+        &backend::BackendOptions::default(),
+    )
+    .expect("backend output");
+
+    let ir = output.as_str();
+    assert!(ir.contains("define i64 @transform(i64 %x, %IO %io)"));
+    assert!(ir.contains("; effects: io"));
+    assert!(ir.contains("ret i64 %"));
+}

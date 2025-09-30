@@ -18,14 +18,18 @@ fn main() {
     let check_nx =
         run_capture(Command::new(&bin).args(["--check", "examples/adt_match_nonexhaustive.mica"]));
     let lower_methods = run_capture(Command::new(&bin).args(["--lower", "examples/methods.mica"]));
+    let typed_ir = run_capture(Command::new(&bin).args(["--ir", "examples/methods.mica"]));
+    let llvm_methods = run_capture(Command::new(&bin).args(["--llvm", "examples/methods.mica"]));
     let lower_spawn =
         run_capture(Command::new(&bin).args(["--lower", "examples/spawn_await.mica"]));
 
     let content = format!(
-        "# CLI Snippets\n\nThis page shows short outputs from the CLI for selected examples.\n\n## Pretty AST (`--ast --pretty`)\n\nCommand: `cargo run -- --ast --pretty examples/adt.mica`\n\n```\n{}\n```\n\n## Exhaustiveness Check (`--check`)\n\nCommand: `cargo run -- --check examples/adt_match_nonexhaustive.mica`\n\n```\n{}\n```\n\n## Lowered HIR (`--lower`)\n\nCommand: `cargo run -- --lower examples/methods.mica`\n\n```\n{}\n```\n\nCommand: `cargo run -- --lower examples/spawn_await.mica`\n\n```\n{}\n```\n\n",
+        "# CLI Snippets\n\nThis page shows short outputs from the CLI for selected examples.\n\n## Pretty AST (`--ast --pretty`)\n\nCommand: `cargo run --bin mica -- --ast --pretty examples/adt.mica`\n\n```\n{}\n```\n\n## Exhaustiveness Check (`--check`)\n\nCommand: `cargo run --bin mica -- --check examples/adt_match_nonexhaustive.mica`\n\n```\n{}\n```\n\n## Lowered HIR (`--lower`)\n\nCommand: `cargo run --bin mica -- --lower examples/methods.mica`\n\n```\n{}\n```\n\n## Typed IR (`--ir`)\n\nCommand: `cargo run --bin mica -- --ir examples/methods.mica`\n\n```\n{}\n```\n\n## LLVM Scaffold (`--llvm`)\n\nCommand: `cargo run --bin mica -- --llvm examples/methods.mica`\n\n```\n{}\n```\n\nCommand: `cargo run --bin mica -- --lower examples/spawn_await.mica`\n\n```\n{}\n```\n\n",
         pretty_adt.trim_end(),
         check_nx.trim_end(),
         lower_methods.trim_end(),
+        typed_ir.trim_end(),
+        llvm_methods.trim_end(),
         lower_spawn.trim_end()
     );
 

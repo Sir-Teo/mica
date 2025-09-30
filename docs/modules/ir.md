@@ -3,17 +3,18 @@
 ## Scope
 
 The SSA-oriented IR defined in `src/ir/mod.rs` lowers the high-level HIR into
-basic blocks, instructions, and typed values. It forms the backbone of Phase 2
-and Phase 3 roadmap milestones focused on optimization and code generation.
+basic blocks, instructions, typed values, and capability-aware metadata. The
+design now doubles as living documentation for the backend contract thanks to
+the LLVM scaffolding backend added in this milestone.
 
 ## Core Types
 
 | Type | Purpose |
 | --- | --- |
-| `Module` | Owns lowered functions alongside shared type/effect tables so backends see a self-contained package of IR plus metadata.【F:src/ir/mod.rs†L8-L169】 |
-| `Function` | Holds parameters, `TypeId` return metadata, basic blocks, and effect identifiers describing capability requirements.【F:src/ir/mod.rs†L17-L225】 |
+| `Module` | Owns lowered functions alongside shared type/effect tables and exposes helpers such as `unknown_type` so backends can recover canonical metadata without re-interning anything.【F:src/ir/mod.rs†L8-L174】 |
+| `Function` | Holds parameters, `TypeId` return metadata, basic blocks, and effect identifiers describing capability requirements for each body.【F:src/ir/mod.rs†L17-L225】 |
 | `BasicBlock` | Represents a control-flow node with instructions and a terminator (currently return).【F:src/ir/mod.rs†L32-L68】 |
-| `Instruction` | Encodes SSA values with IDs, referenced types, and instruction kinds such as literals, binary ops, calls, and records.【F:src/ir/mod.rs†L39-L63】【F:src/ir/mod.rs†L407-L416】 |
+| `Instruction` | Encodes SSA values with IDs, referenced types, and instruction kinds such as literals, binary ops, calls, records, and resolved paths.【F:src/ir/mod.rs†L39-L63】【F:src/ir/mod.rs†L407-L416】 |
 | `TypeTable` & `TypeId` | Intern and reuse structural types so large modules share canonical IDs while keeping lookups O(1).【F:src/ir/mod.rs†L100-L170】【F:src/ir/mod.rs†L538-L584】 |
 | `EffectTable` & `EffectId` | Deduplicate effect names, allowing effect rows to scale linearly with references instead of strings.【F:src/ir/mod.rs†L106-L170】【F:src/ir/mod.rs†L586-L600】 |
 
@@ -32,10 +33,10 @@ and Phase 3 roadmap milestones focused on optimization and code generation.
 
 1. Consumes the HIR structures from the lowering stage, ensuring desugared
    constructs map cleanly onto SSA building blocks.【F:src/ir/mod.rs†L3-L399】【F:src/lower/mod.rs†L3-L320】
-2. Ships canonical type and effect registries that backend integrations (text,
-   LLVM, WASM) can query without re-resolving AST nodes.【F:src/ir/mod.rs†L498-L600】【F:src/backend/text.rs†L1-L129】
+2. Ships canonical type and effect registries that backend integrations (text
+   dumps today, LLVM tomorrow) can query without re-resolving AST nodes.【F:src/ir/mod.rs†L498-L600】【F:src/backend/text.rs†L1-L129】【F:src/backend/llvm.rs†L1-L226】
 3. Tests under `src/tests` exercise IR typing, effect rows, and backend output,
-   preventing regressions as the IR evolves.【F:src/tests/ir_tests.rs†L1-L132】【F:src/tests/backend_tests.rs†L1-L55】
+   preventing regressions as the IR evolves.【F:src/tests/ir_tests.rs†L1-L132】【F:src/tests/backend_tests.rs†L1-L96】
 
 ## Roadmap Alignment
 

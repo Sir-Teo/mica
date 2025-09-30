@@ -11,9 +11,9 @@ written guides synchronized with reality.
 
 | Area | Description |
 | --- | --- |
-| Argument parsing | `run()` parses flags such as `--tokens`, `--ast`, `--pretty`, `--check`, `--resolve`, `--lower`, and the new `--ir` backend dump, validating that exactly one input path is supplied.【F:src/main.rs†L25-L57】 |
-| Mode dispatch | The `Mode` enum enumerates each compiler stage that can be surfaced through the CLI and makes it trivial to wire additional passes as roadmap milestones land.【F:src/main.rs†L205-L213】 |
-| Pipeline execution | Each mode reuses the same parse step and then calls into the relevant library module to print tokens, ASTs, semantic diagnostics, resolver output, lowered HIR strings, or typed IR dumps.【F:src/main.rs†L58-L200】 |
+| Argument parsing | `run()` parses flags such as `--tokens`, `--ast`, `--pretty`, `--check`, `--resolve`, `--lower`, the textual `--ir` dump, and the LLVM preview `--llvm`, validating that exactly one input path is supplied.【F:src/main.rs†L17-L63】 |
+| Mode dispatch | The `Mode` enum enumerates each compiler stage that can be surfaced through the CLI and makes it trivial to wire additional passes as roadmap milestones land.【F:src/main.rs†L207-L215】 |
+| Pipeline execution | Each mode reuses the same parse step and then calls into the relevant library module to print tokens, ASTs, semantic diagnostics, resolver output, lowered HIR strings, or backend dumps.【F:src/main.rs†L63-L204】 |
 | Error reporting | CLI errors are normalized through the shared diagnostics helpers so messages remain consistent across modules.【F:src/main.rs†L35-L47】 |
 | Documentation snapshots | `gen_snippets` rebuilds the project, executes curated commands over `examples/`, and updates `docs/snippets.md` or verifies it in `--check` mode for CI.【F:src/bin/gen_snippets.rs†L1-L60】 |
 
@@ -21,7 +21,7 @@ written guides synchronized with reality.
 
 - `Mode`: Centralized enumeration of exposed stages; follow the established
   pattern when adding backend or optimization passes from Phase 3 of the
-  compiler roadmap.【F:src/main.rs†L205-L213】【F:docs/roadmap/compiler.md†L126-L215】
+  compiler roadmap.【F:src/main.rs†L207-L215】【F:docs/roadmap/compiler.md†L126-L215】
 - `resolve::ResolvedModule`: Data printed by `--resolve`, including module path,
   imports, symbol metadata, capabilities, and resolved paths. It is an important
   integration surface for forthcoming IDE tooling.【F:src/main.rs†L75-L175】【F:docs/roadmap/tooling.md†L1-L60】
@@ -46,8 +46,7 @@ written guides synchronized with reality.
 - **Phase 1 (Static analysis):** The `--check` and `--resolve` modes already pipe
   through type/effect checks and resolver output, providing scaffolding for more
   advanced diagnostics and borrow checking planned in this phase.【F:docs/roadmap/compiler.md†L76-L125】
-- **Phase 2 (Lowering groundwork):** `--lower` and `--ir` expose both the HIR and
-  the typed SSA IR, easing debugging as backend integrations mature.【F:src/main.rs†L186-L200】【F:docs/roadmap/compiler.md†L126-L170】
+- **Phase 2 (Lowering groundwork):** `--lower`, `--ir`, and `--llvm` expose both the HIR and the backend contracts, easing debugging as backend integrations mature.【F:src/main.rs†L184-L201】【F:docs/roadmap/compiler.md†L126-L170】
 - **Phase 3 (Backend and ecosystem tooling):** The structured `Mode` enum and
   snapshot tooling leave room to add code generation, optimization, and package
   manager commands outlined for later phases.【F:docs/roadmap/compiler.md†L170-L215】【F:docs/roadmap/ecosystem.md†L1-L78】
