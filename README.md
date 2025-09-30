@@ -90,12 +90,21 @@ The `examples/` directory showcases the current surface of the language,
 including:
 
 - `adt.mica` — defining algebraic data types and matching over them.
+- `concurrency_pipeline.mica` — coordinated `spawn`/`await` workflows, pattern
+  matching, and capability-aware logging.
 - `effects_and_using.mica` — explicit capabilities with RAII `using` blocks.
-- `channels.mica` — structured concurrency with `spawn`/`await`.
-- `methods.mica` — `impl` blocks and method receivers.
+- `effects_resource_pool.mica` — higher-order helpers that combine `using`,
+  structured error propagation, and cross-capability tasks.
+- `comprehensive_deployment.mica` — an end-to-end workflow that mixes
+  concurrency, nested `using` scopes, and result propagation across a deployment
+  plan.
+- `generics_tree_algorithms.mica` — recursive ADTs with higher-order generic
+  functions and trait bounds in action.
 - `lists_and_loops.mica` — collections, loops, and iteration patterns.
+- `methods.mica` — `impl` blocks and method receivers.
 
-Use the CLI commands above to inspect each example.
+Use the CLI commands above to inspect each example and explore how the
+capabilities compose across files.
 
 ## Repository layout
 

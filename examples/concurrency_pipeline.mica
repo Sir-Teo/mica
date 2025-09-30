@@ -1,0 +1,55 @@
+module demo.concurrent.pipeline
+
+type Job = { id: Int, endpoint: String, retries: Int }
+type Stats = { id: Int, attempts: Int }
+type JobResult = Success(Job, Stats) | Exhausted(Job)
+
+// Spawn network work for each job and record how many attempts were required.
+fn analyze(job: Job, net: Net) -> JobResult !{net} {
+  let mut attempt = 0
+  while attempt < job.retries {
+    let _ = await spawn http::get(job.endpoint, net)
+    attempt = attempt + 1
+    if attempt >= 1 {
+      return Success(job, Stats { id: job.id, attempts: attempt })
+    }
+  }
+  Exhausted(job)
+}
+
+fn classify_attempts(attempts: Int) -> String {
+  if attempts == 1 { "fast" } else { "retried" }
+}
+
+fn persist_success(job: Job, stats: Stats, io: IO) !{io} {
+  using File::open("/tmp/pipeline.log", io)? {
+    io.println("completed:")
+    io.println(job.endpoint)
+    if stats.attempts > 1 {
+      io.println("required retries")
+    }
+  }
+}
+
+fn persist_failure(job: Job, io: IO) !{io} {
+  using File::open("/tmp/pipeline.log", io)? {
+    io.println("gave up:")
+    io.println(job.endpoint)
+  }
+}
+
+fn run_pipeline(jobs: [Job], net: Net, io: IO) !{net, io} {
+  for job in jobs {
+    match await spawn analyze(job, net) {
+      Success(job, stats) => {
+        let label = classify_attempts(stats.attempts)
+        io.println(label)
+        persist_success(job, stats, io)
+      },
+      Exhausted(job) => {
+        io.println("failed")
+        persist_failure(job, io)
+      },
+    }
+  }
+}
