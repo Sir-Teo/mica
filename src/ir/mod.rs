@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::lower::{HBlock, HExpr, HFuncRef, HFunction, HItem, HModule, HParam, HStmt};
+pub mod analysis;
+
+use crate::lower::{HBlock, HExpr, HFuncRef, HFunction, HItem, HModule, HParam, HStmt, HTypeAlias};
 use crate::syntax::ast::{BinaryOp, Literal, Path, TypeExpr};
 
 #[derive(Debug, Clone)]
@@ -38,6 +40,7 @@ pub struct BasicBlock {
 pub struct Instruction {
     pub id: ValueId,
     pub ty: TypeId,
+    pub effects: Vec<EffectId>,
     pub kind: InstKind,
 }
 
@@ -93,6 +96,21 @@ pub struct TypeId(u32);
 pub struct EffectId(u32);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RecordField {
+    pub name: String,
+    pub ty: TypeId,
+    pub offset: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RecordType {
+    pub name: Option<String>,
+    pub fields: Vec<RecordField>,
+    pub size: u32,
+    pub align: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Type {
     Unit,
     Int,
@@ -100,6 +118,7 @@ pub enum Type {
     Bool,
     String,
     Named(String),
+    Record(RecordType),
     Unknown,
 }
 
@@ -107,6 +126,7 @@ pub enum Type {
 pub struct TypeTable {
     entries: Vec<Type>,
     index: HashMap<Type, TypeId>,
+    named: HashMap<String, TypeId>,
     unknown: TypeId,
 }
 
@@ -118,8 +138,14 @@ pub struct EffectTable {
 
 pub fn lower_module(module: &HModule) -> Module {
     let mut lowerer = ModuleLower::new(module.name.clone());
+    for item in &module.items {
+        if let HItem::TypeAlias(alias) = item {
+            lowerer.push_type_alias(alias);
+        }
+    }
     for func in module.items.iter().filter_map(|item| match item {
         HItem::Function(func) => Some(func),
+        HItem::TypeAlias(_) => None,
     }) {
         lowerer.push_function(func);
     }
@@ -131,6 +157,7 @@ struct ModuleLower {
     functions: Vec<Function>,
     types: TypeTable,
     effects: EffectTable,
+    function_effects: HashMap<String, Vec<EffectId>>,
 }
 
 impl ModuleLower {
@@ -140,6 +167,22 @@ impl ModuleLower {
             functions: Vec::new(),
             types: TypeTable::new(),
             effects: EffectTable::default(),
+            function_effects: HashMap::new(),
+        }
+    }
+
+    fn push_type_alias(&mut self, alias: &HTypeAlias) {
+        if !alias.params.is_empty() {
+            return;
+        }
+        match &alias.value {
+            TypeExpr::Record(fields) => {
+                self.types.intern_record(Some(&alias.name), fields);
+            }
+            other => {
+                let ty = self.types.intern_type_expr(other);
+                self.types.define_alias(&alias.name, ty);
+            }
         }
     }
 
@@ -147,14 +190,21 @@ impl ModuleLower {
         let ret_type = func
             .return_type
             .as_ref()
-            .map(|ty| self.types.intern(Type::from_type_expr(ty)));
-        let effect_row = func
+            .map(|ty| self.types.intern_type_expr(ty));
+        let effect_row: Vec<_> = func
             .effect_row
             .iter()
             .map(|name| self.effects.intern(name.clone()))
             .collect();
-        let mut lowerer =
-            FunctionLower::new(func.name.clone(), ret_type, effect_row, &mut self.types);
+        self.function_effects
+            .insert(func.name.clone(), effect_row.clone());
+        let mut lowerer = FunctionLower::new(
+            func.name.clone(),
+            ret_type,
+            effect_row,
+            &mut self.types,
+            self.function_effects.clone(),
+        );
         for param in &func.params {
             lowerer.push_param(param);
         }
@@ -186,6 +236,7 @@ struct FunctionLower<'a> {
     effect_row: Vec<EffectId>,
     types: &'a mut TypeTable,
     unknown: TypeId,
+    functions: HashMap<String, Vec<EffectId>>,
 }
 
 impl<'a> FunctionLower<'a> {
@@ -194,6 +245,7 @@ impl<'a> FunctionLower<'a> {
         ret_type: Option<TypeId>,
         effect_row: Vec<EffectId>,
         types: &'a mut TypeTable,
+        functions: HashMap<String, Vec<EffectId>>,
     ) -> Self {
         let entry = BlockBuilder::new(BlockId(0));
         let unknown = types.unknown();
@@ -210,6 +262,7 @@ impl<'a> FunctionLower<'a> {
             effect_row,
             types,
             unknown,
+            functions,
         }
     }
 
@@ -232,7 +285,7 @@ impl<'a> FunctionLower<'a> {
 
     fn push_param(&mut self, param: &HParam) {
         let id = self.alloc_value();
-        let ty = self.types.intern(Type::from_type_expr(&param.ty));
+        let ty = self.types.intern_type_expr(&param.ty);
         self.value_types.insert(id, ty);
         self.scopes
             .last_mut()
@@ -313,7 +366,7 @@ impl<'a> FunctionLower<'a> {
                         return (id, ty);
                     }
                 }
-                self.emit_instruction(InstKind::Path(path.clone()), self.unknown)
+                self.emit_instruction(InstKind::Path(path.clone()), self.unknown, Vec::new())
             }
             HExpr::Call { func, args } => {
                 if let HFuncRef::Method(name) = func {
@@ -330,12 +383,14 @@ impl<'a> FunctionLower<'a> {
                     HFuncRef::Function(path) => FuncRef::Function(path.clone()),
                     HFuncRef::Method(name) => FuncRef::Method(name.clone()),
                 };
+                let effects = self.lookup_effects(&func_ref);
                 self.emit_instruction(
                     InstKind::Call {
                         func: func_ref,
                         args: lowered_args,
                     },
                     self.unknown,
+                    effects,
                 )
             }
             HExpr::Binary { lhs, op, rhs } => {
@@ -353,6 +408,7 @@ impl<'a> FunctionLower<'a> {
                         rhs: rhs_id,
                     },
                     ty,
+                    Vec::new(),
                 )
             }
             HExpr::Block(block) => self.lower_block_expr(block),
@@ -362,12 +418,18 @@ impl<'a> FunctionLower<'a> {
                     let (id, _) = self.lower_expr(value);
                     lowered_fields.push((name.clone(), id));
                 }
+                let ty = type_path
+                    .as_ref()
+                    .and_then(|path| self.lookup_type(path))
+                    .unwrap_or(self.unknown);
+                let reordered = self.reorder_record_fields(ty, lowered_fields);
                 self.emit_instruction(
                     InstKind::Record {
                         type_path: type_path.clone(),
-                        fields: lowered_fields,
+                        fields: reordered,
                     },
-                    self.unknown,
+                    ty,
+                    Vec::new(),
                 )
             }
         }
@@ -403,16 +465,26 @@ impl<'a> FunctionLower<'a> {
 
     fn emit_literal(&mut self, literal: Literal) -> (ValueId, TypeId) {
         let ty = self.types.intern(Type::from_literal(&literal));
-        self.emit_instruction(InstKind::Literal(literal), ty)
+        self.emit_instruction(InstKind::Literal(literal), ty, Vec::new())
     }
 
-    fn emit_instruction(&mut self, kind: InstKind, ty: TypeId) -> (ValueId, TypeId) {
+    fn emit_instruction(
+        &mut self,
+        kind: InstKind,
+        ty: TypeId,
+        effects: Vec<EffectId>,
+    ) -> (ValueId, TypeId) {
         if self.current_block.terminator.is_some() {
             panic!("attempted to emit instruction after block was terminated");
         }
         let id = self.alloc_value();
         self.value_types.insert(id, ty);
-        let instr = Instruction { id, ty, kind };
+        let instr = Instruction {
+            id,
+            ty,
+            effects,
+            kind,
+        };
         self.current_block.push_instruction(instr);
         (id, ty)
     }
@@ -469,6 +541,7 @@ impl<'a> FunctionLower<'a> {
                 incomings: vec![(then_block_id, then_value), (else_block_id, else_value)],
             },
             ty,
+            Vec::new(),
         );
         (phi_value, phi_ty)
     }
@@ -487,6 +560,45 @@ impl<'a> FunctionLower<'a> {
             }
         }
         None
+    }
+
+    fn lookup_effects(&self, func: &FuncRef) -> Vec<EffectId> {
+        match func {
+            FuncRef::Function(path) if path.segments.len() == 1 => self
+                .functions
+                .get(&path.segments[0])
+                .cloned()
+                .unwrap_or_default(),
+            _ => Vec::new(),
+        }
+    }
+
+    fn lookup_type(&mut self, path: &Path) -> Option<TypeId> {
+        if path.segments.len() == 1 {
+            self.types.lookup_named(&path.segments[0])
+        } else {
+            None
+        }
+    }
+
+    fn reorder_record_fields(
+        &mut self,
+        ty: TypeId,
+        values: Vec<(String, ValueId)>,
+    ) -> Vec<(String, ValueId)> {
+        match self.types.get(ty) {
+            Type::Record(record) => record
+                .fields
+                .iter()
+                .filter_map(|field| {
+                    values
+                        .iter()
+                        .find(|(name, _)| name == &field.name)
+                        .map(|(_, value)| (field.name.clone(), *value))
+                })
+                .collect(),
+            _ => values,
+        }
     }
 
     fn with_scope<F, R>(&mut self, f: F) -> R
@@ -637,12 +749,20 @@ impl TypeTable {
         let mut table = TypeTable {
             entries: Vec::new(),
             index: HashMap::new(),
+            named: HashMap::new(),
             unknown: TypeId(0),
         };
         let unknown = table.insert_raw(Type::Unknown);
         table.unknown = unknown;
-        for builtin in [Type::Unit, Type::Int, Type::Float, Type::Bool, Type::String] {
-            table.insert_raw(builtin);
+        for (name, builtin) in [
+            ("Unit", Type::Unit),
+            ("Int", Type::Int),
+            ("Float", Type::Float),
+            ("Bool", Type::Bool),
+            ("String", Type::String),
+        ] {
+            let id = table.insert_raw(builtin);
+            table.named.insert(name.to_string(), id);
         }
         table
     }
@@ -652,6 +772,17 @@ impl TypeTable {
             return *id;
         }
         let id = TypeId(self.entries.len() as u32);
+        match &ty {
+            Type::Named(name) => {
+                self.named.insert(name.clone(), id);
+            }
+            Type::Record(record) => {
+                if let Some(name) = &record.name {
+                    self.named.insert(name.clone(), id);
+                }
+            }
+            _ => {}
+        }
         self.index.insert(ty.clone(), id);
         self.entries.push(ty);
         id
@@ -665,12 +796,100 @@ impl TypeTable {
         }
     }
 
+    pub fn intern_type_expr(&mut self, expr: &TypeExpr) -> TypeId {
+        match expr {
+            TypeExpr::Unit => self.intern(Type::Unit),
+            TypeExpr::Name(name) | TypeExpr::Generic(name, _) => {
+                if let Some(id) = self.lookup_named(name) {
+                    id
+                } else {
+                    self.intern(Type::from_builtin_name(name))
+                }
+            }
+            TypeExpr::Record(fields) => self.intern_record(None, fields),
+            TypeExpr::Tuple(items) => {
+                if items.is_empty() {
+                    self.intern(Type::Unit)
+                } else {
+                    self.intern(Type::Unknown)
+                }
+            }
+            TypeExpr::Function { return_type, .. } => self.intern_type_expr(return_type),
+            TypeExpr::List(inner) => self.intern_type_expr(inner),
+            TypeExpr::Reference { .. } | TypeExpr::Sum(_) | TypeExpr::SelfType => {
+                self.intern(Type::Unknown)
+            }
+        }
+    }
+
+    pub fn intern_record(&mut self, name: Option<&str>, fields: &[(String, TypeExpr)]) -> TypeId {
+        let mut layout = Vec::with_capacity(fields.len());
+        let mut offset = 0u32;
+        let mut align = 1u32;
+        for (field_name, field_ty) in fields {
+            let field_ty = self.intern_type_expr(field_ty);
+            let field_align = self.align_of(field_ty);
+            let field_size = self.size_of(field_ty);
+            offset = align_to(offset, field_align);
+            layout.push(RecordField {
+                name: field_name.clone(),
+                ty: field_ty,
+                offset,
+            });
+            offset = offset.saturating_add(field_size);
+            align = align.max(field_align);
+        }
+        align = align.max(1);
+        let size = align_to(offset, align);
+        let record = RecordType {
+            name: name.map(|n| n.to_string()),
+            fields: layout,
+            size,
+            align,
+        };
+        self.intern(Type::Record(record))
+    }
+
+    pub fn define_alias(&mut self, name: &str, ty: TypeId) {
+        self.named.insert(name.to_string(), ty);
+    }
+
     pub fn get(&self, id: TypeId) -> &Type {
         &self.entries[id.index()]
     }
 
+    pub fn entries(&self) -> impl Iterator<Item = (TypeId, &Type)> {
+        self.entries
+            .iter()
+            .enumerate()
+            .map(|(index, ty)| (TypeId(index as u32), ty))
+    }
+
+    pub fn lookup_named(&self, name: &str) -> Option<TypeId> {
+        self.named.get(name).copied()
+    }
+
     pub fn unknown(&self) -> TypeId {
         self.unknown
+    }
+
+    pub fn size_of(&self, ty: TypeId) -> u32 {
+        match self.get(ty) {
+            Type::Unit => 0,
+            Type::Bool => 1,
+            Type::Int | Type::Float => 8,
+            Type::String | Type::Named(_) | Type::Unknown => 8,
+            Type::Record(record) => record.size,
+        }
+    }
+
+    pub fn align_of(&self, ty: TypeId) -> u32 {
+        match self.get(ty) {
+            Type::Unit => 1,
+            Type::Bool => 1,
+            Type::Int | Type::Float | Type::String | Type::Named(_) | Type::Unknown => 8,
+            Type::Record(record) => record.align,
+        }
     }
 }
 
@@ -702,23 +921,6 @@ impl Type {
         }
     }
 
-    fn from_type_expr(expr: &TypeExpr) -> Type {
-        match expr {
-            TypeExpr::Unit => Type::Unit,
-            TypeExpr::Name(name) => Type::from_builtin_name(name),
-            TypeExpr::Generic(name, _) => Type::from_builtin_name(name),
-            TypeExpr::Tuple(items) => {
-                if items.is_empty() {
-                    Type::Unit
-                } else {
-                    Type::Unknown
-                }
-            }
-            TypeExpr::Function { return_type, .. } => Type::from_type_expr(return_type),
-            _ => Type::Unknown,
-        }
-    }
-
     fn from_builtin_name(name: &str) -> Type {
         match name {
             "Unit" => Type::Unit,
@@ -728,5 +930,13 @@ impl Type {
             "String" => Type::String,
             other => Type::Named(other.to_string()),
         }
+    }
+}
+
+fn align_to(value: u32, align: u32) -> u32 {
+    if align <= 1 {
+        value
+    } else {
+        ((value + align - 1) / align) * align
     }
 }

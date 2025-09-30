@@ -36,12 +36,12 @@ fn render_function(out: &mut String, module: &ir::Module, function: &ir::Functio
             write!(out, ", ").unwrap();
         }
         let ty = module.type_of(param.ty);
-        write!(out, "{}: {}", param.name, format_type(ty)).unwrap();
+        write!(out, "{}: {}", param.name, format_type(module, ty)).unwrap();
     }
     write!(out, ")").unwrap();
     let ret_type = module.type_of(function.ret_type);
     if !matches!(ret_type, Type::Unit) {
-        write!(out, " -> {}", format_type(ret_type)).unwrap();
+        write!(out, " -> {}", format_type(module, ret_type)).unwrap();
     }
     if !function.effect_row.is_empty() {
         let names: Vec<_> = function
@@ -61,7 +61,7 @@ fn render_function(out: &mut String, module: &ir::Module, function: &ir::Functio
                 "    %{} = {} : {}",
                 inst.id.index(),
                 format_inst(inst),
-                format_type(ty)
+                format_type(module, ty)
             )
             .unwrap();
         }
@@ -139,7 +139,7 @@ fn format_literal(literal: &crate::syntax::ast::Literal) -> String {
     }
 }
 
-fn format_type(ty: &Type) -> String {
+fn format_type(module: &ir::Module, ty: &Type) -> String {
     match ty {
         Type::Unit => "Unit".to_string(),
         Type::Int => "Int".to_string(),
@@ -147,6 +147,20 @@ fn format_type(ty: &Type) -> String {
         Type::Bool => "Bool".to_string(),
         Type::String => "String".to_string(),
         Type::Named(name) => name.clone(),
+        Type::Record(record) => {
+            if let Some(name) = &record.name {
+                name.clone()
+            } else if record.fields.is_empty() {
+                "{}".to_string()
+            } else {
+                let mut parts = Vec::with_capacity(record.fields.len());
+                for field in &record.fields {
+                    let field_ty = module.type_of(field.ty);
+                    parts.push(format!("{}: {}", field.name, format_type(module, field_ty)));
+                }
+                format!("{{ {} }}", parts.join(", "))
+            }
+        }
         Type::Unknown => "_".to_string(),
     }
 }
