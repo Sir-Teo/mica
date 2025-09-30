@@ -57,3 +57,6 @@ roadmap.
 3. **Track roadmap alignment.** Each milestone documents diagnostic exit
    criteria so we know when Phase 2’s richer IR and backend hooks are ready to
    surface structured errors downstream.【F:docs/roadmap/milestones.md†L1-L120】
+4. **Snapshot backend surfacing.** The backend regression suite now asserts
+   that both textual and LLVM scaffolding outputs retain capability metadata,
+   giving diagnostics parity between CLI previews and future native builds.【F:src/tests/backend_tests.rs†L1-L96】

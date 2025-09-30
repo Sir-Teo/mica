@@ -29,6 +29,7 @@ fn run() -> Result<()> {
             "--resolve" => mode = Mode::Resolve,
             "--lower" => mode = Mode::Lower,
             "--ir" => mode = Mode::Ir,
+            "--llvm" | "--emit-llvm" => mode = Mode::Llvm,
             _ => {
                 path_arg = Some(PathBuf::from(arg));
                 for extra in args {
@@ -189,6 +190,15 @@ fn run() -> Result<()> {
                 .map_err(|err| error::Error::parse(None, err.to_string()))?;
             println!("{}", output);
         }
+        Mode::Llvm => {
+            let module = parser::parse_module(&source)?;
+            let hir = lower::lower_module(&module);
+            let typed = ir::lower_module(&hir);
+            let backend = backend::llvm::LlvmBackend::default();
+            let output = backend::run(&backend, &typed, &backend::BackendOptions::default())
+                .map_err(|err| error::Error::parse(None, err.to_string()))?;
+            println!("{}", output.as_str());
+        }
     }
 
     Ok(())
@@ -202,4 +212,5 @@ enum Mode {
     Resolve,
     Lower,
     Ir,
+    Llvm,
 }

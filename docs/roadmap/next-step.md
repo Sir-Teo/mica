@@ -23,3 +23,8 @@ With Phase 1 complete, the focus shifts to the next tranche of roadmap tasks:
 Clearing these items transitions the project into Phase 2, setting the stage for
 SSA lowering, backend work, and the optimizer research called out in the
 compiler roadmap.
+
+_Status update:_ The typed IR specification now lives in `docs/modules/ir.md`,
+an LLVM scaffolding backend exports the contract through `mica --llvm`, and the
+diagnostics playbook plus CLI examples document the richer pipeline surface so
+contributors can iterate confidently.【F:docs/modules/ir.md†L1-L70】【F:src/backend/llvm.rs†L1-L226】【F:docs/snippets.md†L1-L80】
