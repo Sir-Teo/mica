@@ -27,6 +27,7 @@ Command: `cargo run --bin mica -- --lower examples/methods.mica`
 
 ```
 hir module demo.methods
+type Vec2 = Record([("x", Name("Int")), ("y", Name("Int"))])
 fn use_method(a, b)
   add(a, b)
 ```
@@ -51,9 +52,11 @@ Command: `cargo run --bin mica -- --llvm examples/methods.mica`
 ```
 ; ModuleID = 'demo.methods'
 
-define ptr @use_method(ptr %a, ptr %b) {
+%record.Vec2 = type { i64, i64 }
+
+define %record.Vec2 @use_method(%record.Vec2 %a, %record.Vec2 %b) {
 bb0:
-  %2 = call ptr @add(ptr %0, ptr %1)
+  %2 = call ptr @add(%record.Vec2 %0, %record.Vec2 %1)
   ret ptr %2
 }
 ```

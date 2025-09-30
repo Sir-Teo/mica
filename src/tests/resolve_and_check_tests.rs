@@ -723,3 +723,37 @@ fn type_checker_validates_capabilities_and_calls() {
         result.diagnostics
     );
 }
+
+#[test]
+fn diagnostics_report_capability_misuse() {
+    let duplicate_cap = parse("module m\nfn bad(io: IO, other: IO) -> Unit !{io, io} { other }");
+    let diags = check::check_module(&duplicate_cap);
+    assert!(
+        diags
+            .diagnostics
+            .iter()
+            .any(|d| d.message.contains("duplicate capability")),
+        "expected duplicate capability diagnostic"
+    );
+
+    let missing_param = parse("module m\nfn bad() -> Unit !{io} { () }");
+    let diags = check::check_module(&missing_param);
+    assert!(
+        diags.diagnostics.iter().any(|d| d
+            .message
+            .contains("declares capability 'io' but has no parameter")),
+        "expected missing capability parameter diagnostic"
+    );
+
+    let scope_violation = parse(
+        "module m\nfn helper(io: IO) -> Unit !{io} { () }\nfn caller(other: IO) -> Unit { helper(other) }",
+    );
+    let diags = check::check_module(&scope_violation);
+    assert!(
+        diags
+            .diagnostics
+            .iter()
+            .any(|d| d.message.contains("requires capability 'io'")),
+        "expected capability scope diagnostic"
+    );
+}

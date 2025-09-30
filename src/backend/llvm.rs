@@ -85,6 +85,10 @@ impl<'m> ModuleRenderer<'m> {
         }
         writeln!(out).unwrap();
 
+        let mut type_defs = String::new();
+        self.render_type_declarations(&mut type_defs);
+        out.push_str(&type_defs);
+
         for (index, value) in self.string_literals.iter().enumerate() {
             let symbol = format!(".str{}", index);
             let escaped = escape_string(value);
@@ -103,6 +107,32 @@ impl<'m> ModuleRenderer<'m> {
 
         out.push_str(&functions);
         out
+    }
+
+    fn render_type_declarations(&self, out: &mut String) {
+        let mut seen = HashSet::new();
+        for (_, ty) in self.module.types.entries() {
+            if let Type::Record(record) = ty {
+                if let Some(name) = &record.name {
+                    if seen.insert(name.clone()) {
+                        let body = if record.fields.is_empty() {
+                            "{}".to_string()
+                        } else {
+                            let mut parts = Vec::with_capacity(record.fields.len());
+                            for field in &record.fields {
+                                parts.push(format_type(self.module, field.ty));
+                            }
+                            format!("{{ {} }}", parts.join(", "))
+                        };
+                        writeln!(out, "%{} = type {}", record_symbol(name), body).unwrap();
+                    }
+                }
+            }
+        }
+
+        if !seen.is_empty() {
+            writeln!(out).unwrap();
+        }
     }
 
     fn render_function(&mut self, out: &mut String, function: &ir::Function) {
@@ -165,18 +195,29 @@ impl<'m> ModuleRenderer<'m> {
         inst: &ir::Instruction,
         context: &mut RenderContext<'_>,
     ) -> Option<String> {
-        match &inst.kind {
+        let mut line = match &inst.kind {
             InstKind::Literal(literal) => self.render_literal(inst, literal, context),
             InstKind::Binary { op, lhs, rhs } => {
                 Some(render_binary(inst, *op, *lhs, *rhs, context))
             }
             InstKind::Call { func, args } => Some(self.render_call(inst, func, args, context)),
-            InstKind::Record { type_path, fields } => {
-                Some(render_record_stub(inst, type_path, fields, context))
+            InstKind::Record { fields, .. } => {
+                Some(self.render_record_literal(inst, fields, context))
             }
             InstKind::Path(path) => Some(render_path(inst, path)),
             InstKind::Phi { incomings } => Some(render_phi(inst, incomings, context)),
+        }?;
+
+        if !inst.effects.is_empty() {
+            let names: Vec<_> = inst
+                .effects
+                .iter()
+                .map(|id| self.module.effect_name(*id).to_string())
+                .collect();
+            line.push_str(&format!("  ; effects: {}", names.join(", ")));
         }
+
+        Some(line)
     }
 
     fn render_literal(
@@ -261,6 +302,64 @@ impl<'m> ModuleRenderer<'m> {
                 callee,
                 formatted_args.join(", ")
             )
+        }
+    }
+
+    fn render_record_literal(
+        &mut self,
+        inst: &ir::Instruction,
+        fields: &[(String, ValueId)],
+        context: &mut RenderContext<'_>,
+    ) -> String {
+        let ty_name = format_type(self.module, inst.ty);
+        match self.module.type_of(inst.ty) {
+            Type::Record(record) => {
+                if record.fields.is_empty() {
+                    return format!("  %{} = {} undef", inst.id.index(), ty_name);
+                }
+                let mut acc = String::from("undef");
+                let mut expr = String::new();
+                for (index, field) in record.fields.iter().enumerate() {
+                    if let Some((_, value)) = fields.iter().find(|(name, _)| name == &field.name) {
+                        let field_ty = format_type(self.module, field.ty);
+                        expr = format!(
+                            "insertvalue {} {}, {} %{}, {}",
+                            ty_name,
+                            acc,
+                            field_ty,
+                            value.index(),
+                            index
+                        );
+                        if index + 1 != record.fields.len() {
+                            acc = format!("({})", expr);
+                        }
+                    }
+                }
+                if expr.is_empty() {
+                    format!("  %{} = {} undef", inst.id.index(), ty_name)
+                } else {
+                    format!("  %{} = {}", inst.id.index(), expr)
+                }
+            }
+            _ => {
+                let field_args: Vec<String> = fields
+                    .iter()
+                    .map(|(_, value)| {
+                        let ty = context
+                            .value_types
+                            .get(value)
+                            .copied()
+                            .unwrap_or_else(|| self.module.unknown_type());
+                        format!("{} %{}", format_type(self.module, ty), value.index())
+                    })
+                    .collect();
+                format!(
+                    "  %{} = call {} @__mica_record_stub({})",
+                    inst.id.index(),
+                    ty_name,
+                    field_args.join(", ")
+                )
+            }
         }
     }
 
@@ -477,32 +576,6 @@ fn render_phi(
     format!("  %{} = phi {} {}", inst.id.index(), ty, parts.join(", "))
 }
 
-fn render_record_stub(
-    inst: &ir::Instruction,
-    _type_path: &Option<crate::syntax::ast::Path>,
-    fields: &[(String, ValueId)],
-    context: &RenderContext<'_>,
-) -> String {
-    let ret_ty = format_type(context.module, inst.ty);
-    let field_args: Vec<String> = fields
-        .iter()
-        .map(|(_, value)| {
-            let ty = context
-                .value_types
-                .get(value)
-                .copied()
-                .unwrap_or_else(|| context.module.unknown_type());
-            format!("{} %{}", format_type(context.module, ty), value.index())
-        })
-        .collect();
-    format!(
-        "  %{} = call {} @__mica_record_stub({})",
-        inst.id.index(),
-        ret_ty,
-        field_args.join(", ")
-    )
-}
-
 fn escape_string(value: &str) -> String {
     value
         .chars()
@@ -526,10 +599,27 @@ fn format_type(module: &ir::Module, ty: TypeId) -> String {
         Type::Bool => "i1".to_string(),
         Type::String => "ptr".to_string(),
         Type::Named(_name) => "ptr".to_string(),
+        Type::Record(record) => {
+            if let Some(name) = &record.name {
+                format!("%{}", record_symbol(name))
+            } else if record.fields.is_empty() {
+                "{}".to_string()
+            } else {
+                let mut parts = Vec::with_capacity(record.fields.len());
+                for field in &record.fields {
+                    parts.push(format_type(module, field.ty));
+                }
+                format!("{{ {} }}", parts.join(", "))
+            }
+        }
         Type::Unknown => "ptr".to_string(),
     }
 }
 
 fn sanitize_symbol(name: &str) -> String {
     name.replace(['.', ':'], "_")
+}
+
+fn record_symbol(name: &str) -> String {
+    format!("record.{}", sanitize_symbol(name))
 }
