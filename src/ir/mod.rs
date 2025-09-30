@@ -110,6 +110,12 @@ pub struct RecordType {
     pub align: u32,
 }
 
+impl RecordType {
+    pub fn field(&self, name: &str) -> Option<&RecordField> {
+        self.fields.iter().find(|field| field.name == name)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Type {
     Unit,

@@ -118,6 +118,21 @@ fn exhaustive_module() -> Module {
 }
 
 #[test]
+fn diagnostics_require_effect_row_for_calls() {
+    let module = parse(
+        "module m\nfn needs(io: IO) -> Unit !{io} { () }\nfn caller(io: IO) -> Unit { needs(io) }",
+    );
+    let diags = check::check_module(&module);
+    assert!(
+        diags
+            .diagnostics
+            .iter()
+            .any(|d| d.message.contains("does not declare it in its effect row")),
+        "expected missing effect row diagnostic",
+    );
+}
+
+#[test]
 fn resolve_adts() {
     let m = parse("module m\ntype A = X | Y");
     let r = resolve::resolve_module(&m);

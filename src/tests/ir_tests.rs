@@ -348,6 +348,14 @@ fn helper(io: IO) -> Int !{io} {
 fn main(io: IO) -> Int !{io} {
   helper(io)
 }
+
+fn choice(flag: Bool) -> Int {
+  if flag {
+    1
+  } else {
+    2
+  }
+}
 "#;
 
     let module = parse(src);
@@ -363,6 +371,8 @@ fn main(io: IO) -> Int !{io} {
     let entry = pure_fn.blocks[0].id;
     assert!(report.is_block_pure(entry));
     assert!(report.effectful_instructions.is_empty());
+    assert_eq!(report.regions().len(), 1);
+    assert_eq!(report.regions()[0], vec![entry]);
 
     let impure_fn = ir_module
         .functions
@@ -382,4 +392,25 @@ fn main(io: IO) -> Int !{io} {
             .flat_map(|block| block.instructions.iter())
             .any(|inst| inst.id == *id && matches!(inst.kind, ir::InstKind::Call { .. }))
     }));
+    assert!(report.regions().is_empty());
+
+    let choice_fn = ir_module
+        .functions
+        .iter()
+        .find(|f| f.name == "choice")
+        .expect("choice function present");
+    let report = ir::analysis::analyze_function_purity(choice_fn);
+    assert_eq!(report.regions().len(), 1);
+    let region = &report.regions()[0];
+    assert!(
+        region.len() >= 3,
+        "expected merged pure region across blocks"
+    );
+    for block in &choice_fn.blocks {
+        assert!(
+            region.contains(&block.id),
+            "pure region missing block {:?}",
+            block.id
+        );
+    }
 }

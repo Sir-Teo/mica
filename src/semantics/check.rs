@@ -773,6 +773,14 @@ impl<'a, 'm> FunctionChecker<'a, 'm> {
         }
 
         for capability in &effects {
+            if !self.effects.iter().any(|declared| declared == capability) {
+                self.diagnostics.push(Diagnostic {
+                    message: format!(
+                        "call in '{}' uses capability '{}' but the function does not declare it in its effect row",
+                        self.name, capability
+                    ),
+                });
+            }
             if !self.has_capability(capability) {
                 self.diagnostics.push(Diagnostic {
                     message: format!(

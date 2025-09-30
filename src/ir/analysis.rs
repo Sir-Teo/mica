@@ -6,6 +6,7 @@ use super::{Function, InstKind, Terminator, ValueId};
 pub struct PurityReport {
     pub pure_blocks: HashSet<crate::ir::BlockId>,
     pub effectful_instructions: HashSet<ValueId>,
+    pub pure_regions: Vec<Vec<crate::ir::BlockId>>,
 }
 
 impl PurityReport {
@@ -15,6 +16,10 @@ impl PurityReport {
 
     pub fn is_instruction_effectful(&self, id: ValueId) -> bool {
         self.effectful_instructions.contains(&id)
+    }
+
+    pub fn regions(&self) -> &[Vec<crate::ir::BlockId>] {
+        &self.pure_regions
     }
 }
 
@@ -41,9 +46,24 @@ pub fn analyze_function_purity(function: &Function) -> PurityReport {
         }
     }
 
+    let mut regions = Vec::new();
+    let mut current_region: Vec<crate::ir::BlockId> = Vec::new();
+    for block in &function.blocks {
+        if pure_blocks.contains(&block.id) {
+            current_region.push(block.id);
+        } else if !current_region.is_empty() {
+            regions.push(current_region);
+            current_region = Vec::new();
+        }
+    }
+    if !current_region.is_empty() {
+        regions.push(current_region);
+    }
+
     PurityReport {
         pure_blocks,
         effectful_instructions: effectful_insts,
+        pure_regions: regions,
     }
 }
 

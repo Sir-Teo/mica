@@ -3,7 +3,7 @@ use std::fmt::Write;
 
 use crate::ir::{self, InstKind, Terminator, Type, TypeId, ValueId};
 
-use super::{Backend, BackendOptions, BackendResult};
+use super::{Backend, BackendError, BackendOptions, BackendResult};
 
 /// Scaffolding backend that translates the typed SSA module into a
 /// lightweight LLVM-flavoured IR string. The intent is to expose a stable
@@ -45,7 +45,7 @@ impl Backend for LlvmBackend {
             .clone()
             .or_else(|| options.target_triple.clone());
         let renderer = ModuleRenderer::new(module, triple.clone());
-        let ir = renderer.render();
+        let ir = renderer.render()?;
         Ok(LlvmModule {
             ir,
             target_triple: triple,
@@ -70,10 +70,10 @@ impl<'m> ModuleRenderer<'m> {
         }
     }
 
-    fn render(mut self) -> String {
+    fn render(mut self) -> BackendResult<String> {
         let mut functions = String::new();
         for function in &self.module.functions {
-            self.render_function(&mut functions, function);
+            self.render_function(&mut functions, function)?;
             writeln!(functions).unwrap();
         }
 
@@ -83,6 +83,7 @@ impl<'m> ModuleRenderer<'m> {
         if let Some(triple) = &self.target_triple {
             writeln!(out, "target triple = \"{}\"", triple).unwrap();
         }
+        writeln!(out, "target datalayout = \"{}\"", default_data_layout()).unwrap();
         writeln!(out).unwrap();
 
         let mut type_defs = String::new();
@@ -106,7 +107,7 @@ impl<'m> ModuleRenderer<'m> {
         }
 
         out.push_str(&functions);
-        out
+        Ok(out)
     }
 
     fn render_type_declarations(&self, out: &mut String) {
@@ -125,6 +126,12 @@ impl<'m> ModuleRenderer<'m> {
                             format!("{{ {} }}", parts.join(", "))
                         };
                         writeln!(out, "%{} = type {}", record_symbol(name), body).unwrap();
+                        writeln!(
+                            out,
+                            "; layout: size={}, align={}",
+                            record.size, record.align
+                        )
+                        .unwrap();
                     }
                 }
             }
@@ -135,7 +142,7 @@ impl<'m> ModuleRenderer<'m> {
         }
     }
 
-    fn render_function(&mut self, out: &mut String, function: &ir::Function) {
+    fn render_function(&mut self, out: &mut String, function: &ir::Function) -> BackendResult<()> {
         let ret_ty = format_type(self.module, function.ret_type);
         let mut params = Vec::with_capacity(function.params.len());
         let mut context = RenderContext::new(self.module);
@@ -158,6 +165,22 @@ impl<'m> ModuleRenderer<'m> {
         )
         .unwrap();
 
+        let purity = ir::analysis::analyze_function_purity(function);
+        if !purity.pure_regions.is_empty() {
+            let regions: Vec<String> = purity
+                .pure_regions
+                .iter()
+                .map(|region| {
+                    let blocks: Vec<String> = region
+                        .iter()
+                        .map(|block| format!("bb{}", block.index()))
+                        .collect();
+                    format!("[{}]", blocks.join(", "))
+                })
+                .collect();
+            writeln!(out, "  ; pure regions: {}", regions.join(", ")).unwrap();
+        }
+
         if !function.effect_row.is_empty() {
             let names: Vec<_> = function
                 .effect_row
@@ -168,10 +191,11 @@ impl<'m> ModuleRenderer<'m> {
         }
 
         for block in &function.blocks {
-            self.render_block(out, block, &mut context);
+            self.render_block(out, block, &mut context)?;
         }
 
         writeln!(out, "}}").unwrap();
+        Ok(())
     }
 
     fn render_block(
@@ -179,33 +203,34 @@ impl<'m> ModuleRenderer<'m> {
         out: &mut String,
         block: &ir::BasicBlock,
         context: &mut RenderContext<'_>,
-    ) {
+    ) -> BackendResult<()> {
         writeln!(out, "bb{}:", block.id.index()).unwrap();
         for inst in &block.instructions {
             context.value_types.insert(inst.id, inst.ty);
-            if let Some(line) = self.render_instruction(inst, context) {
+            if let Some(line) = self.render_instruction(inst, context)? {
                 writeln!(out, "{}", line).unwrap();
             }
         }
         self.render_terminator(out, &block.terminator, context);
+        Ok(())
     }
 
     fn render_instruction(
         &mut self,
         inst: &ir::Instruction,
         context: &mut RenderContext<'_>,
-    ) -> Option<String> {
+    ) -> BackendResult<Option<String>> {
         let mut line = match &inst.kind {
-            InstKind::Literal(literal) => self.render_literal(inst, literal, context),
+            InstKind::Literal(literal) => Ok(self.render_literal(inst, literal, context)),
             InstKind::Binary { op, lhs, rhs } => {
-                Some(render_binary(inst, *op, *lhs, *rhs, context))
+                Ok(Some(render_binary(inst, *op, *lhs, *rhs, context)))
             }
-            InstKind::Call { func, args } => Some(self.render_call(inst, func, args, context)),
+            InstKind::Call { func, args } => Ok(Some(self.render_call(inst, func, args, context))),
             InstKind::Record { fields, .. } => {
-                Some(self.render_record_literal(inst, fields, context))
+                self.render_record_literal(inst, fields, context).map(Some)
             }
-            InstKind::Path(path) => Some(render_path(inst, path)),
-            InstKind::Phi { incomings } => Some(render_phi(inst, incomings, context)),
+            InstKind::Path(path) => Ok(Some(render_path(inst, path))),
+            InstKind::Phi { incomings } => Ok(Some(render_phi(inst, incomings, context))),
         }?;
 
         if !inst.effects.is_empty() {
@@ -214,10 +239,12 @@ impl<'m> ModuleRenderer<'m> {
                 .iter()
                 .map(|id| self.module.effect_name(*id).to_string())
                 .collect();
-            line.push_str(&format!("  ; effects: {}", names.join(", ")));
+            if let Some(line_str) = &mut line {
+                line_str.push_str(&format!("  ; effects: {}", names.join(", ")));
+            }
         }
 
-        Some(line)
+        Ok(line)
     }
 
     fn render_literal(
@@ -310,15 +337,32 @@ impl<'m> ModuleRenderer<'m> {
         inst: &ir::Instruction,
         fields: &[(String, ValueId)],
         context: &mut RenderContext<'_>,
-    ) -> String {
+    ) -> BackendResult<String> {
         let ty_name = format_type(self.module, inst.ty);
         match self.module.type_of(inst.ty) {
             Type::Record(record) => {
                 if record.fields.is_empty() {
-                    return format!("  %{} = {} undef", inst.id.index(), ty_name);
+                    return Ok(format!("  %{} = {} undef", inst.id.index(), ty_name));
                 }
                 let mut acc = String::from("undef");
                 let mut expr = String::new();
+                let mut seen = HashSet::new();
+                for (name, _) in fields.iter() {
+                    if !seen.insert(name) {
+                        return Err(BackendError::unsupported(format!(
+                            "duplicate field '{}' in record literal",
+                            name
+                        )));
+                    }
+                }
+                for (name, _) in fields.iter() {
+                    if record.field(name).is_none() {
+                        return Err(BackendError::unsupported(format!(
+                            "record literal field '{}' not present in type {}",
+                            name, ty_name
+                        )));
+                    }
+                }
                 for (index, field) in record.fields.iter().enumerate() {
                     if let Some((_, value)) = fields.iter().find(|(name, _)| name == &field.name) {
                         let field_ty = format_type(self.module, field.ty);
@@ -333,13 +377,18 @@ impl<'m> ModuleRenderer<'m> {
                         if index + 1 != record.fields.len() {
                             acc = format!("({})", expr);
                         }
+                    } else {
+                        return Err(BackendError::unsupported(format!(
+                            "record literal missing field '{}' for type {}",
+                            field.name, ty_name
+                        )));
                     }
                 }
-                if expr.is_empty() {
+                Ok(if expr.is_empty() {
                     format!("  %{} = {} undef", inst.id.index(), ty_name)
                 } else {
                     format!("  %{} = {}", inst.id.index(), expr)
-                }
+                })
             }
             _ => {
                 let field_args: Vec<String> = fields
@@ -353,12 +402,12 @@ impl<'m> ModuleRenderer<'m> {
                         format!("{} %{}", format_type(self.module, ty), value.index())
                     })
                     .collect();
-                format!(
+                Ok(format!(
                     "  %{} = call {} @__mica_record_stub({})",
                     inst.id.index(),
                     ty_name,
                     field_args.join(", ")
-                )
+                ))
             }
         }
     }
@@ -622,4 +671,8 @@ fn sanitize_symbol(name: &str) -> String {
 
 fn record_symbol(name: &str) -> String {
     format!("record.{}", sanitize_symbol(name))
+}
+
+fn default_data_layout() -> &'static str {
+    "e-m:e-p:64:64-i64:64-f64:64-n8:16:32:64-S128"
 }

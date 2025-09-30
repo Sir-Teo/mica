@@ -51,8 +51,10 @@ Command: `cargo run --bin mica -- --llvm examples/methods.mica`
 
 ```
 ; ModuleID = 'demo.methods'
+target datalayout = "e-m:e-p:64:64-i64:64-f64:64-n8:16:32:64-S128"
 
 %record.Vec2 = type { i64, i64 }
+; layout: size=16, align=8
 
 define %record.Vec2 @use_method(%record.Vec2 %a, %record.Vec2 %b) {
 bb0:

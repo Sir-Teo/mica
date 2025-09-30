@@ -100,6 +100,7 @@ fn transform(x: Int, io: IO) -> Int !{io} {
     .expect("backend output");
 
     let ir = output.as_str();
+    assert!(ir.contains("target datalayout"));
     assert!(ir.contains("define i64 @transform(i64 %x, ptr %io)"));
     assert!(ir.contains("; effects: io"));
     assert!(ir.contains("bb0:"));
@@ -221,4 +222,39 @@ fn build() -> Data {
     assert!(ir.contains("define %record.Data @build()"));
     assert!(ir.contains("insertvalue %record.Data"));
     assert!(ir.contains("ret %record.Data %"));
+}
+
+#[test]
+fn llvm_backend_rejects_incomplete_record_literals() {
+    let src = r#"
+module backend.record_error
+
+type Data = { value: Int, flag: Bool }
+
+fn build() -> Data {
+  Data { value: 1 }
+}
+"#;
+
+    let module = parse(src);
+    let hir = lower::lower_module(&module);
+    let ir_module = ir::lower_module(&hir);
+    let llvm_backend = backend::llvm::LlvmBackend::default();
+    let err = backend::run(
+        &llvm_backend,
+        &ir_module,
+        &backend::BackendOptions::default(),
+    )
+    .expect_err("expected backend failure");
+
+    match err {
+        backend::BackendError::Unsupported(message) => {
+            assert!(
+                message.contains("missing field") || message.contains("record literal"),
+                "unexpected message: {}",
+                message
+            );
+        }
+        other => panic!("expected unsupported error, got {other:?}"),
+    }
 }
