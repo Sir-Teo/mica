@@ -2,12 +2,14 @@ use std::fmt;
 
 use crate::ir;
 
+pub mod llvm;
 pub mod text;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct BackendOptions {
     pub optimize: bool,
     pub debug_info: bool,
+    pub target_triple: Option<String>,
 }
 
 impl Default for BackendOptions {
@@ -15,6 +17,7 @@ impl Default for BackendOptions {
         BackendOptions {
             optimize: false,
             debug_info: false,
+            target_triple: None,
         }
     }
 }

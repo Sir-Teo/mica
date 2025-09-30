@@ -489,6 +489,10 @@ impl Module {
     pub fn type_of(&self, id: TypeId) -> &Type {
         self.types.get(id)
     }
+
+    pub fn unknown_type(&self) -> TypeId {
+        self.types.unknown()
+    }
 }
 
 impl ValueId {

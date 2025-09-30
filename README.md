@@ -53,11 +53,11 @@ cargo build
 cargo test
 ```
 
-Running `cargo run` with the path to a `.mica` file executes the CLI in its
-default `--ast` mode:
+Running `cargo run --bin mica` with the path to a `.mica` file executes the CLI
+in its default `--ast` mode:
 
 ```bash
-cargo run -- examples/demo.mica
+cargo run --bin mica -- examples/demo.mica
 ```
 
 ## Command-line interface
@@ -66,13 +66,14 @@ The CLI surfaces multiple compiler stages behind feature flags. Combine them as
 needed:
 
 ```bash
-cargo run -- --tokens examples/demo.mica      # Lex the source file
-cargo run -- --ast examples/demo.mica         # Parse into an AST (default mode)
-cargo run -- --ast --pretty examples/adt.mica # Pretty-print the AST
-cargo run -- --resolve examples/adt.mica      # Inspect bindings and capabilities
-cargo run -- --check examples/adt.mica        # Exhaustiveness checks
-cargo run -- --lower examples/methods.mica    # Lower to the simple HIR
-cargo run -- --ir examples/methods.mica       # Dump the typed SSA IR via the backend shim
+cargo run --bin mica -- --tokens examples/demo.mica      # Lex the source file
+cargo run --bin mica -- --ast examples/demo.mica         # Parse into an AST (default mode)
+cargo run --bin mica -- --ast --pretty examples/adt.mica # Pretty-print the AST
+cargo run --bin mica -- --resolve examples/adt.mica      # Inspect bindings and capabilities
+cargo run --bin mica -- --check examples/adt.mica        # Exhaustiveness checks
+cargo run --bin mica -- --lower examples/methods.mica    # Lower to the simple HIR
+cargo run --bin mica -- --ir examples/methods.mica       # Dump the typed SSA IR via the backend shim
+cargo run --bin mica -- --llvm examples/methods.mica     # Emit the LLVM scaffolding preview
 ```
 
 CLI output snapshots are maintained in [`docs/snippets.md`](docs/snippets.md).
