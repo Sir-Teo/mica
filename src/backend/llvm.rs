@@ -145,7 +145,8 @@ impl<'m> ModuleRenderer<'m> {
     fn render_function(&mut self, out: &mut String, function: &ir::Function) -> BackendResult<()> {
         let ret_ty = format_type(self.module, function.ret_type);
         let mut params = Vec::with_capacity(function.params.len());
-        let mut context = RenderContext::new(self.module);
+        let purity = ir::analysis::analyze_function_purity(function);
+        let mut context = RenderContext::new(self.module, Some(&purity));
 
         for param in &function.params {
             context.value_types.insert(param.value, param.ty);
@@ -165,7 +166,6 @@ impl<'m> ModuleRenderer<'m> {
         )
         .unwrap();
 
-        let purity = ir::analysis::analyze_function_purity(function);
         if !purity.pure_regions.is_empty() {
             let regions: Vec<String> = purity
                 .pure_regions
@@ -202,9 +202,19 @@ impl<'m> ModuleRenderer<'m> {
         &mut self,
         out: &mut String,
         block: &ir::BasicBlock,
-        context: &mut RenderContext<'_>,
+        context: &mut RenderContext<'_, '_>,
     ) -> BackendResult<()> {
         writeln!(out, "bb{}:", block.id.index()).unwrap();
+        if let Some(purity) = context
+            .purity
+            .and_then(|report| report.block_effects.get(&block.id))
+        {
+            let label = match purity {
+                ir::analysis::BlockPurity::Pure => "pure",
+                ir::analysis::BlockPurity::Effectful => "effectful",
+            };
+            writeln!(out, "  ; block purity: {}", label).unwrap();
+        }
         for inst in &block.instructions {
             context.value_types.insert(inst.id, inst.ty);
             if let Some(line) = self.render_instruction(inst, context)? {
@@ -218,7 +228,7 @@ impl<'m> ModuleRenderer<'m> {
     fn render_instruction(
         &mut self,
         inst: &ir::Instruction,
-        context: &mut RenderContext<'_>,
+        context: &mut RenderContext<'_, '_>,
     ) -> BackendResult<Option<String>> {
         let mut line = match &inst.kind {
             InstKind::Literal(literal) => Ok(self.render_literal(inst, literal, context)),
@@ -251,7 +261,7 @@ impl<'m> ModuleRenderer<'m> {
         &mut self,
         inst: &ir::Instruction,
         literal: &crate::syntax::ast::Literal,
-        context: &mut RenderContext<'_>,
+        context: &mut RenderContext<'_, '_>,
     ) -> Option<String> {
         let id = inst.id.index();
         match literal {
@@ -294,7 +304,7 @@ impl<'m> ModuleRenderer<'m> {
         inst: &ir::Instruction,
         func: &ir::FuncRef,
         args: &[ValueId],
-        context: &RenderContext<'_>,
+        context: &RenderContext<'_, '_>,
     ) -> String {
         let ret_ty = format_type(context.module, inst.ty);
         let callee = match func {
@@ -336,7 +346,7 @@ impl<'m> ModuleRenderer<'m> {
         &mut self,
         inst: &ir::Instruction,
         fields: &[(String, ValueId)],
-        context: &mut RenderContext<'_>,
+        _context: &mut RenderContext<'_, '_>,
     ) -> BackendResult<String> {
         let ty_name = format_type(self.module, inst.ty);
         match self.module.type_of(inst.ty) {
@@ -390,25 +400,10 @@ impl<'m> ModuleRenderer<'m> {
                     format!("  %{} = {}", inst.id.index(), expr)
                 })
             }
-            _ => {
-                let field_args: Vec<String> = fields
-                    .iter()
-                    .map(|(_, value)| {
-                        let ty = context
-                            .value_types
-                            .get(value)
-                            .copied()
-                            .unwrap_or_else(|| self.module.unknown_type());
-                        format!("{} %{}", format_type(self.module, ty), value.index())
-                    })
-                    .collect();
-                Ok(format!(
-                    "  %{} = call {} @__mica_record_stub({})",
-                    inst.id.index(),
-                    ty_name,
-                    field_args.join(", ")
-                ))
-            }
+            _ => Err(BackendError::unsupported(format!(
+                "record literal for type '{}' requires a concrete record layout",
+                ty_name
+            ))),
         }
     }
 
@@ -416,7 +411,7 @@ impl<'m> ModuleRenderer<'m> {
         &self,
         out: &mut String,
         terminator: &Terminator,
-        context: &RenderContext<'_>,
+        context: &RenderContext<'_, '_>,
     ) {
         match terminator {
             Terminator::Return(Some(value)) => {
@@ -477,18 +472,20 @@ impl<'m> ModuleRenderer<'m> {
     }
 }
 
-struct RenderContext<'m> {
+struct RenderContext<'m, 'p> {
     module: &'m ir::Module,
     value_types: HashMap<ValueId, TypeId>,
     unit_values: HashSet<ValueId>,
+    purity: Option<&'p ir::analysis::PurityReport>,
 }
 
-impl<'m> RenderContext<'m> {
-    fn new(module: &'m ir::Module) -> Self {
+impl<'m, 'p> RenderContext<'m, 'p> {
+    fn new(module: &'m ir::Module, purity: Option<&'p ir::analysis::PurityReport>) -> Self {
         RenderContext {
             module,
             value_types: HashMap::new(),
             unit_values: HashSet::new(),
+            purity,
         }
     }
 }
@@ -498,7 +495,7 @@ fn render_binary(
     op: crate::syntax::ast::BinaryOp,
     lhs: ValueId,
     rhs: ValueId,
-    context: &RenderContext<'_>,
+    context: &RenderContext<'_, '_>,
 ) -> String {
     let result_id = inst.id.index();
     let lhs_ty = context
@@ -615,7 +612,7 @@ fn render_path(inst: &ir::Instruction, path: &crate::syntax::ast::Path) -> Strin
 fn render_phi(
     inst: &ir::Instruction,
     incomings: &[(crate::ir::BlockId, ValueId)],
-    context: &RenderContext<'_>,
+    context: &RenderContext<'_, '_>,
 ) -> String {
     let ty = format_type(context.module, inst.ty);
     let mut parts = Vec::new();

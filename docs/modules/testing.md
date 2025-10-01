@@ -37,6 +37,16 @@ front-end, semantic, and IR behavior stay aligned with the roadmap milestones.
 - **Tooling:** Consistent test output feeds into documentation and IDE tooling,
   helping maintain high-quality examples and diagnostics.【F:docs/roadmap/tooling.md†L1-L60】
 
+## CI Command Reference
+
+To mirror the automated pipeline locally, run the same locked commands the CI workflow executes:
+
+1. `cargo build --locked`
+2. `cargo test --locked --all-targets`
+3. `cargo run --quiet --bin gen_snippets -- --check`
+
+Executing them in order validates the compiler, the regression suites, and the documentation snippets exactly as the CI job does.【F:.github/workflows/ci.yml†L1-L23】
+
 ## Next Steps
 
 - Expand integration tests to cover multi-module workspaces once resolver

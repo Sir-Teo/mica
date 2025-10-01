@@ -216,6 +216,39 @@ fn main(io: IO) -> Int !{io} {
 }
 
 #[test]
+fn call_instructions_record_return_types_when_known() {
+    let src = r#"
+module demo
+
+fn make_vec() -> Int {
+  1
+}
+
+fn use_call() -> Int {
+  make_vec()
+}
+"#;
+
+    let module = parse(src);
+    let hir = lower::lower_module(&module);
+    let ir_module = ir::lower_module(&hir);
+
+    let call_inst = ir_module
+        .functions
+        .iter()
+        .find(|func| func.name == "use_call")
+        .and_then(|func| {
+            func.blocks
+                .iter()
+                .flat_map(|block| block.instructions.iter())
+                .find(|inst| matches!(inst.kind, ir::InstKind::Call { .. }))
+        })
+        .expect("call instruction lowered");
+
+    assert_eq!(ir_module.type_of(call_inst.ty), &ir::Type::Int);
+}
+
+#[test]
 fn lowering_treats_tail_expression_as_return() {
     let src = r#"
 module demo
@@ -373,6 +406,12 @@ fn choice(flag: Bool) -> Int {
     assert!(report.effectful_instructions.is_empty());
     assert_eq!(report.regions().len(), 1);
     assert_eq!(report.regions()[0], vec![entry]);
+    for block in &pure_fn.blocks {
+        assert_eq!(
+            report.block_effects.get(&block.id),
+            Some(&ir::analysis::BlockPurity::Pure)
+        );
+    }
 
     let impure_fn = ir_module
         .functions
@@ -385,13 +424,26 @@ fn choice(flag: Bool) -> Int {
         !report.is_block_pure(entry),
         "call with effects should mark block impure"
     );
-    assert!(report.effectful_instructions.iter().any(|id| {
-        impure_fn
-            .blocks
-            .iter()
-            .flat_map(|block| block.instructions.iter())
-            .any(|inst| inst.id == *id && matches!(inst.kind, ir::InstKind::Call { .. }))
-    }));
+    let call_block = impure_fn
+        .blocks
+        .iter()
+        .find(|block| {
+            block
+                .instructions
+                .iter()
+                .any(|inst| matches!(inst.kind, ir::InstKind::Call { .. }))
+        })
+        .expect("call block present");
+    let call_inst = call_block
+        .instructions
+        .iter()
+        .find(|inst| matches!(inst.kind, ir::InstKind::Call { .. }))
+        .expect("call instruction present");
+    assert!(report.effectful_instructions.contains(&call_inst.id));
+    assert_eq!(
+        report.block_effects.get(&call_block.id),
+        Some(&ir::analysis::BlockPurity::Effectful)
+    );
     assert!(report.regions().is_empty());
 
     let choice_fn = ir_module
@@ -411,6 +463,10 @@ fn choice(flag: Bool) -> Int {
             region.contains(&block.id),
             "pure region missing block {:?}",
             block.id
+        );
+        assert_eq!(
+            report.block_effects.get(&block.id),
+            Some(&ir::analysis::BlockPurity::Pure)
         );
     }
 }

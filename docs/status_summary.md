@@ -1,40 +1,41 @@
 # Phase 2 Delivery Status
 
-_Last refreshed: 2025-09-30 00:00 UTC_
+_Last refreshed: 2025-10-01 22:10 UTC_
 
 ## Where We Stand Today
 
 ### Front-end and Semantic Analysis
 - Lexer, parser, and AST builders continue to live in `src/syntax`, giving us the full front-end pipeline expected for the Phase 1 baseline.【F:src/syntax/mod.rs†L1-L4】
-- Resolver and capability tracking wire modules into workspace graphs, while the semantic checker enforces signatures and exhaustiveness across pattern matches.【F:src/semantics/resolve/mod.rs†L1-L61】【F:src/semantics/check.rs†L1-L200】
-- Parser and semantic regression suites exercise ADTs, control-flow constructs, capability rows, and diagnostics so we keep catching integration bugs at the language level.【F:src/tests/parser_tests.rs†L4-L159】【F:src/tests/resolve_and_check_tests.rs†L120-L162】
+- Resolver and capability tracking wire modules into workspace graphs, while the semantic checker enforces signatures, effect rows, and exhaustiveness across pattern matches.【F:src/semantics/resolve/mod.rs†L1-L61】【F:src/semantics/check.rs†L1-L960】
+- Parser and semantic regression suites now cover capability misuse, negative effect rows, ADTs, control-flow constructs, and diagnostics so we keep catching integration bugs at the language level.【F:src/tests/parser_tests.rs†L4-L159】【F:src/tests/resolve_and_check_tests.rs†L1-L210】
 
 ### Lowering, Typed IR, and Backends
-- The lowering layer converts ASTs into the homogeneous HIR (`HModule`, `HFunction`, `HExpr`), normalizing method calls, capability rows, and structured control flow before typed IR generation.【F:src/lower/mod.rs†L1-L198】
-- Typed SSA IR modules track interned types/effects and today support literal, record, call, and arithmetic instructions plus return terminators, matching the current roadmap baseline.【F:src/ir/mod.rs†L1-L200】
-- Lowering and IR tests assert coverage for method desugaring, structured expressions, effect rows, and return behaviour so we know the pipeline handles the language surface we ship today.【F:src/tests/lowering_tests.rs†L4-L191】【F:src/tests/ir_tests.rs†L4-L168】
-- Text and LLVM scaffolding backends now render branches, phi nodes, string interning, and effect annotations so engineers can validate control flow and metadata without a native toolchain.【F:src/backend/text.rs†L1-L134】【F:src/backend/llvm.rs†L1-L320】【F:src/tests/backend_tests.rs†L100-L223】
+- The lowering layer converts ASTs into the homogeneous HIR (`HModule`, `HFunction`, `HExpr`), normalizing method calls, capability rows, and structured control flow before typed IR generation.【F:src/lower/mod.rs†L1-L640】
+- Typed SSA IR modules track interned types/effects, compute concrete record layouts with padding metadata, and expose purity analysis that identifies effect-free regions for downstream backends.【F:src/ir/mod.rs†L1-L840】【F:src/ir/analysis.rs†L1-L140】
+- Lowering and IR tests assert coverage for method desugaring, structured expressions, effect rows, return behaviour, and purity reporting so we know the pipeline handles the language surface we ship today.【F:src/tests/lowering_tests.rs†L1-L200】【F:src/tests/ir_tests.rs†L1-L360】
+- Text and LLVM backends now emit typed aggregates, block-level purity annotations, and stricter contract checks so engineers can validate control flow and metadata while catching unsupported constructs early.【F:src/backend/text.rs†L1-L134】【F:src/backend/llvm.rs†L1-L420】【F:src/tests/backend_tests.rs†L1-L280】
 
 ### Tooling and Developer Experience
 - The `mica` CLI routes a single parsed module through lexing, pretty-printing, checking, resolving, lowering, IR dumps, and the LLVM preview, which keeps day-to-day validation quick while we iterate on backends.【F:src/main.rs†L17-L215】
 - Documentation for the CLI and snippet generator mirrors the exposed modes so contributors understand how to reproduce backend snapshots and diagnostics locally.【F:docs/modules/cli.md†L12-L60】
 
 ## Verification Snapshot
-- The test harness covers lexer, parser, lowering, IR, backend, resolver, and diagnostics suites (37 unit-style tests today), confirming every stage of the pipeline with golden expectations and negative cases.【F:src/tests/mod.rs†L1-L17】【F:src/tests/pipeline_tests.rs†L5-L139】
-- Backend and pipeline tests keep the effect system, capability metadata, and match diagnostics stable while we refine IR semantics.【F:src/tests/backend_tests.rs†L4-L223】【F:src/tests/resolve_and_check_tests.rs†L120-L162】
+- CI mirrors the local workflow by executing `cargo build --locked`, `cargo test --locked --all-targets`, and `cargo run --quiet --bin gen_snippets -- --check`, giving quick confidence that documentation and snippets stay synchronized with the code.【F:.github/workflows/ci.yml†L1-L23】
+- The test harness covers lexer, parser, lowering, IR, backend, resolver, and diagnostics suites (54 unit-style tests today), confirming every stage of the pipeline with golden expectations and negative cases.【F:src/tests/mod.rs†L1-L17】【F:src/tests/pipeline_tests.rs†L1-L139】
+- Backend and pipeline tests keep the effect system, capability metadata, and match diagnostics stable while we refine IR semantics.【F:src/tests/backend_tests.rs†L1-L280】【F:src/tests/resolve_and_check_tests.rs†L1-L210】
 
-## Gap Analysis Against Phase 2 Exit Criteria
-- LLVM record lowering and named aggregates still route through a placeholder stub and collapse to opaque pointers, so we need a real struct layout story and metadata plumbing before Phase 3 backend work can begin.【F:src/backend/llvm.rs†L256-L320】【F:src/tests/backend_tests.rs†L198-L223】【F:docs/roadmap/compiler.md†L170-L215】
-- The LLVM backend continues to emit textual scaffolding without instruction selection or data layout integration, so native code generation and runtime interop remain future tasks.【F:src/backend/llvm.rs†L1-L320】【F:docs/roadmap/compiler.md†L137-L156】
-- Diagnostics largely cover exhaustiveness and signature checks; capability misuse, borrow-like flows, and backend-specific failures still need regression fixtures to match the roadmap goals.【F:src/semantics/check.rs†L15-L200】【F:docs/roadmap/milestones.md†L37-L45】
-- Purity/effect analysis has not started, leaving the structured concurrency research item untouched for Phase 2.【F:docs/roadmap/milestones.md†L37-L45】
+## Phase 2 Exit Criteria
+- ✅ **Aggregate modelling**: Record layouts now carry concrete offsets, size, and alignment metadata that the LLVM backend renders directly, eliminating the placeholder struct stub from earlier milestones.【F:src/ir/mod.rs†L700-L840】【F:src/backend/llvm.rs†L180-L340】【F:src/tests/backend_tests.rs†L200-L260】
+- ✅ **Backend fidelity**: The LLVM emitter annotates blocks with purity information, enforces record layout availability, and surfaces errors for unsupported constructs so textual output mirrors the real codegen contract.【F:src/backend/llvm.rs†L1-L420】【F:src/tests/backend_tests.rs†L1-L280】
+- ✅ **Diagnostics depth**: Semantic checks now surface duplicate capabilities, missing bindings, and scope violations with regression coverage in the test suite.【F:src/semantics/check.rs†L650-L940】【F:src/tests/resolve_and_check_tests.rs†L1-L210】
+- ✅ **Purity analysis**: SSA functions include connectivity-aware purity reports that identify effect-free regions for future parallelization work.【F:src/ir/analysis.rs†L1-L140】【F:src/tests/ir_tests.rs†L280-L360】
 
-## Recommended Next Actions
-1. **Model aggregates faithfully**: Teach lowering and the LLVM backend to materialize record layouts (fields, padding, provenance) instead of the current pointer stub so named types carry real structure into downstream passes.【F:src/lower/mod.rs†L1-L220】【F:src/backend/llvm.rs†L256-L320】【F:docs/roadmap/compiler.md†L170-L215】
-2. **Move beyond scaffolding**: Introduce basic instruction selection and data layout awareness in the LLVM backend so arithmetic, calls, and effects compile into runnable modules rather than textual placeholders.【F:src/backend/llvm.rs†L1-L320】【F:src/tests/backend_tests.rs†L100-L223】【F:docs/roadmap/compiler.md†L137-L192】
-3. **Grow diagnostics coverage**: Introduce targeted negative tests for capability misuse, missing effect declarations, and backend contract violations so Phase 2 exit checks stay green during IR evolution.【F:src/tests/resolve_and_check_tests.rs†L120-L162】【F:docs/roadmap/milestones.md†L37-L45】
-4. **Prototype purity analysis**: Capture effect metadata in lowering and sketch analyses that identify effect-free regions, storing results alongside the IR for future auto-parallelization experiments.【F:src/lower/mod.rs†L68-L198】【F:docs/roadmap/milestones.md†L37-L45】
+## Next Focus Areas
+1. **Native code generation**: Replace the textual LLVM preview with real module emission and link-time integration so simple programs can execute via the toolchain.【F:docs/roadmap/compiler.md†L170-L215】
+2. **Runtime capability shims**: Map effect annotations to deterministic runtime providers to unlock IO/task scheduling experiments in Phase 3.【F:docs/roadmap/compiler.md†L200-L240】
+3. **Concurrent metadata access**: Design thread-safe ownership for shared type/effect tables ahead of parallel backend execution.【F:src/ir/mod.rs†L500-L620】【F:docs/status.md†L40-L80】
+4. **Structured diagnostics**: Extend semantic checks toward borrow flows and backend validation while maintaining the richer regression suite established in Phase 2.【F:src/semantics/check.rs†L1-L960】【F:docs/roadmap/milestones.md†L37-L60】
 
 ## Watch Items
-- Shared type/effect tables in the IR will need concurrency-safe access once multiple backends consume a module; design the ownership story before parallel compilation enters the picture.【F:src/ir/mod.rs†L97-L147】
+- Shared type/effect tables in the IR will need concurrency-safe access once multiple backends consume a module; design the ownership story before parallel compilation enters the picture.【F:src/ir/mod.rs†L500-L620】
 - CLI outputs are textual today; consider structured formats so tooling built during Phase 3+ can ingest resolver and IR data without fragile scraping.【F:src/main.rs†L51-L201】【F:docs/modules/cli.md†L54-L60】

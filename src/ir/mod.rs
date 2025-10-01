@@ -158,12 +158,18 @@ pub fn lower_module(module: &HModule) -> Module {
     lowerer.finish()
 }
 
+#[derive(Debug, Clone)]
+struct FunctionSignature {
+    ret_type: TypeId,
+    effects: Vec<EffectId>,
+}
+
 struct ModuleLower {
     name: Vec<String>,
     functions: Vec<Function>,
     types: TypeTable,
     effects: EffectTable,
-    function_effects: HashMap<String, Vec<EffectId>>,
+    function_signatures: HashMap<String, FunctionSignature>,
 }
 
 impl ModuleLower {
@@ -173,7 +179,7 @@ impl ModuleLower {
             functions: Vec::new(),
             types: TypeTable::new(),
             effects: EffectTable::default(),
-            function_effects: HashMap::new(),
+            function_signatures: HashMap::new(),
         }
     }
 
@@ -193,29 +199,39 @@ impl ModuleLower {
     }
 
     fn push_function(&mut self, func: &HFunction) {
-        let ret_type = func
+        let declared_ret_type = func
             .return_type
             .as_ref()
             .map(|ty| self.types.intern_type_expr(ty));
+        let ret_type = declared_ret_type.unwrap_or_else(|| self.types.unknown());
         let effect_row: Vec<_> = func
             .effect_row
             .iter()
             .map(|name| self.effects.intern(name.clone()))
             .collect();
-        self.function_effects
-            .insert(func.name.clone(), effect_row.clone());
+        self.function_signatures.insert(
+            func.name.clone(),
+            FunctionSignature {
+                ret_type,
+                effects: effect_row.clone(),
+            },
+        );
         let mut lowerer = FunctionLower::new(
             func.name.clone(),
-            ret_type,
+            declared_ret_type,
             effect_row,
             &mut self.types,
-            self.function_effects.clone(),
+            self.function_signatures.clone(),
         );
         for param in &func.params {
             lowerer.push_param(param);
         }
         lowerer.lower_block(&func.body);
         let lowered = lowerer.finish();
+        if let Some(signature) = self.function_signatures.get_mut(&func.name) {
+            signature.ret_type = lowered.ret_type;
+            signature.effects = lowered.effect_row.clone();
+        }
         self.functions.push(lowered);
     }
 
@@ -242,7 +258,7 @@ struct FunctionLower<'a> {
     effect_row: Vec<EffectId>,
     types: &'a mut TypeTable,
     unknown: TypeId,
-    functions: HashMap<String, Vec<EffectId>>,
+    functions: HashMap<String, FunctionSignature>,
 }
 
 impl<'a> FunctionLower<'a> {
@@ -251,7 +267,7 @@ impl<'a> FunctionLower<'a> {
         ret_type: Option<TypeId>,
         effect_row: Vec<EffectId>,
         types: &'a mut TypeTable,
-        functions: HashMap<String, Vec<EffectId>>,
+        functions: HashMap<String, FunctionSignature>,
     ) -> Self {
         let entry = BlockBuilder::new(BlockId(0));
         let unknown = types.unknown();
@@ -390,12 +406,13 @@ impl<'a> FunctionLower<'a> {
                     HFuncRef::Method(name) => FuncRef::Method(name.clone()),
                 };
                 let effects = self.lookup_effects(&func_ref);
+                let ret_ty = self.lookup_return_type(&func_ref);
                 self.emit_instruction(
                     InstKind::Call {
                         func: func_ref,
                         args: lowered_args,
                     },
-                    self.unknown,
+                    ret_ty,
                     effects,
                 )
             }
@@ -573,9 +590,20 @@ impl<'a> FunctionLower<'a> {
             FuncRef::Function(path) if path.segments.len() == 1 => self
                 .functions
                 .get(&path.segments[0])
-                .cloned()
+                .map(|sig| sig.effects.clone())
                 .unwrap_or_default(),
             _ => Vec::new(),
+        }
+    }
+
+    fn lookup_return_type(&self, func: &FuncRef) -> TypeId {
+        match func {
+            FuncRef::Function(path) if path.segments.len() == 1 => self
+                .functions
+                .get(&path.segments[0])
+                .map(|sig| sig.ret_type)
+                .unwrap_or(self.unknown),
+            _ => self.unknown,
         }
     }
 

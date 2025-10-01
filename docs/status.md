@@ -1,27 +1,27 @@
-# Project Status — Phase 2 Kickoff
+# Project Status — Phase 2 Complete
 
-_Last updated: 2025-09-30 00:00 UTC_
+_Last updated: 2025-10-01 22:10 UTC_
 
 ## Current Health Check
-- **Compiler pipeline**: Lexer, parser, resolver, and type checker are implemented and covered by regression tests.
-- **Typed IR**: Lowerer assigns stable `TypeId`s with shared registries; design notes now describe backend expectations and helpers like `Module::unknown_type` for consumers.【F:docs/modules/ir.md†L1-L70】
-- **Backend**: Text emitter plus the new LLVM scaffolding backend render typed IR with effect metadata for validation and future native code generation.【F:src/backend/llvm.rs†L1-L226】【F:src/tests/backend_tests.rs†L1-L96】
-- **Diagnostics**: Playbook refreshed with backend snapshots and CLI documentation mirrors the expanded surface area, including new IR examples.【F:docs/modules/diagnostics.md†L1-L89】【F:docs/snippets.md†L1-L80】
+- **Compiler pipeline**: Lexer, parser, resolver, and type checker remain healthy with broad regression coverage across the front-end suites.【F:src/semantics/check.rs†L1-L960】【F:src/tests/parser_tests.rs†L4-L159】
+- **Typed IR**: Lowering interns canonical types/effects, records concrete aggregate layouts, and ships purity analysis so downstream passes can reason about effectful regions.【F:src/ir/mod.rs†L1-L840】【F:src/ir/analysis.rs†L1-L140】
+- **Backend**: Text and LLVM renderers emit typed aggregates, purity annotations, and strict diagnostics when layout data is missing, cementing the contract for future native codegen.【F:src/backend/llvm.rs†L1-L420】【F:src/tests/backend_tests.rs†L1-L280】
+- **Diagnostics**: Capability misuse, duplicate effects, and missing bindings now surface dedicated errors with snapshot coverage in the suite.【F:src/semantics/check.rs†L650-L940】【F:src/tests/resolve_and_check_tests.rs†L1-L210】
 
 ## Test & Verification Snapshot
-- `cargo test` (unit + integration) — all 37 suites pass locally across lexer, parser, lowering, IR, backend, resolver, and diagnostics coverage.【F:src/tests/mod.rs†L1-L17】
-- Doc tests for CLI utilities execute with zero regressions.
+- CI commands rerun on Oct 01, 2025 confirm the locked build, test, and snippet checks all succeed (`cargo build --locked`, `cargo test --locked --all-targets`, `cargo run --quiet --bin gen_snippets -- --check`).【F:.github/workflows/ci.yml†L1-L23】
+- `cargo test` (unit + integration) — 54 suites cover lexer, parser, lowering, IR, backend, resolver, and diagnostics, staying green after the latest backend and analysis additions.【F:src/tests/mod.rs†L1-L17】【F:src/tests/pipeline_tests.rs†L1-L139】
 
 ## Near-Term Priorities
-1. Flesh out typed IR coverage for control-flow joins, pattern destructuring, and effect polymorphism.
-2. Harden the LLVM scaffolding into a codegen pipeline that lowers SSA blocks into real LLVM IR instructions.
-3. Extend diagnostics regression matrix with IR-specific failure fixtures and backend error cases.
-4. Explore purity analysis for structured concurrency primitives ahead of runtime work.
+1. Wire the LLVM backend to the native toolchain so simple examples compile to runnable binaries.【F:docs/roadmap/compiler.md†L170-L215】
+2. Stand up capability-aware runtime shims and scheduling hooks that honour the new effect metadata.【F:docs/roadmap/compiler.md†L200-L240】
+3. Design concurrency-safe ownership for shared IR tables before enabling parallel backend execution.【F:src/ir/mod.rs†L500-L620】
+4. Extend diagnostics toward borrow flows and backend validation while maintaining high-signal regression coverage.【F:src/semantics/check.rs†L1-L960】【F:docs/roadmap/milestones.md†L37-L60】
 
 ## Risks & Watch Items
-- **Registry Sharing**: Need to validate concurrency story when multiple backends request metadata.
-- **CLI UX**: `mica --ir` currently emits text only; consider JSON/protobuf for tooling.
-- **Testing Debt**: No fuzzing yet for parser/resolver; schedule once Phase 2 IR features stabilize.
+- **Registry Sharing**: Type/effect tables are single-threaded today; parallel backend work will require synchronized access patterns.【F:src/ir/mod.rs†L500-L620】
+- **CLI UX**: `mica --ir` currently emits text only; consider structured formats for downstream tooling consumers.【F:src/main.rs†L51-L201】【F:docs/modules/cli.md†L54-L60】
+- **Testing Debt**: Parser/resolver fuzzing is still on the backlog; re-evaluate once codegen stabilizes post-Phase 2.
 
 ## Next Status Update
-- Revisit after backend trait RFC merges or when IR lowering milestones shift.
+- Revisit after the first native LLVM artifact lands or when runtime capability shims begin integrating with the CLI.

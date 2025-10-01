@@ -133,6 +133,45 @@ fn diagnostics_require_effect_row_for_calls() {
 }
 
 #[test]
+fn diagnostics_detect_duplicate_capabilities() {
+    let module = parse("module m\nfn writer(io: IO) -> Unit !{io, io} { () }");
+    let diags = check::check_module(&module);
+    assert!(
+        diags
+            .diagnostics
+            .iter()
+            .any(|d| d.message.contains("duplicate capability")),
+        "expected duplicate capability diagnostic"
+    );
+}
+
+#[test]
+fn diagnostics_require_capability_parameter_binding() {
+    let module = parse("module m\nfn worker() -> Unit !{io} { () }");
+    let diags = check::check_module(&module);
+    assert!(
+        diags.diagnostics.iter().any(|d| d
+            .message
+            .contains("declares capability 'io' but has no parameter")),
+        "expected missing capability binding diagnostic"
+    );
+}
+
+#[test]
+fn diagnostics_flag_missing_capability_scope_in_call() {
+    let module = parse(
+        "module m\nfn helper(io: IO) -> Unit !{io} { () }\nfn caller(net: IO) -> Unit !{io} { helper(net) }",
+    );
+    let diags = check::check_module(&module);
+    assert!(
+        diags.diagnostics.iter().any(|d| d
+            .message
+            .contains("requires capability 'io' which is not in scope")),
+        "expected missing capability scope diagnostic"
+    );
+}
+
+#[test]
 fn resolve_adts() {
     let m = parse("module m\ntype A = X | Y");
     let r = resolve::resolve_module(&m);
