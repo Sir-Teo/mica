@@ -225,6 +225,39 @@ fn build() -> Data {
 }
 
 #[test]
+fn llvm_backend_preserves_call_return_types() {
+    let src = r#"
+module backend.call_types
+
+type Vec2 = { x: Int, y: Int }
+
+fn build_vec2(x: Int, y: Int) -> Vec2 {
+  Vec2 { x, y }
+}
+
+fn use_call() -> Vec2 {
+  build_vec2(1, 2)
+}
+"#;
+
+    let module = parse(src);
+    let hir = lower::lower_module(&module);
+    let ir_module = ir::lower_module(&hir);
+    let llvm_backend = backend::llvm::LlvmBackend::default();
+    let output = backend::run(
+        &llvm_backend,
+        &ir_module,
+        &backend::BackendOptions::default(),
+    )
+    .expect("backend output");
+
+    let ir = output.as_str();
+    assert!(ir.contains("define %record.Vec2 @use_call()"));
+    assert!(ir.contains("call %record.Vec2 @build_vec2"));
+    assert!(ir.contains("ret %record.Vec2 %"));
+}
+
+#[test]
 fn llvm_backend_rejects_incomplete_record_literals() {
     let src = r#"
 module backend.record_error
@@ -251,6 +284,39 @@ fn build() -> Data {
         backend::BackendError::Unsupported(message) => {
             assert!(
                 message.contains("missing field") || message.contains("record literal"),
+                "unexpected message: {}",
+                message
+            );
+        }
+        other => panic!("expected unsupported error, got {other:?}"),
+    }
+}
+
+#[test]
+fn llvm_backend_rejects_untyped_record_literals() {
+    let src = r#"
+module backend.record_untyped
+
+fn make() {
+  Missing { flag: true }
+}
+"#;
+
+    let module = parse(src);
+    let hir = lower::lower_module(&module);
+    let ir_module = ir::lower_module(&hir);
+    let llvm_backend = backend::llvm::LlvmBackend::default();
+    let err = backend::run(
+        &llvm_backend,
+        &ir_module,
+        &backend::BackendOptions::default(),
+    )
+    .expect_err("expected backend failure");
+
+    match err {
+        backend::BackendError::Unsupported(message) => {
+            assert!(
+                message.contains("record literal"),
                 "unexpected message: {}",
                 message
             );
