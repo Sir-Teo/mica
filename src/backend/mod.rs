@@ -3,6 +3,7 @@ use std::fmt;
 use crate::ir;
 
 pub mod llvm;
+pub mod native;
 pub mod text;
 
 #[derive(Debug, Clone)]

@@ -670,6 +670,6 @@ fn record_symbol(name: &str) -> String {
     format!("record.{}", sanitize_symbol(name))
 }
 
-fn default_data_layout() -> &'static str {
+pub(crate) fn default_data_layout() -> &'static str {
     "e-m:e-p:64:64-i64:64-f64:64-n8:16:32:64-S128"
 }
