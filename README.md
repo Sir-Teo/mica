@@ -1,31 +1,46 @@
 # Mica
 
-Mica is an experimental systems programming language exploring a tiny, expressive
-core with predictable performance, explicit effects, and deterministic
-concurrency. The repository currently ships a prototype compiler front-end with
-a growing suite of language services, documentation, and examples.
+<p align="center">
+  <strong>Mica</strong> is an experimental systems language that explores a tiny, expressive
+  core with explicit effects, deterministic concurrency, and predictable
+  performance.<br />
+  <em>Minimal • Industrial • Composable • Auditable</em>
+</p>
 
-- **Minimal core** you can learn in an afternoon—everything else is library
-  code.
-- **Predictable performance** via ahead-of-time compilation and zero-cost
-  abstractions.
-- **Safety and auditability** through explicit capabilities, structured
-  concurrency, and deterministic parallelism.
-- **Interop-first design** with a stable C ABI and hooks for Python/JavaScript
-  "foreign tasks".
+Mica ships as a compact prototype compiler front-end backed by runnable
+examples, language tour documentation, and snapshot-tested tooling. The project
+is intentionally small enough to read in a weekend while still demonstrating the
+design patterns required for a production-grade compiler.
 
-> Mica stands for **Minimal, Industrial, Composable, Auditable**.
+## Highlights
+
+- **Tiny but expressive core** – Learn the entire syntax in an afternoon and
+  extend behaviour via standard libraries instead of bespoke keywords.
+- **Deterministic concurrency** – Structured `spawn`/`await` with effect
+  tracking ensures reproducible outcomes.
+- **Capability-based effects** – Explicit `using` clauses make side effects and
+  resource access auditable.
+- **Ahead-of-time tooling** – The CLI exposes every compiler stage from tokens
+  to native code generation, each backed by golden-file snapshots.
+- **Interop-friendly ABI** – C-compatible calling conventions and hooks for
+  Python/JavaScript “foreign tasks” keep the language ecosystem-friendly.
+
+---
 
 ## Table of contents
 
+- [Highlights](#highlights)
 - [Project status](#project-status)
-- [Getting started](#getting-started)
-- [Command-line interface](#command-line-interface)
-- [Language tour](#language-tour)
-- [Examples](#examples)
+- [Quickstart](#quickstart)
+- [CLI reference](#cli-reference)
+- [Language features](#language-features)
+- [Example gallery](#example-gallery)
 - [Repository layout](#repository-layout)
+- [Documentation & resources](#documentation--resources)
+- [Development workflow](#development-workflow)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
+- [FAQ](#faq)
 - [License](#license)
 
 ## Project status
@@ -35,32 +50,64 @@ Mica is a prototype under active design. Today the repository contains:
 - A lexer, parser, resolver, effect checker, lowerer, and pretty-printer wired
   together behind a single CLI binary (`mica`).
 - Exhaustiveness checking for `match` expressions, capability tracking, and
-  structured diagnostics.
+  structured diagnostics with source-code snippets.
 - Snapshot-driven documentation for the CLI, plus a tutorial-oriented language
   tour.
 - An executable test suite covering lexing, parsing, resolving, lowering,
   formatting, and both textual/native backend paths.
 
-See the [roadmap](#roadmap) for the longer-term build-out.
+See the [roadmap](#roadmap) for the longer-term build-out and current areas of
+focus.
 
-## Getting started
+## Quickstart
 
-Mica uses the Rust toolchain. Install Rust via <https://rustup.rs/> if you do not
-already have it, then build and test the project:
+### 1. Install prerequisites
+
+- Install a recent stable Rust toolchain via <https://rustup.rs/>.
+- LLVM is bundled with Rust, so no additional native dependencies are required
+  for the current prototype.
+
+### 2. Clone and build
 
 ```bash
+git clone https://github.com/<you>/mica.git
+cd mica
 cargo build
+```
+
+The initial build downloads the Rust dependencies. Subsequent builds and runs
+are incremental and fast.
+
+### 3. Run the test suite
+
+```bash
 cargo test
 ```
 
-Running `cargo run --bin mica` with the path to a `.mica` file executes the CLI
-in its default `--ast` mode:
+The tests execute integration flows that cover lexing, parsing, lowering, the
+IR pipeline, and snapshot comparisons.
+
+### 4. Explore the CLI
+
+Inspect the AST of a demo program:
 
 ```bash
 cargo run --bin mica -- examples/demo.mica
 ```
 
-## Command-line interface
+Or compile and execute one of the runnable samples end-to-end:
+
+```bash
+cargo run --bin mica -- --run examples/methods.mica
+```
+
+### 5. Troubleshooting
+
+- If builds fail due to an outdated toolchain, run `rustup update` and retry.
+- Regenerate CLI snapshots when golden files drift: `cargo run --bin gen_snippets`.
+- Use `cargo clean` to clear stale build artifacts when switching toolchains.
+
+## CLI reference
 
 The CLI surfaces multiple compiler stages behind feature flags. Combine them as
 needed:
@@ -80,14 +127,53 @@ cargo run --bin mica -- --run examples/methods.mica      # Compile + run via the
 
 CLI output snapshots are maintained in [`docs/snippets.md`](docs/snippets.md).
 
-## Language tour
+### Editor integration
 
-For a quick walkthrough of modules, algebraic data types, pattern matching,
-effects, concurrency, generics, and more, read [`docs/tour.md`](docs/tour.md).
-Each section in the tour links directly to runnable examples in the
-[`examples/`](examples) directory.
+A dedicated language server is still in development. In the meantime, the
+pretty-printer, CLI snapshots, and `cargo fmt` keep code style consistent.
 
-## Examples
+## Language features
+
+### Quick example
+
+The following snippet demonstrates pattern matching and capability-aware
+logging. Save it as `hello.mica` and run `cargo run --bin mica -- --run hello.mica`:
+
+```mica
+module hello
+
+capability Console
+
+func main(using Console console) -> Result[Int, Error] {
+  let hour = 17
+  let message = match hour {
+    hour if hour < 12 -> "Good morning"
+    hour if hour < 18 -> "Good afternoon"
+    _                 -> "Good evening"
+  }
+
+  console.println(message)
+  Ok(0)
+}
+```
+
+The example highlights Mica's explicit capabilities and exhaustive `match`
+expressions, even in small standalone modules.
+
+### Feature highlights
+
+- **Modules & namespaces** — `module` declarations map directly to file system
+  layout, simplifying code navigation.
+- **Algebraic data types (ADTs)** — First-class enums with pattern matching and
+  guard clauses.
+- **Deterministic concurrency** — `spawn`, `await`, and effect-scoped `using`
+  blocks keep asynchronous flows auditable.
+- **Generics & traits** — Zero-cost abstractions with trait-constrained
+  generics and higher-order functions.
+- **Capabilities & effects** — Resources are granted explicitly, keeping IO,
+  logging, and networking opt-in.
+
+## Example gallery
 
 The `examples/` directory showcases the current surface of the language,
 including:
@@ -109,7 +195,8 @@ including:
 - `methods.mica` — `impl` blocks and method receivers.
 
 Use the CLI commands above to inspect each example and explore how the
-capabilities compose across files.
+capabilities compose across files. Pair them with the [language tour](#documentation--resources)
+for guided explanations.
 
 ## Repository layout
 
@@ -131,7 +218,49 @@ capabilities compose across files.
 ```
 
 This layout is intentionally compact so newcomers can find the relevant stage of
-the pipeline quickly.
+the pipeline quickly. Every directory contains focused Rust modules with
+documented entry points to make exploratory reading easier.
+
+## Documentation & resources
+
+- [`docs/tour.md`](docs/tour.md) — Guided walkthrough of syntax, semantics, and
+  runtime behaviour.
+- [`docs/snippets.md`](docs/snippets.md) — CLI output snapshots that double as
+  regression tests.
+- [`docs/roadmap/`](docs/roadmap) — Milestones, design notes, and implementation
+  plans.
+- [`examples/`](examples) — Runnable programs referenced throughout the tour
+  and used in integration tests.
+- [Issues](https://github.com/zesterer/mica/issues) — Discussion of active work,
+  feature requests, and bug reports.
+
+## Development workflow
+
+1. Make changes to the compiler or examples.
+2. Format and lint your work:
+   ```bash
+   cargo fmt
+   cargo clippy --all-targets --all-features
+   ```
+3. Run the full test suite:
+   ```bash
+   cargo test
+   ```
+4. Update CLI snapshots when relevant:
+   ```bash
+   cargo run --bin gen_snippets -- --check   # verify
+   cargo run --bin gen_snippets              # regenerate if needed
+   ```
+
+Continuous integration mirrors this workflow, so keeping the tree clean ensures
+fast reviews.
+
+### Recommended tooling
+
+- `cargo check` for quick iteration loops.
+- `cargo fmt --check` in CI environments to verify formatting.
+- An editor with rust-analyzer or language-server support for Rust will surface
+  type errors as you work on the compiler.
 
 ## Roadmap
 
@@ -161,9 +290,29 @@ Contributions are welcome! A few tips:
 - Update snapshots with `cargo run --bin gen_snippets` when CLI output changes
   (use `-- --check` to verify they are current).
 - Prefer small, focused pull requests so reviews stay fast and friendly.
+- Open an issue to discuss ideas, questions, or areas where you would like to
+  help.
 
-Feel free to open an issue to discuss ideas, questions, or areas where you would
-like to help.
+Community discussion channels (such as GitHub Discussions) will come online as
+the project matures—watch the repository for updates.
+
+## FAQ
+
+### Is Mica production ready?
+
+Not yet. The language is still iterating on core semantics and tooling. Expect
+breaking changes between releases.
+
+### Does Mica target a virtual machine or native code?
+
+Mica lowers to a typed SSA IR and emits LLVM IR for native code generation. A
+bytecode or WASM backend may appear in future roadmap milestones.
+
+### Where can I ask questions or follow along?
+
+Track issues and discussions in the GitHub repository, or open an issue to start
+a conversation. News about community chat channels will land in the roadmap
+directory as they become available.
 
 ## License
 
