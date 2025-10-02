@@ -216,7 +216,7 @@ Each module plan includes objectives, detailed tasks, dependencies, and exit cri
 
 **Step-by-step plan**
 1. Stand up `xtask` utilities for snapshot regeneration and fixture scaffolding.
-2. Introduce code coverage reporting via `cargo llvm-cov` in CI.
+2. Reintroduce portable code coverage reporting in CI (prefer `cargo llvm-cov` when feasible, or an equivalent collector).
 3. Automate fuzzing hooks for lexer/parser (`cargo fuzz` integration).
 4. Document testing strategy in `docs/roadmap/tooling.md`.
 
@@ -224,7 +224,7 @@ Each module plan includes objectives, detailed tasks, dependencies, and exit cri
 - Cross-cutting; evolves with modules.
 
 **Exit Criteria**
-- CI pipeline enforces formatting, clippy, tests, coverage threshold, and snippet freshness.
+- CI pipeline enforces formatting, clippy, tests, snippet freshness, and reinstated coverage thresholds.
 - Fuzzers execute nightly with budgeted runtime.
 
 **Future-facing trajectory**

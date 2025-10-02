@@ -79,14 +79,14 @@ automation-heavy, next-decade developer workflows.
 
 ## Testing Infrastructure
 
-1. Add `cargo llvm-cov` support and enforce coverage thresholds.
+1. Restore portable coverage reporting (revisit `cargo llvm-cov` or alternatives) and enforce thresholds once infrastructure is stable across constrained environments.
 2. Wire fuzzers: `cargo fuzz run lexer` and `cargo fuzz run parser` on nightly schedule.
 3. Provide regression suite harness for effect system edge cases.
 4. Document triage process for test flakes (see `docs/CONTRIBUTING.md`).
 
 **Acceptance Criteria**
-- CI matrix runs tests, fmt, lint, coverage, fuzz smoke, docs.
-- Initial coverage gate lands at 50% line execution via `cargo llvm-cov`, with the intent to ratchet higher as runtime shims and fuzz hooks arrive.【F:.github/workflows/ci.yml†L39-L71】
+- CI matrix runs tests, fmt, lint, docs, and native smoke checks; coverage is reinstated once the job runs reliably without extra tooling installs.
+- Coverage gates resume at 50% line execution once the portable reporting path is in place, with headroom to ratchet higher alongside runtime shims and fuzz hooks.【F:.github/workflows/ci.yml†L1-L55】
 - Nightly pipeline reports coverage/fuzz metrics to Slack.
 
 **Future-facing trajectory**

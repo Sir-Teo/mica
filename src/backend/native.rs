@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -7,6 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::ir::{self, InstKind, Terminator, Type, ValueId};
 
 use super::{Backend, BackendError, BackendOptions, BackendResult};
+
+type RecordNameMap = HashMap<ir::TypeId, String>;
 
 /// Backend that lowers the typed SSA module into portable C code and relies on
 /// the host C compiler to produce machine code. This approach keeps the
@@ -39,20 +42,25 @@ impl NativeArtifact {
         let c_path = temp_path("mica", "c");
         self.write_source(&c_path)?;
 
-        let status = Command::new("cc")
+        let output = Command::new("cc")
             .arg(&c_path)
             .arg("-std=c11")
             .arg("-O2")
             .arg("-o")
             .arg(out_path)
-            .status()
+            .output()
             .map_err(|err| BackendError::Internal(format!("failed to invoke cc: {err}")))?;
 
         fs::remove_file(&c_path).ok();
 
-        if !status.success() {
+        if !output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(BackendError::Internal(format!(
-                "cc exited with status {status}",
+                "cc exited with status {}. stdout: {} stderr: {}",
+                output.status,
+                stdout.trim(),
+                stderr.trim()
             )));
         }
 
@@ -83,15 +91,28 @@ fn generate_c_source(module: &ir::Module) -> BackendResult<String> {
     writeln!(out, "#include <stddef.h>").unwrap();
     writeln!(out).unwrap();
 
+    let record_names = collect_record_names(module);
+    emit_record_definitions(&mut out, module, &record_names)?;
+
     // Emit prototypes to allow mutual recursion.
     for function in &module.functions {
-        writeln!(out, "{};", function_signature(module, function)?).unwrap();
+        writeln!(
+            out,
+            "{};",
+            function_signature(module, function, &record_names)?
+        )
+        .unwrap();
     }
     writeln!(out).unwrap();
 
     for function in &module.functions {
-        writeln!(out, "{} {{", function_signature(module, function)?).unwrap();
-        emit_function_body(&mut out, module, function)?;
+        writeln!(
+            out,
+            "{} {{",
+            function_signature(module, function, &record_names)?
+        )
+        .unwrap();
+        emit_function_body(&mut out, module, function, &record_names)?;
         writeln!(out, "}}").unwrap();
         writeln!(out).unwrap();
     }
@@ -99,15 +120,42 @@ fn generate_c_source(module: &ir::Module) -> BackendResult<String> {
     Ok(out)
 }
 
-fn function_signature(module: &ir::Module, function: &ir::Function) -> BackendResult<String> {
+fn emit_record_definitions(
+    out: &mut String,
+    module: &ir::Module,
+    record_names: &RecordNameMap,
+) -> BackendResult<()> {
+    if record_names.is_empty() {
+        return Ok(());
+    }
+
+    let mut entries: Vec<_> = record_names.iter().collect();
+    entries.sort_by_key(|(id, _)| id.index());
+
+    for (type_id, name) in entries {
+        let Type::Record(record) = module.type_of(*type_id) else {
+            continue;
+        };
+        writeln!(out, "typedef struct {name} {{").unwrap();
+        for field in &record.fields {
+            let field_ty = c_type_value(module, field.ty, record_names);
+            writeln!(out, "  {} {};", field_ty, sanitize_identifier(&field.name)).unwrap();
+        }
+        writeln!(out, "}} {name};").unwrap();
+        writeln!(out).unwrap();
+    }
+
+    Ok(())
+}
+
+fn function_signature(
+    module: &ir::Module,
+    function: &ir::Function,
+    record_names: &RecordNameMap,
+) -> BackendResult<String> {
     let mut signature = String::new();
-    write!(
-        signature,
-        "{} {}(",
-        c_type_return(module.type_of(function.ret_type)),
-        mangle_name(&function.name)
-    )
-    .unwrap();
+    let ret_type = c_type_return(module, function.ret_type, record_names);
+    write!(signature, "{} {}(", ret_type, mangle_name(&function.name)).unwrap();
 
     for (index, param) in function.params.iter().enumerate() {
         if index > 0 {
@@ -116,7 +164,7 @@ fn function_signature(module: &ir::Module, function: &ir::Function) -> BackendRe
         write!(
             signature,
             "{} arg{}",
-            c_type_value(module.type_of(param.ty)),
+            c_type_value(module, param.ty, record_names),
             index
         )
         .unwrap();
@@ -134,6 +182,7 @@ fn emit_function_body(
     out: &mut String,
     module: &ir::Module,
     function: &ir::Function,
+    record_names: &RecordNameMap,
 ) -> BackendResult<()> {
     writeln!(out, "  int prev_block = -1;").unwrap();
     writeln!(out, "  int current_block = 0;").unwrap();
@@ -143,7 +192,7 @@ fn emit_function_body(
         writeln!(
             out,
             "  {} {} = arg{};",
-            c_type_value(module.type_of(param.ty)),
+            c_type_value(module, param.ty, record_names),
             var,
             index
         )
@@ -158,10 +207,10 @@ fn emit_function_body(
     writeln!(out, "  goto block0;").unwrap();
 
     for block in &function.blocks {
-        emit_block(out, module, function, block)?;
+        emit_block(out, module, function, block, record_names)?;
     }
 
-    match default_return(module, function.ret_type) {
+    match default_return(module, function.ret_type, record_names) {
         Some(expr) => {
             writeln!(out, "  return {};", expr).unwrap();
         }
@@ -177,13 +226,14 @@ fn emit_block(
     module: &ir::Module,
     function: &ir::Function,
     block: &ir::BasicBlock,
+    record_names: &RecordNameMap,
 ) -> BackendResult<()> {
     writeln!(out, "block{}:", block.id.index()).unwrap();
     writeln!(out, "  current_block = {};", block.id.index()).unwrap();
 
     for inst in &block.instructions {
         if let InstKind::Phi { .. } = &inst.kind {
-            emit_phi(out, module, inst)?;
+            emit_phi(out, module, inst, record_names)?;
         }
     }
 
@@ -191,17 +241,22 @@ fn emit_block(
         if matches!(inst.kind, InstKind::Phi { .. }) {
             continue;
         }
-        emit_instruction(out, module, inst)?;
+        emit_instruction(out, module, inst, record_names)?;
     }
 
-    emit_terminator(out, module, function, block)?;
+    emit_terminator(out, module, function, block, record_names)?;
     Ok(())
 }
 
-fn emit_phi(out: &mut String, module: &ir::Module, inst: &ir::Instruction) -> BackendResult<()> {
-    let ty = module.type_of(inst.ty);
+fn emit_phi(
+    out: &mut String,
+    module: &ir::Module,
+    inst: &ir::Instruction,
+    record_names: &RecordNameMap,
+) -> BackendResult<()> {
+    let ty = inst.ty;
     let var = value_name(inst.id);
-    writeln!(out, "  {} {};", c_type_value(ty), var).unwrap();
+    writeln!(out, "  {} {};", c_type_value(module, ty, record_names), var).unwrap();
 
     if let InstKind::Phi { incomings } = &inst.kind {
         writeln!(out, "  switch (prev_block) {{").unwrap();
@@ -215,7 +270,13 @@ fn emit_phi(out: &mut String, module: &ir::Module, inst: &ir::Instruction) -> Ba
             )
             .unwrap();
         }
-        writeln!(out, "    default: {} = {}; break;", var, default_value(ty)).unwrap();
+        writeln!(
+            out,
+            "    default: {} = {}; break;",
+            var,
+            default_value(module, ty, record_names)
+        )
+        .unwrap();
         writeln!(out, "  }}").unwrap();
     }
 
@@ -226,18 +287,26 @@ fn emit_instruction(
     out: &mut String,
     module: &ir::Module,
     inst: &ir::Instruction,
+    record_names: &RecordNameMap,
 ) -> BackendResult<()> {
-    let ty = module.type_of(inst.ty);
+    let ty = inst.ty;
     let var = value_name(inst.id);
     match &inst.kind {
         InstKind::Literal(lit) => {
-            writeln!(out, "  {} {} = {};", c_type_value(ty), var, literal(lit)).unwrap();
+            writeln!(
+                out,
+                "  {} {} = {};",
+                c_type_value(module, ty, record_names),
+                var,
+                literal(lit)
+            )
+            .unwrap();
         }
         InstKind::Binary { op, lhs, rhs } => {
             writeln!(
                 out,
                 "  {} {} = {} {} {};",
-                c_type_value(ty),
+                c_type_value(module, ty, record_names),
                 var,
                 value_name(*lhs),
                 op,
@@ -255,14 +324,20 @@ fn emit_instruction(
                 .map(|arg| value_name(*arg))
                 .collect::<Vec<_>>()
                 .join(", ");
-            if matches!(ty, Type::Unit) {
+            if matches!(module.type_of(ty), Type::Unit) {
                 writeln!(out, "  {}({});", mangle_name(&name), args).unwrap();
-                writeln!(out, "  {} {} = 0;", c_type_value(ty), var).unwrap();
+                writeln!(
+                    out,
+                    "  {} {} = 0;",
+                    c_type_value(module, ty, record_names),
+                    var
+                )
+                .unwrap();
             } else {
                 writeln!(
                     out,
                     "  {} {} = {}({});",
-                    c_type_value(ty),
+                    c_type_value(module, ty, record_names),
                     var,
                     mangle_name(&name),
                     args
@@ -270,15 +345,55 @@ fn emit_instruction(
                 .unwrap();
             }
         }
-        InstKind::Record { .. } => {
-            return Err(BackendError::Unsupported(
-                "record literals are not yet supported by the native backend".into(),
-            ));
+        InstKind::Record { fields, .. } => {
+            let Type::Record(record) = module.type_of(ty) else {
+                return Err(BackendError::Internal(
+                    "record literal lowered with non-record type".into(),
+                ));
+            };
+            let mut initializers = Vec::with_capacity(record.fields.len());
+            for field in &record.fields {
+                let Some((_, value)) = fields.iter().find(|(name, _)| name == &field.name) else {
+                    let record_name = record.name.as_deref().unwrap_or("<anonymous record>");
+                    return Err(BackendError::Unsupported(format!(
+                        "record literal for '{record_name}' is missing field '{}'",
+                        field.name
+                    )));
+                };
+                initializers.push(format!(
+                    ".{} = {}",
+                    sanitize_identifier(&field.name),
+                    value_name(*value)
+                ));
+            }
+            for (name, _) in fields {
+                if record.field(name).is_none() {
+                    return Err(BackendError::Unsupported(format!(
+                        "record literal references unknown field '{}'",
+                        name
+                    )));
+                }
+            }
+            let type_name = c_type_value(module, ty, record_names);
+            if initializers.is_empty() {
+                writeln!(out, "  {} {} = ({}){{0}};", type_name, var, type_name).unwrap();
+            } else {
+                writeln!(
+                    out,
+                    "  {} {} = ({}){{ {} }};",
+                    type_name,
+                    var,
+                    type_name,
+                    initializers.join(", ")
+                )
+                .unwrap();
+            }
         }
-        InstKind::Path(_) => {
-            return Err(BackendError::Unsupported(
-                "path expressions are not yet supported by the native backend".into(),
-            ));
+        InstKind::Path(path) => {
+            return Err(BackendError::Unsupported(format!(
+                "path expression '{}' cannot be lowered by the native backend yet",
+                path.segments.join("::")
+            )));
         }
         InstKind::Phi { .. } => {}
     }
@@ -290,6 +405,7 @@ fn emit_terminator(
     module: &ir::Module,
     function: &ir::Function,
     block: &ir::BasicBlock,
+    record_names: &RecordNameMap,
 ) -> BackendResult<()> {
     match &block.terminator {
         Terminator::Return(Some(value)) => {
@@ -299,7 +415,7 @@ fn emit_terminator(
                 writeln!(out, "  return {};", value_name(*value)).unwrap();
             }
         }
-        Terminator::Return(None) => match default_return(module, function.ret_type) {
+        Terminator::Return(None) => match default_return(module, function.ret_type, record_names) {
             Some(expr) => {
                 writeln!(out, "  return {};", expr).unwrap();
             }
@@ -330,39 +446,48 @@ fn emit_terminator(
     Ok(())
 }
 
-fn c_type_value(ty: &Type) -> &'static str {
-    match ty {
-        Type::Int | Type::Named(_) | Type::Unknown | Type::Unit | Type::Record(_) => "int64_t",
-        Type::String => "const char *",
-        Type::Float => "double",
-        Type::Bool => "bool",
+fn c_type_value(module: &ir::Module, ty: ir::TypeId, record_names: &RecordNameMap) -> String {
+    match module.type_of(ty) {
+        Type::Int | Type::Named(_) | Type::Unknown | Type::Unit => "int64_t".into(),
+        Type::String => "const char *".into(),
+        Type::Float => "double".into(),
+        Type::Bool => "bool".into(),
+        Type::Record(_) => record_names
+            .get(&ty)
+            .cloned()
+            .unwrap_or_else(|| format!("record_{}", ty.index())),
     }
 }
 
-fn c_type_return(ty: &Type) -> &'static str {
-    match ty {
-        Type::Unit => "void",
-        other => c_type_value(other),
+fn c_type_return(module: &ir::Module, ty: ir::TypeId, record_names: &RecordNameMap) -> String {
+    match module.type_of(ty) {
+        Type::Unit => "void".into(),
+        _ => c_type_value(module, ty, record_names),
     }
 }
 
-fn default_value(ty: &Type) -> &'static str {
-    match ty {
-        Type::Bool => "false",
-        Type::Float => "0.0",
-        Type::String => "NULL",
-        _ => "0",
+fn default_value(module: &ir::Module, ty: ir::TypeId, record_names: &RecordNameMap) -> String {
+    match module.type_of(ty) {
+        Type::Bool => "false".into(),
+        Type::Float => "0.0".into(),
+        Type::String => "NULL".into(),
+        Type::Record(_) => format!("({}){{0}}", c_type_value(module, ty, record_names)),
+        _ => "0".into(),
     }
 }
 
-fn default_return(module: &ir::Module, ty: ir::TypeId) -> Option<&'static str> {
-    let ty = module.type_of(ty);
-    match ty {
+fn default_return(
+    module: &ir::Module,
+    ty: ir::TypeId,
+    record_names: &RecordNameMap,
+) -> Option<String> {
+    match module.type_of(ty) {
         Type::Unit => None,
-        Type::Float => Some("0.0"),
-        Type::Bool => Some("false"),
-        Type::String => Some("NULL"),
-        _ => Some("0"),
+        Type::Float => Some("0.0".into()),
+        Type::Bool => Some("false".into()),
+        Type::String => Some("NULL".into()),
+        Type::Record(_) => Some(format!("({}){{0}}", c_type_value(module, ty, record_names))),
+        _ => Some("0".into()),
     }
 }
 
@@ -395,15 +520,48 @@ fn value_name(id: ValueId) -> String {
 }
 
 fn mangle_name(name: &str) -> String {
-    name.replace("::", "_")
+    sanitize_identifier(&name.replace("::", "_"))
 }
 
-fn temp_path(prefix: &str, ext: &str) -> PathBuf {
+fn sanitize_identifier(name: &str) -> String {
+    let mut result = String::new();
+    for ch in name.chars() {
+        if ch.is_ascii_alphanumeric() || ch == '_' {
+            result.push(ch);
+        } else {
+            result.push('_');
+        }
+    }
+    if result.is_empty() {
+        result.push('_');
+    }
+    if result.chars().next().unwrap().is_ascii_digit() {
+        result.insert(0, '_');
+    }
+    result
+}
+
+fn collect_record_names(module: &ir::Module) -> RecordNameMap {
+    let mut names = HashMap::new();
+    for (id, ty) in module.types.entries() {
+        if let Type::Record(record) = ty {
+            let base = record
+                .name
+                .as_ref()
+                .map(|name| sanitize_identifier(name))
+                .unwrap_or_else(|| format!("anon_{}", id.index()));
+            names.insert(id, format!("record_{}", base));
+        }
+    }
+    names
+}
+
+fn temp_path(prefix: &str, extension: &str) -> PathBuf {
     let mut path = std::env::temp_dir();
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    path.push(format!("{}_{}.{ext}", prefix, nanos));
+    path.push(format!("{prefix}-{nanos}.{extension}"));
     path
 }
