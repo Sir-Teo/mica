@@ -68,7 +68,7 @@ should observe before moving on.
   4. Harden testing infrastructure (coverage, fuzzing, xtask automation).
 - **Exit**:
   - VS Code extension demo validated with live editing session.
-  - CI enforces fmt, lint, tests, docs, coverage.
+  - CI enforces fmt, lint, tests, docs, and (once reinstated) coverage.
   - **Future signal**: LSP emits capability flow data consumable by future auditing tools.
 
 ## Phase 5 — Ecosystem Launch

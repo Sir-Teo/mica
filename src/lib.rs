@@ -3,6 +3,7 @@ pub mod diagnostics;
 pub mod ir;
 pub mod lower;
 pub mod pretty;
+pub mod runtime;
 pub mod semantics;
 pub mod syntax;
 

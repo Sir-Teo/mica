@@ -7,6 +7,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use mica::{
     Result, backend, check, error, ir, lexer, lower, parser, pretty,
     resolve::{self, CapabilityScope, PathKind, SymbolCategory, SymbolScope},
+    runtime,
+    syntax::ast,
 };
 
 fn main() {
@@ -236,6 +238,14 @@ fn run() -> Result<()> {
         }
         Mode::Run { output } => {
             let module = parser::parse_module(&source)?;
+            let resolved = resolve::resolve_module(&module);
+            if let Some(spec) = entry_task_spec(&module, &resolved) {
+                let runtime = runtime::Runtime::with_default_shims()
+                    .map_err(|err| error::Error::parse(None, err.to_string()))?;
+                runtime
+                    .ensure_capabilities(&spec)
+                    .map_err(|err| error::Error::parse(None, err.to_string()))?;
+            }
             let hir = lower::lower_module(&module);
             let typed = ir::lower_module(&hir);
             let backend = backend::native::NativeBackend;
@@ -292,4 +302,87 @@ enum Mode {
     Llvm,
     Build { output: Option<PathBuf> },
     Run { output: Option<PathBuf> },
+}
+
+fn entry_task_spec(
+    module: &ast::Module,
+    resolved: &resolve::Resolved,
+) -> Option<runtime::TaskSpec> {
+    let has_main = module.items.iter().any(|item| match item {
+        ast::Item::Function(func) => func.name == "main",
+        _ => false,
+    });
+    if !has_main {
+        return None;
+    }
+
+    let module_name = resolved.module_path.join("::");
+    let task_name = if module_name.is_empty() {
+        String::from("main")
+    } else {
+        format!("{}::main", module_name)
+    };
+
+    let mut spec = runtime::TaskSpec::new(task_name);
+    for binding in &resolved.capabilities {
+        if let CapabilityScope::Function {
+            module_path,
+            function,
+        } = &binding.scope
+            && module_path == &resolved.module_path
+            && function == "main"
+        {
+            spec.require(binding.name.clone());
+        }
+    }
+    Some(spec)
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    #[test]
+    fn entry_task_spec_collects_main_capabilities() {
+        let module = ast::Module {
+            name: vec!["demo".into()],
+            items: vec![ast::Item::Function(ast::Function {
+                is_public: false,
+                name: "main".into(),
+                generics: Vec::new(),
+                params: Vec::new(),
+                return_type: None,
+                effect_row: vec!["io".into()],
+                body: ast::Block {
+                    statements: Vec::new(),
+                },
+            })],
+        };
+
+        let mut resolved = resolve::Resolved {
+            module_path: vec!["demo".into()],
+            ..Default::default()
+        };
+        resolved.capabilities.push(resolve::CapabilityBinding {
+            name: "io".into(),
+            scope: CapabilityScope::Function {
+                module_path: vec!["demo".into()],
+                function: "main".into(),
+            },
+        });
+
+        let spec = entry_task_spec(&module, &resolved).expect("entry spec");
+        assert_eq!(spec.name(), "demo::main");
+        assert_eq!(spec.capabilities(), &[String::from("io")]);
+    }
+
+    #[test]
+    fn entry_task_spec_ignores_modules_without_main() {
+        let module = ast::Module {
+            name: vec!["demo".into()],
+            items: Vec::new(),
+        };
+        let resolved = resolve::Resolved::default();
+        assert!(entry_task_spec(&module, &resolved).is_none());
+    }
 }

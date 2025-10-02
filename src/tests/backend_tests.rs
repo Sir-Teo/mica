@@ -410,3 +410,44 @@ fn caller() {
         artifact.c_source
     );
 }
+
+#[test]
+fn native_backend_emits_record_literals() {
+    let src = r#"
+module backend.native_record
+
+type Vec2 = { x: Int, y: Int }
+
+fn build(x: Int, y: Int) -> Vec2 {
+  Vec2 { x, y }
+}
+"#;
+
+    let module = parse(src);
+    let hir = lower::lower_module(&module);
+    let ir_module = ir::lower_module(&hir);
+    let backend = backend::native::NativeBackend;
+    let artifact = backend::run(&backend, &ir_module, &backend::BackendOptions::default())
+        .expect("native backend artifact");
+
+    assert!(
+        artifact.c_source.contains("typedef struct record_Vec2"),
+        "expected record typedef in native output: {}",
+        artifact.c_source
+    );
+    assert!(
+        artifact.c_source.contains("record_Vec2 build"),
+        "expected Vec2 signature in native output: {}",
+        artifact.c_source
+    );
+    assert!(
+        artifact.c_source.contains("(record_Vec2){ .x ="),
+        "expected record literal initializer in native output: {}",
+        artifact.c_source
+    );
+    assert!(
+        artifact.c_source.contains(".y ="),
+        "expected y field initialization in native output: {}",
+        artifact.c_source
+    );
+}
