@@ -50,3 +50,4 @@ jobs:
       - name: Native backend smoke test
         run: cargo run --locked --quiet --bin mica -- --run examples/native_entry.mica
 
+
