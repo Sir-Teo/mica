@@ -412,6 +412,42 @@ fn caller() {
 }
 
 #[test]
+fn native_backend_threads_runtime_capabilities() {
+    let src = r#"
+module backend.native_capabilities
+
+fn log(io: IO) !{io} {
+  io.println("hello")
+}
+"#;
+
+    let module = parse(src);
+    let hir = lower::lower_module(&module);
+    let ir_module = ir::lower_module(&hir);
+    let backend = backend::native::NativeBackend;
+    let artifact = backend::run(&backend, &ir_module, &backend::BackendOptions::default())
+        .expect("native backend artifact");
+
+    assert!(
+        artifact
+            .c_source
+            .contains("mica_runtime_require_capability(\"io\")"),
+        "runtime guards missing from C source: {}",
+        artifact.c_source
+    );
+    assert!(
+        artifact.c_source.contains("mica_runtime_io_write_line"),
+        "expected IO runtime shim in C source: {}",
+        artifact.c_source
+    );
+    assert!(
+        artifact.c_source.contains("MICA_RUNTIME_CAPABILITY_NAMES"),
+        "capability registry not emitted: {}",
+        artifact.c_source
+    );
+}
+
+#[test]
 fn native_backend_emits_record_literals() {
     let src = r#"
 module backend.native_record

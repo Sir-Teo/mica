@@ -11,7 +11,7 @@ written guides synchronized with reality.
 
 | Area | Description |
 | --- | --- |
-| Argument parsing | `run()` parses flags such as `--tokens`, `--ast`, `--pretty`, `--check`, `--resolve`, `--lower`, the textual `--ir` dump, the LLVM preview `--llvm`, and the native `--build`/`--run` flows, validating that exactly one input path is supplied.【F:src/main.rs†L17-L105】 |
+| Argument parsing | `run()` parses flags such as `--tokens`, `--ast`, `--pretty`, `--check`, `--resolve`, `--resolve-json`, `--lower`, textual `--ir`, structured `--ir-json`, the LLVM preview `--llvm`, and the native `--build`/`--run` flows, validating that exactly one input path is supplied.【F:src/main.rs†L17-L120】 |
 | Mode dispatch | The `Mode` enum enumerates each compiler stage that can be surfaced through the CLI and makes it trivial to wire additional passes as roadmap milestones land.【F:src/main.rs†L212-L262】 |
 | Pipeline execution | Each mode reuses the same parse step and then calls into the relevant library module to print tokens, ASTs, semantic diagnostics, resolver output, lowered HIR strings, backend dumps, or native build artefacts.【F:src/main.rs†L105-L260】 |
 | Error reporting | CLI errors are normalized through the shared diagnostics helpers so messages remain consistent across modules.【F:src/main.rs†L35-L47】 |
@@ -22,9 +22,13 @@ written guides synchronized with reality.
 - `Mode`: Centralized enumeration of exposed stages; follow the established
   pattern when adding backend or optimization passes from Phase 3 of the
   compiler roadmap.【F:src/main.rs†L212-L262】【F:docs/roadmap/compiler.md†L126-L215】
-- `resolve::ResolvedModule`: Data printed by `--resolve`, including module path,
-  imports, symbol metadata, capabilities, and resolved paths. It is an important
-  integration surface for forthcoming IDE tooling.【F:src/main.rs†L75-L175】【F:docs/roadmap/tooling.md†L1-L60】
+- `resolve::Resolved`: The resolver snapshot now prints human-readable output
+  (`--resolve`) and emits JSON (`--resolve-json`) for tooling consumption. Data
+  includes module path, imports, symbol metadata, capabilities, and resolved
+  paths.【F:src/main.rs†L75-L195】【F:docs/roadmap/tooling.md†L1-L60】
+- `ir::module_to_json`: Converts the typed SSA module into a structured payload
+  consumed by `--ir-json`, complementing the textual dump and paving the way for
+  richer backend tooling.【F:src/ir/mod.rs†L860-L1120】【F:src/main.rs†L150-L210】
 - Snapshot harness helpers in `gen_snippets`: Guarantee the docs remain accurate
   by comparing generated output against committed snippets, a prerequisite for
   the roadmap’s documentation quality goals.【F:src/bin/gen_snippets.rs†L24-L58】【F:docs/roadmap/tooling.md†L32-L60】
