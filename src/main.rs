@@ -19,308 +19,95 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    let mut args = env::args().skip(1);
-    let mut mode = Mode::Ast;
-    let mut pretty = false;
-    let mut output_path: Option<PathBuf> = None;
-    let mut path_arg = None;
+    let cli_args = CliArgs::parse(env::args().skip(1))?;
+    let source = fs::read_to_string(&cli_args.input_path)
+        .map_err(|e| error::Error::lex(None, e.to_string()))?;
+    let ctx = CommandContext::new(cli_args.input_path.clone(), source, cli_args.pretty);
 
-    while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "--tokens" => mode = Mode::Tokens,
-            "--ast" => mode = Mode::Ast,
-            "--check" => mode = Mode::Check,
-            "--pretty" => pretty = true,
-            "--resolve" => mode = Mode::Resolve,
-            "--resolve-json" => mode = Mode::ResolveJson,
-            "--lower" => mode = Mode::Lower,
-            "--ir" => mode = Mode::Ir,
-            "--ir-json" => mode = Mode::IrJson,
-            "--llvm" | "--emit-llvm" => mode = Mode::Llvm,
-            "--build" => mode = Mode::Build { output: None },
-            "--run" => mode = Mode::Run { output: None },
-            "--out" => {
-                let value = args
-                    .next()
-                    .ok_or_else(|| error::Error::parse(None, "expected output path after --out"))?;
-                output_path = Some(PathBuf::from(value));
-            }
-            _ => {
-                path_arg = Some(PathBuf::from(arg));
-                for extra in args {
-                    if path_arg.is_some() {
-                        return Err(error::Error::parse(
-                            None,
-                            format!("unexpected extra argument '{}'", extra),
-                        ));
-                    }
+    cli_args.command.execute(ctx)
+}
+
+struct CliArgs {
+    input_path: PathBuf,
+    pretty: bool,
+    command: CommandKind,
+}
+
+impl CliArgs {
+    fn parse<I>(mut args: I) -> Result<Self>
+    where
+        I: Iterator<Item = String>,
+    {
+        let mut command = CommandKind::Ast;
+        let mut pretty = false;
+        let mut output_path: Option<PathBuf> = None;
+        let mut input_path: Option<PathBuf> = None;
+
+        while let Some(arg) = args.next() {
+            match arg.as_str() {
+                "--tokens" => command = CommandKind::Tokens,
+                "--ast" => command = CommandKind::Ast,
+                "--check" => command = CommandKind::Check,
+                "--pretty" => pretty = true,
+                "--resolve" => command = CommandKind::Resolve,
+                "--resolve-json" => command = CommandKind::ResolveJson,
+                "--lower" => command = CommandKind::Lower,
+                "--ir" => command = CommandKind::Ir,
+                "--ir-json" => command = CommandKind::IrJson,
+                "--llvm" | "--emit-llvm" => command = CommandKind::Llvm,
+                "--build" => command = CommandKind::Build { output: None },
+                "--run" => command = CommandKind::Run { output: None },
+                "--out" => {
+                    let value = args.next().ok_or_else(|| {
+                        error::Error::parse(None, "expected output path after --out")
+                    })?;
+                    output_path = Some(PathBuf::from(value));
                 }
-                break;
+                _ => {
+                    input_path = Some(PathBuf::from(arg));
+                    for extra in args {
+                        if input_path.is_some() {
+                            return Err(error::Error::parse(
+                                None,
+                                format!("unexpected extra argument '{}'", extra),
+                            ));
+                        }
+                    }
+                    break;
+                }
             }
         }
+
+        let input_path =
+            input_path.ok_or_else(|| error::Error::parse(None, "missing input file"))?;
+
+        Ok(Self {
+            input_path,
+            pretty,
+            command: command.with_output_path(output_path),
+        })
     }
-
-    let path = path_arg.ok_or_else(|| error::Error::parse(None, "missing input file"))?;
-    let source = fs::read_to_string(&path).map_err(|e| error::Error::lex(None, e.to_string()))?;
-
-    match &mut mode {
-        Mode::Build { output } | Mode::Run { output } => {
-            if output_path.is_some() {
-                *output = output_path.clone();
-            }
-        }
-        _ => {}
-    }
-
-    match mode {
-        Mode::Tokens => {
-            let tokens = lexer::lex(&source)?;
-            for token in tokens {
-                println!("{:?}", token);
-            }
-        }
-        Mode::Ast => {
-            let module = parser::parse_module(&source)?;
-            if pretty {
-                println!("{}", pretty::module_to_string(&module));
-            } else {
-                println!("{:#?}", module);
-            }
-        }
-        Mode::Check => {
-            let module = parser::parse_module(&source)?;
-            let result = check::check_module(&module);
-            if result.diagnostics.is_empty() {
-                println!("ok");
-            } else {
-                for d in result.diagnostics {
-                    println!("warning: {}", d.message);
-                }
-            }
-        }
-        Mode::Resolve => {
-            let module = parser::parse_module(&source)?;
-            let resolved = resolve::resolve_module(&module);
-
-            println!("module: {}", resolved.module_path.join("."));
-
-            if !resolved.imports.is_empty() {
-                println!("imports:");
-                for import in &resolved.imports {
-                    match &import.alias {
-                        Some(alias) => println!("  use {} as {}", import.path.join("::"), alias),
-                        None => println!("  use {}", import.path.join("::")),
-                    }
-                }
-            }
-
-            if !resolved.adts.is_empty() {
-                println!("types:");
-                for (adt, variants) in resolved.adts.iter() {
-                    if variants.is_empty() {
-                        println!("  type {}", adt);
-                    } else {
-                        println!("  type {} = {}", adt, variants.join(" | "));
-                    }
-                }
-            }
-
-            let mut functions = resolved
-                .symbols
-                .iter()
-                .filter_map(|symbol| match &symbol.category {
-                    SymbolCategory::Function { is_public } => Some((symbol, *is_public)),
-                    _ => None,
-                })
-                .collect::<Vec<_>>();
-            functions.sort_by(|(a, _), (b, _)| a.name.cmp(&b.name));
-
-            if !functions.is_empty() {
-                println!("functions:");
-                for (symbol, is_public) in functions {
-                    let visibility = if is_public { "pub " } else { "" };
-                    let scope = match &symbol.scope {
-                        SymbolScope::Module(path) => path.join("::"),
-                        SymbolScope::Function {
-                            module_path,
-                            function,
-                        } => {
-                            format!("{}::{}", module_path.join("::"), function)
-                        }
-                        SymbolScope::TypeAlias {
-                            module_path,
-                            type_name,
-                        } => {
-                            format!("{}::{}", module_path.join("::"), type_name)
-                        }
-                    };
-                    println!("  {visibility}fn {} (scope: {})", symbol.name, scope);
-                }
-            }
-
-            if !resolved.capabilities.is_empty() {
-                println!("capabilities:");
-                for binding in &resolved.capabilities {
-                    let scope = match &binding.scope {
-                        CapabilityScope::Function {
-                            module_path,
-                            function,
-                        } => {
-                            format!("fn {}::{}", module_path.join("::"), function)
-                        }
-                        CapabilityScope::TypeAlias {
-                            module_path,
-                            type_name,
-                        } => {
-                            format!("type {}::{}", module_path.join("::"), type_name)
-                        }
-                    };
-                    println!("  {scope} requires {}", binding.name);
-                }
-            }
-
-            if !resolved.resolved_paths.is_empty() {
-                println!("paths:");
-                for path in &resolved.resolved_paths {
-                    let kind = match path.kind {
-                        PathKind::Type => "type",
-                        PathKind::Value => "value",
-                        PathKind::Variant => "variant",
-                    };
-                    if let Some(symbol) = &path.resolved {
-                        println!(
-                            "  {} -> {} ({:?})",
-                            path.segments.join("::"),
-                            symbol.name,
-                            symbol.category
-                        );
-                    } else {
-                        println!("  {} -> <unresolved {}>", path.segments.join("::"), kind);
-                    }
-                }
-            }
-        }
-        Mode::ResolveJson => {
-            let module = parser::parse_module(&source)?;
-            let resolved = resolve::resolve_module(&module);
-            let json = resolved_to_json(&resolved);
-            println!("{}", json);
-        }
-        Mode::Lower => {
-            let module = parser::parse_module(&source)?;
-            let h = lower::lower_module(&module);
-            println!("{}", lower::hir_to_string(&h));
-        }
-        Mode::Ir => {
-            let module = parser::parse_module(&source)?;
-            let hir = lower::lower_module(&module);
-            let typed = ir::lower_module(&hir);
-            let backend = backend::text::TextBackend;
-            let output = backend::run(&backend, &typed, &backend::BackendOptions::default())
-                .map_err(|err| error::Error::parse(None, err.to_string()))?;
-            println!("{}", output);
-        }
-        Mode::IrJson => {
-            let module = parser::parse_module(&source)?;
-            let hir = lower::lower_module(&module);
-            let typed = ir::lower_module(&hir);
-            let json = ir_module_to_json(&typed);
-            println!("{}", json);
-        }
-        Mode::Llvm => {
-            let module = parser::parse_module(&source)?;
-            let hir = lower::lower_module(&module);
-            let typed = ir::lower_module(&hir);
-            let backend = backend::llvm::LlvmBackend::default();
-            let output = backend::run(&backend, &typed, &backend::BackendOptions::default())
-                .map_err(|err| error::Error::parse(None, err.to_string()))?;
-            println!("{}", output.as_str());
-        }
-        Mode::Build { output } => {
-            let module = parser::parse_module(&source)?;
-            let hir = lower::lower_module(&module);
-            let typed = ir::lower_module(&hir);
-            let backend = backend::native::NativeBackend;
-            let artifact = backend::run(&backend, &typed, &backend::BackendOptions::default())
-                .map_err(|err| error::Error::parse(None, err.to_string()))?;
-            let mut default_path = path.clone();
-            default_path.set_extension("bin");
-            let target_path = output.unwrap_or(default_path);
-            artifact
-                .link_executable(&target_path)
-                .map_err(|err| error::Error::parse(None, err.to_string()))?;
-            println!("built {}", target_path.display());
-        }
-        Mode::Run { output } => {
-            let module = parser::parse_module(&source)?;
-            let resolved = resolve::resolve_module(&module);
-            if let Some(spec) = entry_task_spec(&module, &resolved) {
-                let runtime = runtime::Runtime::with_default_shims()
-                    .map_err(|err| error::Error::parse(None, err.to_string()))?;
-                runtime
-                    .ensure_capabilities(&spec)
-                    .map_err(|err| error::Error::parse(None, err.to_string()))?;
-            }
-            let hir = lower::lower_module(&module);
-            let typed = ir::lower_module(&hir);
-            let backend = backend::native::NativeBackend;
-            let artifact = backend::run(&backend, &typed, &backend::BackendOptions::default())
-                .map_err(|err| error::Error::parse(None, err.to_string()))?;
-            let (exe_path, cleanup_path);
-            if let Some(path) = output {
-                artifact
-                    .link_executable(&path)
-                    .map_err(|err| error::Error::parse(None, err.to_string()))?;
-                exe_path = path.clone();
-                cleanup_path = None;
-            } else {
-                let mut path_buf = env::temp_dir();
-                let nanos = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_nanos();
-                path_buf.push(format!("mica-run-{nanos}"));
-                artifact
-                    .link_executable(&path_buf)
-                    .map_err(|err| error::Error::parse(None, err.to_string()))?;
-                exe_path = path_buf;
-                cleanup_path = Some(exe_path.clone());
-            }
-
-            let output = Command::new(&exe_path)
-                .output()
-                .map_err(|err| error::Error::parse(None, err.to_string()))?;
-            if !output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                let mut message = format!("program exited with status {}", output.status);
-                if !stdout.trim().is_empty() {
-                    message.push_str(&format!("; stdout: {}", stdout.trim()));
-                }
-                if !stderr.trim().is_empty() {
-                    message.push_str(&format!("; stderr: {}", stderr.trim()));
-                }
-                return Err(error::Error::parse(None, message));
-            }
-
-            if !output.stdout.is_empty() {
-                print!("{}", String::from_utf8_lossy(&output.stdout));
-            }
-            if !output.stderr.is_empty() {
-                eprint!("{}", String::from_utf8_lossy(&output.stderr));
-            }
-
-            if let Some(path) = cleanup_path {
-                fs::remove_file(&path).ok();
-            }
-        }
-    }
-
-    Ok(())
 }
 
 #[derive(Debug, Clone)]
-enum Mode {
+struct CommandContext {
+    input_path: PathBuf,
+    source: String,
+    pretty: bool,
+}
+
+impl CommandContext {
+    fn new(input_path: PathBuf, source: String, pretty: bool) -> Self {
+        Self {
+            input_path,
+            source,
+            pretty,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum CommandKind {
     Tokens,
     Ast,
     Check,
@@ -332,6 +119,296 @@ enum Mode {
     Llvm,
     Build { output: Option<PathBuf> },
     Run { output: Option<PathBuf> },
+}
+
+impl CommandKind {
+    fn with_output_path(self, output: Option<PathBuf>) -> Self {
+        match self {
+            CommandKind::Build { .. } => CommandKind::Build { output },
+            CommandKind::Run { .. } => CommandKind::Run { output },
+            other => other,
+        }
+    }
+
+    fn execute(self, ctx: CommandContext) -> Result<()> {
+        match self {
+            CommandKind::Tokens => run_tokens(&ctx),
+            CommandKind::Ast => run_ast(&ctx),
+            CommandKind::Check => run_check(&ctx),
+            CommandKind::Resolve => run_resolve(&ctx),
+            CommandKind::ResolveJson => run_resolve_json(&ctx),
+            CommandKind::Lower => run_lower(&ctx),
+            CommandKind::Ir => run_ir(&ctx),
+            CommandKind::IrJson => run_ir_json(&ctx),
+            CommandKind::Llvm => run_llvm(&ctx),
+            CommandKind::Build { output } => run_build(&ctx, output),
+            CommandKind::Run { output } => run_executable(&ctx, output),
+        }
+    }
+}
+
+fn run_tokens(ctx: &CommandContext) -> Result<()> {
+    let tokens = lexer::lex(&ctx.source)?;
+    for token in tokens {
+        println!("{:?}", token);
+    }
+    Ok(())
+}
+
+fn run_ast(ctx: &CommandContext) -> Result<()> {
+    let module = parser::parse_module(&ctx.source)?;
+    if ctx.pretty {
+        println!("{}", pretty::module_to_string(&module));
+    } else {
+        println!("{:#?}", module);
+    }
+    Ok(())
+}
+
+fn run_check(ctx: &CommandContext) -> Result<()> {
+    let module = parser::parse_module(&ctx.source)?;
+    let result = check::check_module(&module);
+    if result.diagnostics.is_empty() {
+        println!("ok");
+    } else {
+        for d in result.diagnostics {
+            println!("warning: {}", d.message);
+        }
+    }
+    Ok(())
+}
+
+fn run_resolve(ctx: &CommandContext) -> Result<()> {
+    let module = parser::parse_module(&ctx.source)?;
+    let resolved = resolve::resolve_module(&module);
+
+    println!("module: {}", resolved.module_path.join("."));
+
+    if !resolved.imports.is_empty() {
+        println!("imports:");
+        for import in &resolved.imports {
+            match &import.alias {
+                Some(alias) => println!("  use {} as {}", import.path.join("::"), alias),
+                None => println!("  use {}", import.path.join("::")),
+            }
+        }
+    }
+
+    if !resolved.adts.is_empty() {
+        println!("types:");
+        for (adt, variants) in resolved.adts.iter() {
+            if variants.is_empty() {
+                println!("  type {}", adt);
+            } else {
+                println!("  type {} = {}", adt, variants.join(" | "));
+            }
+        }
+    }
+
+    let mut functions = resolved
+        .symbols
+        .iter()
+        .filter_map(|symbol| match &symbol.category {
+            SymbolCategory::Function { is_public } => Some((symbol, *is_public)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    functions.sort_by(|(a, _), (b, _)| a.name.cmp(&b.name));
+
+    if !functions.is_empty() {
+        println!("functions:");
+        for (symbol, is_public) in functions {
+            let visibility = if is_public { "pub " } else { "" };
+            let scope = match &symbol.scope {
+                SymbolScope::Module(path) => path.join("::"),
+                SymbolScope::Function {
+                    module_path,
+                    function,
+                } => {
+                    format!("{}::{}", module_path.join("::"), function)
+                }
+                SymbolScope::TypeAlias {
+                    module_path,
+                    type_name,
+                } => {
+                    format!("{}::{}", module_path.join("::"), type_name)
+                }
+            };
+            println!("  {visibility}fn {} (scope: {})", symbol.name, scope);
+        }
+    }
+
+    if !resolved.capabilities.is_empty() {
+        println!("capabilities:");
+        for binding in &resolved.capabilities {
+            let scope = match &binding.scope {
+                CapabilityScope::Function {
+                    module_path,
+                    function,
+                } => {
+                    format!("fn {}::{}", module_path.join("::"), function)
+                }
+                CapabilityScope::TypeAlias {
+                    module_path,
+                    type_name,
+                } => {
+                    format!("type {}::{}", module_path.join("::"), type_name)
+                }
+            };
+            println!("  {scope} requires {}", binding.name);
+        }
+    }
+
+    if !resolved.resolved_paths.is_empty() {
+        println!("paths:");
+        for path in &resolved.resolved_paths {
+            let kind = match path.kind {
+                PathKind::Type => "type",
+                PathKind::Value => "value",
+                PathKind::Variant => "variant",
+            };
+            if let Some(symbol) = &path.resolved {
+                println!(
+                    "  {} -> {} ({:?})",
+                    path.segments.join("::"),
+                    symbol.name,
+                    symbol.category
+                );
+            } else {
+                println!("  {} -> <unresolved {}>", path.segments.join("::"), kind);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn run_resolve_json(ctx: &CommandContext) -> Result<()> {
+    let module = parser::parse_module(&ctx.source)?;
+    let resolved = resolve::resolve_module(&module);
+    let json = resolved_to_json(&resolved);
+    println!("{}", json);
+    Ok(())
+}
+
+fn run_lower(ctx: &CommandContext) -> Result<()> {
+    let module = parser::parse_module(&ctx.source)?;
+    let h = lower::lower_module(&module);
+    println!("{}", lower::hir_to_string(&h));
+    Ok(())
+}
+
+fn run_ir(ctx: &CommandContext) -> Result<()> {
+    let module = parser::parse_module(&ctx.source)?;
+    let hir = lower::lower_module(&module);
+    let typed = ir::lower_module(&hir);
+    let backend = backend::text::TextBackend;
+    let output = backend::run(&backend, &typed, &backend::BackendOptions::default())
+        .map_err(|err| error::Error::parse(None, err.to_string()))?;
+    println!("{}", output);
+    Ok(())
+}
+
+fn run_ir_json(ctx: &CommandContext) -> Result<()> {
+    let module = parser::parse_module(&ctx.source)?;
+    let hir = lower::lower_module(&module);
+    let typed = ir::lower_module(&hir);
+    let json = ir_module_to_json(&typed);
+    println!("{}", json);
+    Ok(())
+}
+
+fn run_llvm(ctx: &CommandContext) -> Result<()> {
+    let module = parser::parse_module(&ctx.source)?;
+    let hir = lower::lower_module(&module);
+    let typed = ir::lower_module(&hir);
+    let backend = backend::llvm::LlvmBackend::default();
+    let output = backend::run(&backend, &typed, &backend::BackendOptions::default())
+        .map_err(|err| error::Error::parse(None, err.to_string()))?;
+    println!("{}", output.as_str());
+    Ok(())
+}
+
+fn run_build(ctx: &CommandContext, output: Option<PathBuf>) -> Result<()> {
+    let module = parser::parse_module(&ctx.source)?;
+    let hir = lower::lower_module(&module);
+    let typed = ir::lower_module(&hir);
+    let backend = backend::native::NativeBackend;
+    let artifact = backend::run(&backend, &typed, &backend::BackendOptions::default())
+        .map_err(|err| error::Error::parse(None, err.to_string()))?;
+    let mut default_path = ctx.input_path.clone();
+    default_path.set_extension("bin");
+    let target_path = output.unwrap_or(default_path);
+    artifact
+        .link_executable(&target_path)
+        .map_err(|err| error::Error::parse(None, err.to_string()))?;
+    println!("built {}", target_path.display());
+    Ok(())
+}
+
+fn run_executable(ctx: &CommandContext, output: Option<PathBuf>) -> Result<()> {
+    let module = parser::parse_module(&ctx.source)?;
+    let resolved = resolve::resolve_module(&module);
+    if let Some(spec) = entry_task_spec(&module, &resolved) {
+        let runtime = runtime::Runtime::with_default_shims()
+            .map_err(|err| error::Error::parse(None, err.to_string()))?;
+        runtime
+            .ensure_capabilities(&spec)
+            .map_err(|err| error::Error::parse(None, err.to_string()))?;
+    }
+    let hir = lower::lower_module(&module);
+    let typed = ir::lower_module(&hir);
+    let backend = backend::native::NativeBackend;
+    let artifact = backend::run(&backend, &typed, &backend::BackendOptions::default())
+        .map_err(|err| error::Error::parse(None, err.to_string()))?;
+    let (exe_path, cleanup_path);
+    if let Some(path) = output {
+        artifact
+            .link_executable(&path)
+            .map_err(|err| error::Error::parse(None, err.to_string()))?;
+        exe_path = path.clone();
+        cleanup_path = None;
+    } else {
+        let mut path_buf = env::temp_dir();
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        path_buf.push(format!("mica-run-{nanos}"));
+        artifact
+            .link_executable(&path_buf)
+            .map_err(|err| error::Error::parse(None, err.to_string()))?;
+        exe_path = path_buf;
+        cleanup_path = Some(exe_path.clone());
+    }
+
+    let output = Command::new(&exe_path)
+        .output()
+        .map_err(|err| error::Error::parse(None, err.to_string()))?;
+    if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let mut message = format!("program exited with status {}", output.status);
+        if !stdout.trim().is_empty() {
+            message.push_str(&format!("; stdout: {}", stdout.trim()));
+        }
+        if !stderr.trim().is_empty() {
+            message.push_str(&format!("; stderr: {}", stderr.trim()));
+        }
+        return Err(error::Error::parse(None, message));
+    }
+
+    if !output.stdout.is_empty() {
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+    }
+    if !output.stderr.is_empty() {
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+    }
+
+    if let Some(path) = cleanup_path {
+        fs::remove_file(&path).ok();
+    }
+    Ok(())
 }
 
 fn entry_task_spec(
