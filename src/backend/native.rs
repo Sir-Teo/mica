@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -89,9 +89,15 @@ fn generate_c_source(module: &ir::Module) -> BackendResult<String> {
     writeln!(out, "#include <stdbool.h>").unwrap();
     writeln!(out, "#include <stdint.h>").unwrap();
     writeln!(out, "#include <stddef.h>").unwrap();
+    writeln!(out, "#include <stdlib.h>").unwrap();
+    writeln!(out, "#include <stdio.h>").unwrap();
+    writeln!(out, "#include <string.h>").unwrap();
+    writeln!(out, "#include <time.h>").unwrap();
     writeln!(out).unwrap();
 
     let record_names = collect_record_names(module);
+    let capabilities = collect_capabilities(module);
+    emit_runtime_support(&mut out, &capabilities)?;
     emit_record_definitions(&mut out, module, &record_names)?;
 
     // Emit prototypes to allow mutual recursion.
@@ -198,6 +204,8 @@ fn emit_function_body(
         )
         .unwrap();
     }
+
+    emit_runtime_capability_guards(out, module, function)?;
 
     if function.params.is_empty() {
         // C requires a statement even if there are no params.
@@ -315,6 +323,11 @@ fn emit_instruction(
             .unwrap();
         }
         InstKind::Call { func, args } => {
+            if let ir::FuncRef::Method(name) = func
+                && emit_runtime_method(out, module, name, args, ty, &var, record_names)?
+            {
+                return Ok(());
+            }
             let name = match func {
                 ir::FuncRef::Function(path) => path.segments.join("_"),
                 ir::FuncRef::Method(name) => name.clone(),
@@ -539,6 +552,217 @@ fn sanitize_identifier(name: &str) -> String {
         result.insert(0, '_');
     }
     result
+}
+
+fn emit_runtime_capability_guards(
+    out: &mut String,
+    module: &ir::Module,
+    function: &ir::Function,
+) -> BackendResult<()> {
+    if function.effect_row.is_empty() {
+        return Ok(());
+    }
+
+    writeln!(out, "  mica_runtime_initialize();").unwrap();
+    let mut seen = BTreeSet::new();
+    for effect in &function.effect_row {
+        let name = module.effects.name(*effect);
+        if seen.insert(name) {
+            writeln!(
+                out,
+                "  mica_runtime_require_capability(\"{}\");",
+                escape_string(name)
+            )
+            .unwrap();
+        }
+    }
+    Ok(())
+}
+
+fn emit_runtime_method(
+    out: &mut String,
+    module: &ir::Module,
+    name: &str,
+    args: &[ir::ValueId],
+    ty: ir::TypeId,
+    var: &str,
+    record_names: &RecordNameMap,
+) -> BackendResult<bool> {
+    match name {
+        "println" | "write_line" => {
+            if args.len() < 2 {
+                return Err(BackendError::Internal(format!(
+                    "method '{name}' expected value argument"
+                )));
+            }
+            writeln!(out, "  mica_runtime_initialize();").unwrap();
+            writeln!(
+                out,
+                "  mica_runtime_require_capability(\"{}\");",
+                escape_string("io")
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "  mica_runtime_io_write_line({});",
+                value_name(args[1])
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "  {} {} = 0;",
+                c_type_value(module, ty, record_names),
+                var
+            )
+            .unwrap();
+            Ok(true)
+        }
+        "now_millis" => {
+            writeln!(out, "  mica_runtime_initialize();").unwrap();
+            writeln!(
+                out,
+                "  mica_runtime_require_capability(\"{}\");",
+                escape_string("time")
+            )
+            .unwrap();
+            writeln!(
+                out,
+                "  {} {} = mica_runtime_time_now_millis();",
+                c_type_value(module, ty, record_names),
+                var
+            )
+            .unwrap();
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
+}
+
+fn emit_runtime_support(out: &mut String, capabilities: &[String]) -> BackendResult<()> {
+    if capabilities.is_empty() {
+        out.push_str("static const size_t MICA_RUNTIME_CAPABILITY_COUNT = 0;\n");
+        out.push_str("static const char *MICA_RUNTIME_CAPABILITY_NAMES[1] = { NULL };\n");
+        out.push_str("static int MICA_RUNTIME_CAPABILITY_AVAILABLE[1] = { 0 };\n");
+    } else {
+        let count = capabilities.len();
+        let names = capabilities
+            .iter()
+            .map(|cap| format!("\"{}\"", escape_string(cap)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let zeros = vec!["0"; count].join(", ");
+        out.push_str(&format!(
+            "static const size_t MICA_RUNTIME_CAPABILITY_COUNT = {count};\n"
+        ));
+        out.push_str(&format!(
+            "static const char *MICA_RUNTIME_CAPABILITY_NAMES[{count}] = {{ {names} }};\n"
+        ));
+        out.push_str(&format!(
+            "static int MICA_RUNTIME_CAPABILITY_AVAILABLE[{count}] = {{ {zeros} }};\n"
+        ));
+    }
+    out.push_str("static int MICA_RUNTIME_INITIALIZED = 0;\n\n");
+
+    out.push_str("static void mica_runtime_mark_capability(const char *name) {\n");
+    out.push_str("  for (size_t i = 0; i < MICA_RUNTIME_CAPABILITY_COUNT; ++i) {\n");
+    out.push_str("    const char *candidate = MICA_RUNTIME_CAPABILITY_NAMES[i];\n");
+    out.push_str("    if (candidate && strcmp(candidate, name) == 0) {\n");
+    out.push_str("      MICA_RUNTIME_CAPABILITY_AVAILABLE[i] = 1;\n");
+    out.push_str("      return;\n");
+    out.push_str("    }\n");
+    out.push_str("  }\n");
+    out.push_str("}\n\n");
+
+    out.push_str("static void mica_runtime_register_default_providers(void) {\n");
+    if capabilities.is_empty() {
+        out.push_str("  (void)MICA_RUNTIME_CAPABILITY_NAMES;\n");
+    } else {
+        if capabilities.iter().any(|cap| cap == "io") {
+            out.push_str(&format!(
+                "  mica_runtime_mark_capability(\"{}\");\n",
+                escape_string("io")
+            ));
+        }
+        if capabilities.iter().any(|cap| cap == "time") {
+            out.push_str(&format!(
+                "  mica_runtime_mark_capability(\"{}\");\n",
+                escape_string("time")
+            ));
+        }
+    }
+    out.push_str("}\n\n");
+
+    out.push_str("static void mica_runtime_initialize(void) {\n");
+    out.push_str("  if (!MICA_RUNTIME_INITIALIZED) {\n");
+    out.push_str("    MICA_RUNTIME_INITIALIZED = 1;\n");
+    out.push_str("    mica_runtime_register_default_providers();\n");
+    out.push_str("  }\n");
+    out.push_str("}\n\n");
+
+    out.push_str("static void mica_runtime_missing_capability(const char *name) {\n");
+    out.push_str(
+        "  fprintf(stderr, \"error: capability provider '%s' is not registered\\n\", name);\n",
+    );
+    out.push_str("  exit(74);\n");
+    out.push_str("}\n\n");
+
+    out.push_str("static void mica_runtime_require_capability(const char *name) {\n");
+    out.push_str("  for (size_t i = 0; i < MICA_RUNTIME_CAPABILITY_COUNT; ++i) {\n");
+    out.push_str("    const char *candidate = MICA_RUNTIME_CAPABILITY_NAMES[i];\n");
+    out.push_str("    if (candidate && strcmp(candidate, name) == 0) {\n");
+    out.push_str("      if (!MICA_RUNTIME_CAPABILITY_AVAILABLE[i]) {\n");
+    out.push_str("        mica_runtime_missing_capability(name);\n");
+    out.push_str("      }\n");
+    out.push_str("      return;\n");
+    out.push_str("    }\n");
+    out.push_str("  }\n");
+    out.push_str(
+        "  fprintf(stderr, \"error: capability '%s' is not declared in this binary\\n\", name);\n",
+    );
+    out.push_str("  exit(74);\n");
+    out.push_str("}\n\n");
+
+    out.push_str(
+        "static void mica_runtime_provider_failure(const char *capability, const char *message) {\n",
+    );
+    out.push_str(
+        "  fprintf(stderr, \"error: capability provider '%s' reported an error: %s\\n\", capability, message);\n",
+    );
+    out.push_str("  exit(74);\n");
+    out.push_str("}\n\n");
+
+    out.push_str("static void mica_runtime_io_write_line(const char *message) {\n");
+    out.push_str(&format!(
+        "  mica_runtime_require_capability(\"{}\");\n",
+        escape_string("io")
+    ));
+    out.push_str("  if (message) {\n");
+    out.push_str("    fprintf(stdout, \"%s\\n\", message);\n");
+    out.push_str("    fflush(stdout);\n");
+    out.push_str("  }\n");
+    out.push_str("}\n\n");
+
+    out.push_str("static int64_t mica_runtime_time_now_millis(void) {\n");
+    out.push_str(&format!(
+        "  mica_runtime_require_capability(\"{}\");\n",
+        escape_string("time")
+    ));
+    out.push_str("  struct timespec ts;\n");
+    out.push_str("  timespec_get(&ts, TIME_UTC);\n");
+    out.push_str("  return (int64_t)ts.tv_sec * 1000 + (int64_t)(ts.tv_nsec / 1000000);\n");
+    out.push_str("}\n\n");
+
+    Ok(())
+}
+
+fn collect_capabilities(module: &ir::Module) -> Vec<String> {
+    let mut caps = BTreeSet::new();
+    for function in &module.functions {
+        for effect in &function.effect_row {
+            caps.insert(module.effects.name(*effect).to_string());
+        }
+    }
+    caps.into_iter().collect()
 }
 
 fn collect_record_names(module: &ir::Module) -> RecordNameMap {

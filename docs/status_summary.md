@@ -21,7 +21,7 @@ _Last refreshed: 2025-10-06 00:00 UTC_
 - Documentation for the CLI and snippet generator mirrors the exposed modes so contributors understand how to reproduce backend snapshots and diagnostics locally.【F:docs/modules/cli.md†L12-L80】
 
 ## Verification Snapshot
-- CI now enforces formatting and clippy linting, builds docs, runs the full workspace test matrix, verifies CLI snippets, and smokes the native backend via `examples/native_entry.mica`; coverage reporting is paused until we land a portable replacement for the prior `cargo llvm-cov` job.【F:.github/workflows/ci.yml†L1-L55】【F:examples/native_entry.mica†L1-L10】
+- CI now enforces formatting and clippy linting, builds docs, runs the full workspace test matrix, verifies CLI snippets, and smokes the native backend via `examples/native_entry.mica`; coverage reporting is paused until we land a portable replacement for the prior `cargo llvm-cov` job.【F:.github/workflows/ci.yml†L1-L53】【F:examples/native_entry.mica†L1-L10】
 - The test harness covers lexer, parser, lowering, IR, backend, resolver, and diagnostics suites (55 unit-style tests today), confirming every stage of the pipeline with golden expectations and negative cases.【F:src/tests/mod.rs†L1-L17】【F:src/tests/backend_tests.rs†L320-L382】
 - Backend and pipeline tests keep the effect system, capability metadata, and match diagnostics stable while we refine IR semantics.【F:src/tests/backend_tests.rs†L1-L382】【F:src/tests/resolve_and_check_tests.rs†L1-L210】
 
@@ -32,11 +32,11 @@ _Last refreshed: 2025-10-06 00:00 UTC_
 - ✅ **Purity analysis**: SSA functions include connectivity-aware purity reports that identify effect-free regions for future parallelization work.【F:src/ir/analysis.rs†L1-L140】【F:src/tests/ir_tests.rs†L280-L360】
 
 ## Next Focus Areas
-1. **Runtime integration**: Wire generated binaries to invoke capability providers directly so runtime validation becomes full effect handling during execution.【F:src/backend/native.rs†L200-L420】【F:src/main.rs†L210-L320】
-2. **Execution diagnostics**: Surface structured errors from the native pipeline (link failures, unsupported IR) instead of raw toolchain exits.【F:src/backend/native.rs†L200-L360】【F:src/main.rs†L210-L260】
-3. **Parallel backend preparation**: Leverage the new copy-on-write registries to prototype parallel code generation and measure contention across threads.【F:src/ir/mod.rs†L100-L215】【F:src/ir/mod.rs†L780-L940】
-4. **Structured CLI outputs**: Extend resolver/IR dumps with machine-readable formats to support upcoming tooling milestones.【F:src/main.rs†L63-L205】【F:docs/modules/cli.md†L60-L80】
+1. **Provider breadth**: Extend the baked-in runtime shims beyond console/time to cover filesystem and networking scenarios now that executables consult capability providers at run time.【F:src/backend/native.rs†L1-L720】【F:src/runtime/mod.rs†L1-L520】
+2. **Runtime telemetry**: Emit structured execution events from generated binaries so downstream tooling can visualize capability flows and task scheduling decisions.【F:src/runtime/mod.rs†L260-L480】【F:src/backend/native.rs†L1-L720】
+3. **Parallel backend scaling**: Stress the new parallel compile driver across workspace-sized module sets and instrument contention hotspots ahead of broader backend scaling.【F:src/backend/mod.rs†L1-L200】【F:src/ir/mod.rs†L1-L1120】
+4. **Tooling APIs**: Layer higher-level CLI entry points over the resolver/IR JSON dumps to unblock IDE integrations and automated audits.【F:src/main.rs†L20-L360】【F:docs/modules/cli.md†L60-L80】
 
 ## Watch Items
-- Runtime validation precedes execution, but compiled executables still bypass provider shims at runtime; thread the handlers into generated code so capability metadata continues to matter end to end.【F:src/runtime/mod.rs†L1-L380】【F:src/main.rs†L210-L320】
-- CLI outputs are textual today; consider structured formats so tooling built during Phase 3+ can ingest resolver and IR data without fragile scraping.【F:src/main.rs†L63-L205】【F:docs/modules/cli.md†L60-L80】
+- Default provider coverage remains intentionally narrow; add smoke tests for filesystems/networking before broadening the runtime registry to production workloads.【F:src/backend/native.rs†L1-L720】【F:src/tests/backend_tests.rs†L320-L420】
+- Evaluate portable coverage collectors that work across the CI matrix so we can reintroduce reporting without relying on bespoke tool installs.【F:.github/workflows/ci.yml†L1-L53】

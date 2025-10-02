@@ -32,8 +32,10 @@ fn run() -> Result<()> {
             "--check" => mode = Mode::Check,
             "--pretty" => pretty = true,
             "--resolve" => mode = Mode::Resolve,
+            "--resolve-json" => mode = Mode::ResolveJson,
             "--lower" => mode = Mode::Lower,
             "--ir" => mode = Mode::Ir,
+            "--ir-json" => mode = Mode::IrJson,
             "--llvm" | "--emit-llvm" => mode = Mode::Llvm,
             "--build" => mode = Mode::Build { output: None },
             "--run" => mode = Mode::Run { output: None },
@@ -198,6 +200,12 @@ fn run() -> Result<()> {
                 }
             }
         }
+        Mode::ResolveJson => {
+            let module = parser::parse_module(&source)?;
+            let resolved = resolve::resolve_module(&module);
+            let json = resolved_to_json(&resolved);
+            println!("{}", json);
+        }
         Mode::Lower => {
             let module = parser::parse_module(&source)?;
             let h = lower::lower_module(&module);
@@ -211,6 +219,13 @@ fn run() -> Result<()> {
             let output = backend::run(&backend, &typed, &backend::BackendOptions::default())
                 .map_err(|err| error::Error::parse(None, err.to_string()))?;
             println!("{}", output);
+        }
+        Mode::IrJson => {
+            let module = parser::parse_module(&source)?;
+            let hir = lower::lower_module(&module);
+            let typed = ir::lower_module(&hir);
+            let json = ir_module_to_json(&typed);
+            println!("{}", json);
         }
         Mode::Llvm => {
             let module = parser::parse_module(&source)?;
@@ -272,14 +287,27 @@ fn run() -> Result<()> {
                 cleanup_path = Some(exe_path.clone());
             }
 
-            let status = Command::new(&exe_path)
-                .status()
+            let output = Command::new(&exe_path)
+                .output()
                 .map_err(|err| error::Error::parse(None, err.to_string()))?;
-            if !status.success() {
-                return Err(error::Error::parse(
-                    None,
-                    format!("program exited with status {status}"),
-                ));
+            if !output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let mut message = format!("program exited with status {}", output.status);
+                if !stdout.trim().is_empty() {
+                    message.push_str(&format!("; stdout: {}", stdout.trim()));
+                }
+                if !stderr.trim().is_empty() {
+                    message.push_str(&format!("; stderr: {}", stderr.trim()));
+                }
+                return Err(error::Error::parse(None, message));
+            }
+
+            if !output.stdout.is_empty() {
+                print!("{}", String::from_utf8_lossy(&output.stdout));
+            }
+            if !output.stderr.is_empty() {
+                eprint!("{}", String::from_utf8_lossy(&output.stderr));
             }
 
             if let Some(path) = cleanup_path {
@@ -297,8 +325,10 @@ enum Mode {
     Ast,
     Check,
     Resolve,
+    ResolveJson,
     Lower,
     Ir,
+    IrJson,
     Llvm,
     Build { output: Option<PathBuf> },
     Run { output: Option<PathBuf> },
@@ -338,6 +368,536 @@ fn entry_task_spec(
     Some(spec)
 }
 
+fn resolved_to_json(resolved: &resolve::Resolved) -> String {
+    let mut fields = Vec::new();
+    fields.push(("module_path", json_string_array(&resolved.module_path)));
+
+    let mut adt_pairs = resolved
+        .adts
+        .iter()
+        .map(|(name, variants)| (name.clone(), json_string_array(variants)))
+        .collect::<Vec<_>>();
+    adt_pairs.sort_by(|a, b| a.0.cmp(&b.0));
+    fields.push(("adts", json_object_pairs(adt_pairs)));
+
+    let mut variant_pairs = resolved
+        .variant_to_adt
+        .iter()
+        .map(|(name, adts)| (name.clone(), json_string_array(adts)))
+        .collect::<Vec<_>>();
+    variant_pairs.sort_by(|a, b| a.0.cmp(&b.0));
+    fields.push(("variant_to_adt", json_object_pairs(variant_pairs)));
+
+    let imports = resolved
+        .imports
+        .iter()
+        .map(|import| {
+            json_object(vec![
+                ("path", json_string_array(&import.path)),
+                (
+                    "alias",
+                    import
+                        .alias
+                        .as_ref()
+                        .map(|alias| json_string(alias))
+                        .unwrap_or_else(|| "null".to_string()),
+                ),
+            ])
+        })
+        .collect::<Vec<_>>();
+    fields.push(("imports", json_array(imports)));
+
+    let symbols = resolved
+        .symbols
+        .iter()
+        .map(resolved_symbol_json)
+        .collect::<Vec<_>>();
+    fields.push(("symbols", json_array(symbols)));
+
+    let paths = resolved
+        .resolved_paths
+        .iter()
+        .map(resolved_path_json)
+        .collect::<Vec<_>>();
+    fields.push(("resolved_paths", json_array(paths)));
+
+    let capabilities = resolved
+        .capabilities
+        .iter()
+        .map(capability_binding_json)
+        .collect::<Vec<_>>();
+    fields.push(("capabilities", json_array(capabilities)));
+
+    let diagnostics = resolved
+        .diagnostics
+        .iter()
+        .map(resolve_diagnostic_json)
+        .collect::<Vec<_>>();
+    fields.push(("diagnostics", json_array(diagnostics)));
+
+    json_object(fields)
+}
+
+fn ir_module_to_json(module: &ir::Module) -> String {
+    let functions = module
+        .functions
+        .iter()
+        .map(|function| ir_function_json(module, function))
+        .collect::<Vec<_>>();
+    let types = module
+        .types
+        .entries()
+        .map(|(id, ty)| ir_type_entry_json(id, ty))
+        .collect::<Vec<_>>();
+    let effects = module
+        .effects
+        .entries()
+        .map(|(id, name)| {
+            json_object(vec![
+                ("id", id.index().to_string()),
+                ("name", json_string(name)),
+            ])
+        })
+        .collect::<Vec<_>>();
+
+    json_object(vec![
+        ("name", json_string_array(&module.name)),
+        ("functions", json_array(functions)),
+        ("types", json_array(types)),
+        ("effects", json_array(effects)),
+    ])
+}
+
+fn ir_function_json(module: &ir::Module, function: &ir::Function) -> String {
+    let params = function
+        .params
+        .iter()
+        .map(|param| {
+            json_object(vec![
+                ("name", json_string(&param.name)),
+                ("type", param.ty.index().to_string()),
+                ("value", param.value.index().to_string()),
+            ])
+        })
+        .collect::<Vec<_>>();
+
+    let blocks = function
+        .blocks
+        .iter()
+        .map(|block| ir_block_json(module, block))
+        .collect::<Vec<_>>();
+
+    let effects = function
+        .effect_row
+        .iter()
+        .map(|effect| module.effects.name(*effect).to_string())
+        .collect::<Vec<_>>();
+
+    json_object(vec![
+        ("name", json_string(&function.name)),
+        ("ret_type", function.ret_type.index().to_string()),
+        ("effect_row", json_string_array(&effects)),
+        ("params", json_array(params)),
+        ("blocks", json_array(blocks)),
+    ])
+}
+
+fn ir_block_json(module: &ir::Module, block: &ir::BasicBlock) -> String {
+    let instructions = block
+        .instructions
+        .iter()
+        .map(|inst| ir_instruction_json(module, inst))
+        .collect::<Vec<_>>();
+
+    json_object(vec![
+        ("id", block.id.index().to_string()),
+        ("instructions", json_array(instructions)),
+        ("terminator", ir_terminator_json(module, &block.terminator)),
+    ])
+}
+
+fn ir_instruction_json(module: &ir::Module, inst: &ir::Instruction) -> String {
+    let effects = inst
+        .effects
+        .iter()
+        .map(|effect| module.effects.name(*effect).to_string())
+        .collect::<Vec<_>>();
+
+    json_object(vec![
+        ("id", inst.id.index().to_string()),
+        ("type", inst.ty.index().to_string()),
+        ("effects", json_string_array(&effects)),
+        ("kind", ir_instruction_kind_json(module, &inst.kind)),
+    ])
+}
+
+fn ir_instruction_kind_json(_module: &ir::Module, kind: &ir::InstKind) -> String {
+    match kind {
+        ir::InstKind::Literal(lit) => json_object(vec![
+            ("kind", json_string("Literal")),
+            ("value", literal_json(lit)),
+        ]),
+        ir::InstKind::Binary { op, lhs, rhs } => json_object(vec![
+            ("kind", json_string("Binary")),
+            ("op", json_string(&op.to_string())),
+            ("lhs", lhs.index().to_string()),
+            ("rhs", rhs.index().to_string()),
+        ]),
+        ir::InstKind::Call { func, args } => {
+            let function_json = match func {
+                ir::FuncRef::Function(path) => json_object(vec![
+                    ("type", json_string("Function")),
+                    ("path", json_string_array(&path.segments)),
+                ]),
+                ir::FuncRef::Method(name) => json_object(vec![
+                    ("type", json_string("Method")),
+                    ("name", json_string(name)),
+                ]),
+            };
+            let args_json = json_array(
+                args.iter()
+                    .map(|arg| arg.index().to_string())
+                    .collect::<Vec<_>>(),
+            );
+            json_object(vec![
+                ("kind", json_string("Call")),
+                ("function", function_json),
+                ("args", args_json),
+            ])
+        }
+        ir::InstKind::Record { type_path, fields } => {
+            let type_json = type_path
+                .as_ref()
+                .map(|path| json_string_array(&path.segments))
+                .unwrap_or_else(|| "null".to_string());
+            let field_json = json_array(
+                fields
+                    .iter()
+                    .map(|(name, value)| {
+                        json_object(vec![
+                            ("name", json_string(name)),
+                            ("value", value.index().to_string()),
+                        ])
+                    })
+                    .collect::<Vec<_>>(),
+            );
+            json_object(vec![
+                ("kind", json_string("Record")),
+                ("type_path", type_json),
+                ("fields", field_json),
+            ])
+        }
+        ir::InstKind::Path(path) => json_object(vec![
+            ("kind", json_string("Path")),
+            ("segments", json_string_array(&path.segments)),
+        ]),
+        ir::InstKind::Phi { incomings } => {
+            let incomings_json = json_array(
+                incomings
+                    .iter()
+                    .map(|(block, value)| {
+                        json_object(vec![
+                            ("block", block.index().to_string()),
+                            ("value", value.index().to_string()),
+                        ])
+                    })
+                    .collect::<Vec<_>>(),
+            );
+            json_object(vec![
+                ("kind", json_string("Phi")),
+                ("incomings", incomings_json),
+            ])
+        }
+    }
+}
+
+fn ir_terminator_json(_module: &ir::Module, terminator: &ir::Terminator) -> String {
+    match terminator {
+        ir::Terminator::Return(Some(value)) => json_object(vec![
+            ("kind", json_string("Return")),
+            ("value", value.index().to_string()),
+        ]),
+        ir::Terminator::Return(None) => json_object(vec![
+            ("kind", json_string("Return")),
+            ("value", "null".to_string()),
+        ]),
+        ir::Terminator::Branch {
+            condition,
+            then_block,
+            else_block,
+        } => json_object(vec![
+            ("kind", json_string("Branch")),
+            ("condition", condition.index().to_string()),
+            ("then", then_block.index().to_string()),
+            ("else", else_block.index().to_string()),
+        ]),
+        ir::Terminator::Jump(target) => json_object(vec![
+            ("kind", json_string("Jump")),
+            ("target", target.index().to_string()),
+        ]),
+    }
+}
+
+fn ir_type_entry_json(id: ir::TypeId, ty: &ir::Type) -> String {
+    json_object(vec![
+        ("id", id.index().to_string()),
+        ("type", ir_type_json(ty)),
+    ])
+}
+
+fn ir_type_json(ty: &ir::Type) -> String {
+    match ty {
+        ir::Type::Unit => json_object(vec![("kind", json_string("Unit"))]),
+        ir::Type::Int => json_object(vec![("kind", json_string("Int"))]),
+        ir::Type::Float => json_object(vec![("kind", json_string("Float"))]),
+        ir::Type::Bool => json_object(vec![("kind", json_string("Bool"))]),
+        ir::Type::String => json_object(vec![("kind", json_string("String"))]),
+        ir::Type::Named(name) => json_object(vec![
+            ("kind", json_string("Named")),
+            ("name", json_string(name)),
+        ]),
+        ir::Type::Record(record) => {
+            let fields = record
+                .fields
+                .iter()
+                .map(|field| {
+                    json_object(vec![
+                        ("name", json_string(&field.name)),
+                        ("type", field.ty.index().to_string()),
+                        ("offset", field.offset.to_string()),
+                    ])
+                })
+                .collect::<Vec<_>>();
+            json_object(vec![
+                ("kind", json_string("Record")),
+                (
+                    "name",
+                    record
+                        .name
+                        .as_ref()
+                        .map(|name| json_string(name))
+                        .unwrap_or_else(|| "null".to_string()),
+                ),
+                ("fields", json_array(fields)),
+                ("size", record.size.to_string()),
+                ("align", record.align.to_string()),
+            ])
+        }
+        ir::Type::Unknown => json_object(vec![("kind", json_string("Unknown"))]),
+    }
+}
+
+fn literal_json(literal: &ast::Literal) -> String {
+    match literal {
+        ast::Literal::Int(value) => json_object(vec![
+            ("type", json_string("Int")),
+            ("value", value.to_string()),
+        ]),
+        ast::Literal::Float(value) => json_object(vec![
+            ("type", json_string("Float")),
+            ("value", value.to_string()),
+        ]),
+        ast::Literal::Bool(value) => json_object(vec![
+            ("type", json_string("Bool")),
+            ("value", bool_string(*value)),
+        ]),
+        ast::Literal::String(value) => json_object(vec![
+            ("type", json_string("String")),
+            ("value", json_string(value)),
+        ]),
+        ast::Literal::Unit => json_object(vec![("type", json_string("Unit"))]),
+    }
+}
+
+fn resolved_symbol_json(symbol: &resolve::SymbolInfo) -> String {
+    json_object(vec![
+        ("name", json_string(&symbol.name)),
+        ("category", symbol_category_json(&symbol.category)),
+        ("scope", symbol_scope_json(&symbol.scope)),
+    ])
+}
+
+fn resolved_path_json(path: &resolve::ResolvedPath) -> String {
+    let resolved_json = path
+        .resolved
+        .as_ref()
+        .map(resolved_symbol_json)
+        .unwrap_or_else(|| "null".to_string());
+    json_object(vec![
+        ("segments", json_string_array(&path.segments)),
+        ("kind", json_string(path_kind_name(path.kind))),
+        ("resolved", resolved_json),
+    ])
+}
+
+fn capability_binding_json(binding: &resolve::CapabilityBinding) -> String {
+    json_object(vec![
+        ("name", json_string(&binding.name)),
+        ("scope", capability_scope_json(&binding.scope)),
+    ])
+}
+
+fn resolve_diagnostic_json(diag: &resolve::ResolveDiagnostic) -> String {
+    json_object(vec![
+        ("path", json_string_array(&diag.path)),
+        ("kind", json_string(path_kind_name(diag.kind))),
+        ("scope", symbol_scope_json(&diag.scope)),
+        ("message", json_string(&diag.message)),
+    ])
+}
+
+fn symbol_category_json(category: &resolve::SymbolCategory) -> String {
+    match category {
+        resolve::SymbolCategory::Type { is_public, params } => json_object(vec![
+            ("type", json_string("Type")),
+            ("is_public", bool_string(*is_public)),
+            ("params", json_string_array(params)),
+        ]),
+        resolve::SymbolCategory::Variant { parent } => json_object(vec![
+            ("type", json_string("Variant")),
+            ("parent", json_string(parent)),
+        ]),
+        resolve::SymbolCategory::Function { is_public } => json_object(vec![
+            ("type", json_string("Function")),
+            ("is_public", bool_string(*is_public)),
+        ]),
+        resolve::SymbolCategory::TypeParam => json_object(vec![("type", json_string("TypeParam"))]),
+        resolve::SymbolCategory::ValueParam => {
+            json_object(vec![("type", json_string("ValueParam"))])
+        }
+        resolve::SymbolCategory::LocalBinding => {
+            json_object(vec![("type", json_string("LocalBinding"))])
+        }
+        resolve::SymbolCategory::ImportAlias { target } => json_object(vec![
+            ("type", json_string("ImportAlias")),
+            ("target", json_string_array(target)),
+        ]),
+    }
+}
+
+fn symbol_scope_json(scope: &resolve::SymbolScope) -> String {
+    match scope {
+        resolve::SymbolScope::Module(path) => json_object(vec![
+            ("type", json_string("Module")),
+            ("path", json_string_array(path)),
+        ]),
+        resolve::SymbolScope::TypeAlias {
+            module_path,
+            type_name,
+        } => json_object(vec![
+            ("type", json_string("TypeAlias")),
+            ("module_path", json_string_array(module_path)),
+            ("type_name", json_string(type_name)),
+        ]),
+        resolve::SymbolScope::Function {
+            module_path,
+            function,
+        } => json_object(vec![
+            ("type", json_string("Function")),
+            ("module_path", json_string_array(module_path)),
+            ("function", json_string(function)),
+        ]),
+    }
+}
+
+fn capability_scope_json(scope: &resolve::CapabilityScope) -> String {
+    match scope {
+        resolve::CapabilityScope::Function {
+            module_path,
+            function,
+        } => json_object(vec![
+            ("type", json_string("Function")),
+            ("module_path", json_string_array(module_path)),
+            ("function", json_string(function)),
+        ]),
+        resolve::CapabilityScope::TypeAlias {
+            module_path,
+            type_name,
+        } => json_object(vec![
+            ("type", json_string("TypeAlias")),
+            ("module_path", json_string_array(module_path)),
+            ("type_name", json_string(type_name)),
+        ]),
+    }
+}
+
+fn path_kind_name(kind: resolve::PathKind) -> &'static str {
+    match kind {
+        resolve::PathKind::Type => "Type",
+        resolve::PathKind::Value => "Value",
+        resolve::PathKind::Variant => "Variant",
+    }
+}
+
+fn json_string(value: &str) -> String {
+    format!("\"{}\"", json_escape(value))
+}
+
+fn json_string_array(values: &[String]) -> String {
+    json_array(values.iter().map(|value| json_string(value)).collect())
+}
+
+fn json_array(values: Vec<String>) -> String {
+    let mut out = String::from("[");
+    for (index, value) in values.iter().enumerate() {
+        if index > 0 {
+            out.push(',');
+        }
+        out.push_str(value);
+    }
+    out.push(']');
+    out
+}
+
+fn json_object(fields: Vec<(&str, String)>) -> String {
+    let mut out = String::from("{");
+    for (index, (key, value)) in fields.iter().enumerate() {
+        if index > 0 {
+            out.push(',');
+        }
+        out.push('"');
+        out.push_str(&json_escape(key));
+        out.push_str("\":");
+        out.push_str(value);
+    }
+    out.push('}');
+    out
+}
+
+fn json_object_pairs(pairs: Vec<(String, String)>) -> String {
+    let mut out = String::from("{");
+    for (index, (key, value)) in pairs.iter().enumerate() {
+        if index > 0 {
+            out.push(',');
+        }
+        out.push('"');
+        out.push_str(&json_escape(key));
+        out.push_str("\":");
+        out.push_str(value);
+    }
+    out.push('}');
+    out
+}
+
+fn json_escape(value: &str) -> String {
+    let mut escaped = String::new();
+    for ch in value.chars() {
+        match ch {
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            ch if ch < ' ' => escaped.push_str(&format!("\\u{:04x}", ch as u32)),
+            other => escaped.push(other),
+        }
+    }
+    escaped
+}
+
+fn bool_string(value: bool) -> String {
+    if value { "true" } else { "false" }.to_string()
+}
 #[cfg(test)]
 mod cli_tests {
     use super::*;
