@@ -38,8 +38,8 @@ Mica is a prototype under active design. Today the repository contains:
   structured diagnostics.
 - Snapshot-driven documentation for the CLI, plus a tutorial-oriented language
   tour.
-- An executable test suite covering lexing, parsing, resolving, lowering, and
-  formatting.
+- An executable test suite covering lexing, parsing, resolving, lowering,
+  formatting, and both textual/native backend paths.
 
 See the [roadmap](#roadmap) for the longer-term build-out.
 
@@ -74,6 +74,8 @@ cargo run --bin mica -- --check examples/adt.mica        # Exhaustiveness checks
 cargo run --bin mica -- --lower examples/methods.mica    # Lower to the simple HIR
 cargo run --bin mica -- --ir examples/methods.mica       # Dump the typed SSA IR via the backend shim
 cargo run --bin mica -- --llvm examples/methods.mica     # Emit the LLVM scaffolding preview
+cargo run --bin mica -- --build examples/methods.mica    # Produce a native binary next to the source
+cargo run --bin mica -- --run examples/methods.mica      # Compile + run via the native backend
 ```
 
 CLI output snapshots are maintained in [`docs/snippets.md`](docs/snippets.md).
@@ -99,6 +101,8 @@ including:
 - `comprehensive_deployment.mica` — an end-to-end workflow that mixes
   concurrency, nested `using` scopes, and result propagation across a deployment
   plan.
+- `native_entry.mica` — a minimal module with an entry point that exercises the
+  native `--build`/`--run` workflow end-to-end.
 - `generics_tree_algorithms.mica` — recursive ADTs with higher-order generic
   functions and trait bounds in action.
 - `lists_and_loops.mica` — collections, loops, and iteration patterns.
@@ -116,7 +120,7 @@ capabilities compose across files.
 │   ├── syntax/          # Lexer and parser
 │   ├── semantics/       # Resolver, effect checker, and type utilities
 │   ├── lower/           # Lowering to a simplified HIR
-│   ├── backend/         # Backend traits and textual emitters
+│   ├── backend/         # Backend traits, textual emitters, and native codegen
 │   ├── diagnostics/     # Shared error and warning types
 │   └── pretty/          # Concrete syntax tree formatter
 ├── docs/

@@ -1,0 +1,11 @@
+module examples.native_entry
+
+fn add(a: Int, b: Int) -> Int {
+  a + b
+}
+
+fn main() -> Int {
+  let base = 39
+  let total = add(base, 3)
+  total - 42
+}

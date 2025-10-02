@@ -60,10 +60,10 @@ impl ScopeStack {
             return None;
         }
 
-        if segments.len() > 1 {
-            if let Some(info) = lookup_variant_from_segments(segments, resolved) {
-                return Some(info);
-            }
+        if segments.len() > 1
+            && let Some(info) = lookup_variant_from_segments(segments, resolved)
+        {
+            return Some(info);
         }
 
         for layer in self.stack.iter().rev() {

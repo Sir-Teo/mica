@@ -1,6 +1,6 @@
-# Phase 2 Delivery Status
+# Phase 3 Kickoff Status
 
-_Last refreshed: 2025-10-01 22:10 UTC_
+_Last refreshed: 2025-10-05 00:00 UTC_
 
 ## Where We Stand Today
 
@@ -11,31 +11,31 @@ _Last refreshed: 2025-10-01 22:10 UTC_
 
 ### Lowering, Typed IR, and Backends
 - The lowering layer converts ASTs into the homogeneous HIR (`HModule`, `HFunction`, `HExpr`), normalizing method calls, capability rows, and structured control flow before typed IR generation.【F:src/lower/mod.rs†L1-L640】
-- Typed SSA IR modules track interned types/effects, compute concrete record layouts with padding metadata, and expose purity analysis that identifies effect-free regions for downstream backends.【F:src/ir/mod.rs†L1-L840】【F:src/ir/analysis.rs†L1-L140】
+- Typed SSA IR modules now share their type/effect registries through copy-on-write arenas so multiple backends can consume a module without cloning metadata, paving the way for parallel compilation.【F:src/ir/mod.rs†L100-L215】【F:src/ir/mod.rs†L780-L940】
 - Lowering and IR tests assert coverage for method desugaring, structured expressions, effect rows, return behaviour, and purity reporting so we know the pipeline handles the language surface we ship today.【F:src/tests/lowering_tests.rs†L1-L200】【F:src/tests/ir_tests.rs†L1-L360】
-- Text and LLVM backends now emit typed aggregates, block-level purity annotations, and stricter contract checks so engineers can validate control flow and metadata while catching unsupported constructs early.【F:src/backend/text.rs†L1-L134】【F:src/backend/llvm.rs†L1-L420】【F:src/tests/backend_tests.rs†L1-L280】
+- The new native backend emits portable C for each typed IR module, drives the system C toolchain to produce binaries, and is covered by an executable regression test alongside the text and LLVM preview emitters.【F:src/backend/native.rs†L1-L400】【F:src/tests/backend_tests.rs†L300-L382】
 
 ### Tooling and Developer Experience
-- The `mica` CLI routes a single parsed module through lexing, pretty-printing, checking, resolving, lowering, IR dumps, and the LLVM preview, which keeps day-to-day validation quick while we iterate on backends.【F:src/main.rs†L17-L215】
-- Documentation for the CLI and snippet generator mirrors the exposed modes so contributors understand how to reproduce backend snapshots and diagnostics locally.【F:docs/modules/cli.md†L12-L60】
+- The `mica` CLI now includes native `--build` and `--run` flows in addition to lexing, resolving, lowering, IR dumps, and the LLVM preview so contributors can execute examples end-to-end through the new backend.【F:src/main.rs†L17-L260】
+- Documentation for the CLI and snippet generator mirrors the exposed modes so contributors understand how to reproduce backend snapshots and diagnostics locally.【F:docs/modules/cli.md†L12-L80】
 
 ## Verification Snapshot
-- CI mirrors the local workflow by executing `cargo build --locked`, `cargo test --locked --all-targets`, and `cargo run --quiet --bin gen_snippets -- --check`, giving quick confidence that documentation and snippets stay synchronized with the code.【F:.github/workflows/ci.yml†L1-L23】
-- The test harness covers lexer, parser, lowering, IR, backend, resolver, and diagnostics suites (54 unit-style tests today), confirming every stage of the pipeline with golden expectations and negative cases.【F:src/tests/mod.rs†L1-L17】【F:src/tests/pipeline_tests.rs†L1-L139】
-- Backend and pipeline tests keep the effect system, capability metadata, and match diagnostics stable while we refine IR semantics.【F:src/tests/backend_tests.rs†L1-L280】【F:src/tests/resolve_and_check_tests.rs†L1-L210】
+- CI now enforces formatting and clippy linting, builds docs, runs the full workspace test matrix, verifies CLI snippets, smokes the native backend via `examples/native_entry.mica`, and records coverage with a 50% line-execution gate using `cargo llvm-cov`.【F:.github/workflows/ci.yml†L1-L77】【F:examples/native_entry.mica†L1-L10】
+- The test harness covers lexer, parser, lowering, IR, backend, resolver, and diagnostics suites (55 unit-style tests today), confirming every stage of the pipeline with golden expectations and negative cases.【F:src/tests/mod.rs†L1-L17】【F:src/tests/backend_tests.rs†L320-L382】
+- Backend and pipeline tests keep the effect system, capability metadata, and match diagnostics stable while we refine IR semantics.【F:src/tests/backend_tests.rs†L1-L382】【F:src/tests/resolve_and_check_tests.rs†L1-L210】
 
 ## Phase 2 Exit Criteria
-- ✅ **Aggregate modelling**: Record layouts now carry concrete offsets, size, and alignment metadata that the LLVM backend renders directly, eliminating the placeholder struct stub from earlier milestones.【F:src/ir/mod.rs†L700-L840】【F:src/backend/llvm.rs†L180-L340】【F:src/tests/backend_tests.rs†L200-L260】
-- ✅ **Backend fidelity**: The LLVM emitter annotates blocks with purity information, enforces record layout availability, and surfaces errors for unsupported constructs so textual output mirrors the real codegen contract.【F:src/backend/llvm.rs†L1-L420】【F:src/tests/backend_tests.rs†L1-L280】
+- ✅ **Aggregate modelling**: Record layouts now carry concrete offsets, size, and alignment metadata that the LLVM backend renders directly, eliminating the placeholder struct stub from earlier milestones.【F:src/ir/mod.rs†L700-L940】【F:src/backend/llvm.rs†L180-L340】【F:src/tests/backend_tests.rs†L200-L260】
+- ✅ **Backend fidelity**: The LLVM emitter annotates blocks with purity information, enforces record layout availability, and surfaces errors for unsupported constructs so textual output mirrors the real codegen contract.【F:src/backend/llvm.rs†L1-L420】【F:src/tests/backend_tests.rs†L1-L308】
 - ✅ **Diagnostics depth**: Semantic checks now surface duplicate capabilities, missing bindings, and scope violations with regression coverage in the test suite.【F:src/semantics/check.rs†L650-L940】【F:src/tests/resolve_and_check_tests.rs†L1-L210】
 - ✅ **Purity analysis**: SSA functions include connectivity-aware purity reports that identify effect-free regions for future parallelization work.【F:src/ir/analysis.rs†L1-L140】【F:src/tests/ir_tests.rs†L280-L360】
 
 ## Next Focus Areas
-1. **Native code generation**: Replace the textual LLVM preview with real module emission and link-time integration so simple programs can execute via the toolchain.【F:docs/roadmap/compiler.md†L170-L215】
-2. **Runtime capability shims**: Map effect annotations to deterministic runtime providers to unlock IO/task scheduling experiments in Phase 3.【F:docs/roadmap/compiler.md†L200-L240】
-3. **Concurrent metadata access**: Design thread-safe ownership for shared type/effect tables ahead of parallel backend execution.【F:src/ir/mod.rs†L500-L620】【F:docs/status.md†L40-L80】
-4. **Structured diagnostics**: Extend semantic checks toward borrow flows and backend validation while maintaining the richer regression suite established in Phase 2.【F:src/semantics/check.rs†L1-L960】【F:docs/roadmap/milestones.md†L37-L60】
+1. **Runtime capability shims**: Map effect annotations to deterministic runtime providers to unlock IO/task scheduling experiments in Phase 3.【F:docs/roadmap/compiler.md†L200-L240】
+2. **Execution diagnostics**: Surface structured errors from the native pipeline (link failures, unsupported IR) instead of raw toolchain exits.【F:src/backend/native.rs†L141-L199】【F:src/main.rs†L210-L260】
+3. **Parallel backend preparation**: Leverage the new copy-on-write registries to prototype parallel code generation and measure contention across threads.【F:src/ir/mod.rs†L100-L215】【F:src/ir/mod.rs†L780-L940】
+4. **Structured CLI outputs**: Extend resolver/IR dumps with machine-readable formats to support upcoming tooling milestones.【F:src/main.rs†L63-L205】【F:docs/modules/cli.md†L60-L80】
 
 ## Watch Items
-- Shared type/effect tables in the IR will need concurrency-safe access once multiple backends consume a module; design the ownership story before parallel compilation enters the picture.【F:src/ir/mod.rs†L500-L620】
-- CLI outputs are textual today; consider structured formats so tooling built during Phase 3+ can ingest resolver and IR data without fragile scraping.【F:src/main.rs†L51-L201】【F:docs/modules/cli.md†L54-L60】
+- Native code generation currently targets portable C without record/aggregate support; expand coverage before enabling more complex examples.【F:src/backend/native.rs†L230-L320】
+- CLI outputs are textual today; consider structured formats so tooling built during Phase 3+ can ingest resolver and IR data without fragile scraping.【F:src/main.rs†L63-L205】【F:docs/modules/cli.md†L60-L80】

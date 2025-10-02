@@ -123,7 +123,7 @@ fn lower_block(b: &Block) -> HBlock {
                 value: lower_expr(&l.value),
             }),
             Stmt::Expr(e) => stmts.push(HStmt::Expr(lower_expr(e))),
-            Stmt::Return(e) => stmts.push(HStmt::Return(e.as_ref().map(|e| lower_expr(e)))),
+            Stmt::Return(e) => stmts.push(HStmt::Return(e.as_ref().map(lower_expr))),
             Stmt::Break | Stmt::Continue => {}
         }
     }
@@ -176,13 +176,12 @@ fn lower_expr(e: &Expr) -> HExpr {
             }
         }
         Expr::Field { expr, name: _ } => {
-            // As value: keep as Path if simple, else ignore
-            let base = match &**expr {
+            // As value: keep as Path if simple, else ignore. Encode as a call-ready method
+            // reference if needed; for now just return the lowered receiver.
+            match &**expr {
                 Expr::Path(p) => HExpr::Path(p.clone()),
                 _ => lower_expr(expr),
-            };
-            // Encode as a call-ready method reference if needed; for now just return the base
-            base
+            }
         }
         Expr::Index { expr, index } => {
             // Desugar index as method call: index(expr, idx)

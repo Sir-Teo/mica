@@ -41,30 +41,37 @@ impl ModuleGraph {
 
             match kind {
                 PathKind::Type => {
-                    if remainder.len() == 1 {
-                        if let Some(symbol) = exports.types.get(&remainder[0]) {
-                            return Some(symbol.clone());
-                        }
-                    } else if remainder.len() == 2 {
-                        if let Some(symbol) = exports.variants.get(&remainder[1]) {
-                            return Some(symbol.clone());
-                        }
+                    if remainder.len() == 1
+                        && let Some(symbol) = exports.types.get(&remainder[0])
+                    {
+                        return Some(symbol.clone());
+                    } else if remainder.len() == 2
+                        && let Some(symbol) = exports.variants.get(&remainder[1])
+                    {
+                        return Some(symbol.clone());
                     }
                 }
                 PathKind::Value => {
-                    if remainder.len() == 1 {
-                        if let Some(symbol) = exports.values.get(&remainder[0]) {
-                            return Some(symbol.clone());
-                        }
-                        if let Some(symbol) = exports.variants.get(&remainder[0]) {
-                            return Some(symbol.clone());
-                        }
-                    } else if let Some(symbol) = exports.variants.get(remainder.last().unwrap()) {
+                    if remainder.len() == 1
+                        && let Some(symbol) = exports.values.get(&remainder[0])
+                    {
+                        return Some(symbol.clone());
+                    }
+                    if remainder.len() == 1
+                        && let Some(symbol) = exports.variants.get(&remainder[0])
+                    {
+                        return Some(symbol.clone());
+                    }
+                    if let Some(last) = remainder.last()
+                        && let Some(symbol) = exports.variants.get(last)
+                    {
                         return Some(symbol.clone());
                     }
                 }
                 PathKind::Variant => {
-                    if let Some(symbol) = exports.variants.get(remainder.last().unwrap()) {
+                    if let Some(last) = remainder.last()
+                        && let Some(symbol) = exports.variants.get(last)
+                    {
                         return Some(symbol.clone());
                     }
                 }

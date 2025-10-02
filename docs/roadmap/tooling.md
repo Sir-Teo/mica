@@ -86,6 +86,7 @@ automation-heavy, next-decade developer workflows.
 
 **Acceptance Criteria**
 - CI matrix runs tests, fmt, lint, coverage, fuzz smoke, docs.
+- Initial coverage gate lands at 50% line execution via `cargo llvm-cov`, with the intent to ratchet higher as runtime shims and fuzz hooks arrive.【F:.github/workflows/ci.yml†L39-L71】
 - Nightly pipeline reports coverage/fuzz metrics to Slack.
 
 **Future-facing trajectory**

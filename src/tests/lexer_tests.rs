@@ -1,5 +1,7 @@
 use super::*;
 
+type TokenPredicate = Box<dyn Fn(&TokenKind) -> bool>;
+
 #[test]
 fn lex_double_colon_and_question() {
     let src = "File::open(\"/tmp/x\")?";
@@ -11,7 +13,7 @@ fn lex_double_colon_and_question() {
 
 #[test]
 fn lexer_keywords_and_symbols_cover_every_branch() {
-    let cases: Vec<(&str, Box<dyn Fn(&TokenKind) -> bool>)> = vec![
+    let cases: Vec<(&str, TokenPredicate)> = vec![
         ("module", Box::new(|t| matches!(t, TokenKind::Module))),
         ("pub", Box::new(|t| matches!(t, TokenKind::Pub))),
         ("fn", Box::new(|t| matches!(t, TokenKind::Fn))),
@@ -54,9 +56,13 @@ fn lexer_keywords_and_symbols_cover_every_branch() {
         ),
         (
             "3.14",
-            Box::new(
-                |t| matches!(t, TokenKind::FloatLiteral(v) if (*v - 3.14).abs() < f64::EPSILON),
-            ),
+            Box::new(|t| {
+                let expected = "3.14".parse::<f64>().unwrap();
+                matches!(
+                    t,
+                    TokenKind::FloatLiteral(v) if (*v - expected).abs() < f64::EPSILON
+                )
+            }),
         ),
         (
             "6.02e23",
@@ -101,7 +107,7 @@ fn lexer_keywords_and_symbols_cover_every_branch() {
 
     for (src, check) in cases {
         let toks = lexer::lex(src).expect("lex ok");
-        assert!(toks.len() >= 1);
+        assert!(!toks.is_empty());
         assert!(
             check(&toks[0].kind),
             "unexpected token for {src:?}: {:?}",

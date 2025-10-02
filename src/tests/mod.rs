@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use crate::diagnostics::error::{Error, ErrorKind};
 use crate::semantics::{check, resolve};
 use crate::syntax::{ast::*, lexer, parser, token::TokenKind};
