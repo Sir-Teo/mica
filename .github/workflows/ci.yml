@@ -4,9 +4,30 @@ on:
   push:
   pull_request:
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cargo fmt
+        run: cargo fmt --all -- --check
+
+      - name: Cargo clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,9 +38,40 @@ jobs:
       - name: Cargo build
         run: cargo build --locked
 
-      - name: Cargo test (all targets)
-        run: cargo test --locked --all-targets
+      - name: Cargo test (workspace)
+        run: cargo test --locked --workspace --all-targets
+
+      - name: Cargo doc
+        run: cargo doc --locked --no-deps
 
       - name: Check CLI snippets up-to-date
-        run: cargo run --quiet --bin gen_snippets -- --check
+        run: cargo run --locked --quiet --bin gen_snippets -- --check
 
+      - name: Native backend smoke test
+        run: cargo run --locked --quiet --bin mica -- --run examples/native_entry.mica
+
+  coverage:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Collect coverage report
+        run: cargo llvm-cov --locked --workspace --lcov --output-path lcov.info --fail-under-lines 50
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: lcov.info

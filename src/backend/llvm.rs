@@ -93,7 +93,7 @@ impl<'m> ModuleRenderer<'m> {
         for (index, value) in self.string_literals.iter().enumerate() {
             let symbol = format!(".str{}", index);
             let escaped = escape_string(value);
-            let len = value.as_bytes().len() + 1;
+            let len = value.len() + 1;
             writeln!(
                 out,
                 "@{} = private constant [{} x i8] c\"{}\\00\"",
@@ -113,27 +113,26 @@ impl<'m> ModuleRenderer<'m> {
     fn render_type_declarations(&self, out: &mut String) {
         let mut seen = HashSet::new();
         for (_, ty) in self.module.types.entries() {
-            if let Type::Record(record) = ty {
-                if let Some(name) = &record.name {
-                    if seen.insert(name.clone()) {
-                        let body = if record.fields.is_empty() {
-                            "{}".to_string()
-                        } else {
-                            let mut parts = Vec::with_capacity(record.fields.len());
-                            for field in &record.fields {
-                                parts.push(format_type(self.module, field.ty));
-                            }
-                            format!("{{ {} }}", parts.join(", "))
-                        };
-                        writeln!(out, "%{} = type {}", record_symbol(name), body).unwrap();
-                        writeln!(
-                            out,
-                            "; layout: size={}, align={}",
-                            record.size, record.align
-                        )
-                        .unwrap();
+            if let Type::Record(record) = ty
+                && let Some(name) = &record.name
+                && seen.insert(name.clone())
+            {
+                let body = if record.fields.is_empty() {
+                    "{}".to_string()
+                } else {
+                    let mut parts = Vec::with_capacity(record.fields.len());
+                    for field in &record.fields {
+                        parts.push(format_type(self.module, field.ty));
                     }
-                }
+                    format!("{{ {} }}", parts.join(", "))
+                };
+                writeln!(out, "%{} = type {}", record_symbol(name), body).unwrap();
+                writeln!(
+                    out,
+                    "; layout: size={}, align={}",
+                    record.size, record.align
+                )
+                .unwrap();
             }
         }
 
@@ -288,7 +287,7 @@ impl<'m> ModuleRenderer<'m> {
                 Some(format!(
                     "  %{} = getelementptr inbounds ([{} x i8], ptr @{}, i32 0, i32 0)",
                     id,
-                    value.as_bytes().len() + 1,
+                    value.len() + 1,
                     symbol
                 ))
             }
@@ -670,6 +669,6 @@ fn record_symbol(name: &str) -> String {
     format!("record.{}", sanitize_symbol(name))
 }
 
-fn default_data_layout() -> &'static str {
+pub(crate) fn default_data_layout() -> &'static str {
     "e-m:e-p:64:64-i64:64-f64:64-n8:16:32:64-S128"
 }

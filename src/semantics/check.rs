@@ -25,11 +25,11 @@ fn check_exhaustiveness(module: &Module) -> Vec<Diagnostic> {
     let mut adts: Vec<(String, Vec<String>)> = Vec::new();
 
     for item in &module.items {
-        if let Item::TypeAlias(ta) = item {
-            if let TypeExpr::Sum(vars) = &ta.value {
-                let variants: Vec<String> = vars.iter().map(|v| v.name.clone()).collect();
-                adts.push((ta.name.clone(), variants));
-            }
+        if let Item::TypeAlias(ta) = item
+            && let TypeExpr::Sum(vars) = &ta.value
+        {
+            let variants: Vec<String> = vars.iter().map(|v| v.name.clone()).collect();
+            adts.push((ta.name.clone(), variants));
         }
     }
 
@@ -146,11 +146,10 @@ fn visit_expr(expr: &Expr, adts: &[(String, Vec<String>)], diags: &mut Vec<Diagn
             visit_expr(value, adts, diags)
         }
         Expr::Spawn(e) | Expr::Await(e) | Expr::Try(e) => visit_expr(e, adts, diags),
-        Expr::Chan { capacity, .. } => {
-            if let Some(c) = capacity {
-                visit_expr(c, adts, diags)
-            }
-        }
+        Expr::Chan {
+            capacity: Some(capacity),
+            ..
+        } => visit_expr(capacity, adts, diags),
         Expr::Using { expr, body, .. } => {
             visit_expr(expr, adts, diags);
             for s in &body.statements {
@@ -185,10 +184,10 @@ impl<'a> Checker<'a> {
 
     fn run(&mut self) {
         for item in &self.module.items {
-            if let Item::Function(func) = item {
-                if let Some(sig) = self.functions.get(&func.name).cloned() {
-                    self.check_function(func, sig);
-                }
+            if let Item::Function(func) = item
+                && let Some(sig) = self.functions.get(&func.name).cloned()
+            {
+                self.check_function(func, sig);
             }
         }
 
@@ -206,10 +205,10 @@ impl<'a> Checker<'a> {
 
     fn collect_variants(&mut self) {
         for item in &self.module.items {
-            if let Item::TypeAlias(alias) = item {
-                if let TypeExpr::Sum(variants) = &alias.value {
-                    self.register_variants(alias, variants);
-                }
+            if let Item::TypeAlias(alias) = item
+                && let TypeExpr::Sum(variants) = &alias.value
+            {
+                self.register_variants(alias, variants);
             }
         }
     }
@@ -365,29 +364,29 @@ impl<'a, 'm> FunctionChecker<'a, 'm> {
         }
 
         let block_ty = self.check_block(&func.body);
-        if let Some(expected) = &self.return_type {
-            if let Some(actual) = block_ty {
-                if !types_compatible(expected, &actual) {
-                    self.diagnostics.push(Diagnostic {
-                        message: format!(
-                            "function '{}' returns '{}' but expected '{}'",
-                            self.name,
-                            actual.describe(),
-                            expected.describe()
-                        ),
-                    });
-                }
-            }
-        } else if let Some(actual) = block_ty {
-            if !matches!(actual, TypeRepr::Unit | TypeRepr::Unknown) {
-                self.diagnostics.push(Diagnostic {
-                    message: format!(
-                        "function '{}' returns value of type '{}' but is declared without return type",
-                        self.name,
-                        actual.describe()
-                    ),
-                });
-            }
+        if let Some(expected) = &self.return_type
+            && let Some(actual) = block_ty.as_ref()
+            && !types_compatible(expected, actual)
+        {
+            self.diagnostics.push(Diagnostic {
+                message: format!(
+                    "function '{}' returns '{}' but expected '{}'",
+                    self.name,
+                    actual.describe(),
+                    expected.describe()
+                ),
+            });
+        } else if self.return_type.is_none()
+            && let Some(actual) = block_ty.as_ref()
+            && !matches!(actual, TypeRepr::Unit | TypeRepr::Unknown)
+        {
+            self.diagnostics.push(Diagnostic {
+                message: format!(
+                    "function '{}' returns value of type '{}' but is declared without return type",
+                    self.name,
+                    actual.describe()
+                ),
+            });
         }
     }
 
@@ -432,27 +431,30 @@ impl<'a, 'm> FunctionChecker<'a, 'm> {
                     last_type = self.check_expr(expr).unwrap_or(TypeRepr::Unknown);
                 }
                 Stmt::Return(Some(expr)) => {
-                    if let Some(expected) = &expected_return {
-                        if let Some(actual) = self.check_expr(expr) {
-                            if !types_compatible(expected, &actual) {
-                                self.diagnostics.push(Diagnostic {
-                                    message: format!(
-                                        "returning '{}' but function '{}' expects '{}'",
-                                        actual.describe(),
-                                        self.name,
-                                        expected.describe()
-                                    ),
-                                });
-                            }
+                    let actual = self.check_expr(expr);
+                    match (&expected_return, actual) {
+                        (Some(expected), Some(actual)) if !types_compatible(expected, &actual) => {
+                            self.diagnostics.push(Diagnostic {
+                                message: format!(
+                                    "returning '{}' but function '{}' expects '{}'",
+                                    actual.describe(),
+                                    self.name,
+                                    expected.describe()
+                                ),
+                            });
                         }
-                    } else if let Some(actual) = self.check_expr(expr) {
-                        self.diagnostics.push(Diagnostic {
-                            message: format!(
-                                "function '{}' does not declare a return type but returns '{}'",
-                                self.name,
-                                actual.describe()
-                            ),
-                        });
+                        (None, Some(actual))
+                            if !matches!(actual, TypeRepr::Unit | TypeRepr::Unknown) =>
+                        {
+                            self.diagnostics.push(Diagnostic {
+                                message: format!(
+                                    "function '{}' does not declare a return type but returns '{}'",
+                                    self.name,
+                                    actual.describe()
+                                ),
+                            });
+                        }
+                        _ => {}
                     }
                     last_type = TypeRepr::Unit;
                 }
@@ -507,16 +509,16 @@ impl<'a, 'm> FunctionChecker<'a, 'm> {
                 then_branch,
                 else_branch,
             } => {
-                if let Some(cond_ty) = self.check_expr(condition) {
-                    if !types_compatible(&TypeRepr::Primitive(PrimitiveType::Bool), &cond_ty) {
-                        self.diagnostics.push(Diagnostic {
-                            message: format!(
-                                "if condition in '{}' is '{}' but must be Bool",
-                                self.name,
-                                cond_ty.describe()
-                            ),
-                        });
-                    }
+                if let Some(cond_ty) = self.check_expr(condition)
+                    && !types_compatible(&TypeRepr::Primitive(PrimitiveType::Bool), &cond_ty)
+                {
+                    self.diagnostics.push(Diagnostic {
+                        message: format!(
+                            "if condition in '{}' is '{}' but must be Bool",
+                            self.name,
+                            cond_ty.describe()
+                        ),
+                    });
                 }
                 let then_ty = self.check_expr(then_branch).unwrap_or(TypeRepr::Unknown);
                 if let Some(else_expr) = else_branch {
@@ -540,21 +542,17 @@ impl<'a, 'm> FunctionChecker<'a, 'm> {
                 for arm in arms {
                     self.push_scope();
                     self.bind_pattern(&arm.pattern, scrutinee_ty.as_ref());
-                    if let Some(guard) = &arm.guard {
-                        if let Some(guard_ty) = self.check_expr(guard) {
-                            if !types_compatible(
-                                &TypeRepr::Primitive(PrimitiveType::Bool),
-                                &guard_ty,
-                            ) {
-                                self.diagnostics.push(Diagnostic {
-                                    message: format!(
-                                        "match guard in '{}' has type '{}' but must be Bool",
-                                        self.name,
-                                        guard_ty.describe()
-                                    ),
-                                });
-                            }
-                        }
+                    if let Some(guard) = &arm.guard
+                        && let Some(guard_ty) = self.check_expr(guard)
+                        && !types_compatible(&TypeRepr::Primitive(PrimitiveType::Bool), &guard_ty)
+                    {
+                        self.diagnostics.push(Diagnostic {
+                            message: format!(
+                                "match guard in '{}' has type '{}' but must be Bool",
+                                self.name,
+                                guard_ty.describe()
+                            ),
+                        });
                     }
                     let body_ty = self.check_expr(&arm.body).unwrap_or(TypeRepr::Unknown);
                     if let Some(existing) = &arm_type {
@@ -581,17 +579,17 @@ impl<'a, 'm> FunctionChecker<'a, 'm> {
             }
             Expr::Assignment { target, value } => {
                 let target_ty = self.check_expr(target).unwrap_or(TypeRepr::Unknown);
-                if let Some(value_ty) = self.check_expr(value) {
-                    if !types_compatible(&target_ty, &value_ty) {
-                        self.diagnostics.push(Diagnostic {
-                            message: format!(
-                                "cannot assign '{}' to '{}' in '{}'",
-                                value_ty.describe(),
-                                target_ty.describe(),
-                                self.name
-                            ),
-                        });
-                    }
+                if let Some(value_ty) = self.check_expr(value)
+                    && !types_compatible(&target_ty, &value_ty)
+                {
+                    self.diagnostics.push(Diagnostic {
+                        message: format!(
+                            "cannot assign '{}' to '{}' in '{}'",
+                            value_ty.describe(),
+                            target_ty.describe(),
+                            self.name
+                        ),
+                    });
                 }
                 Some(target_ty)
             }
@@ -758,17 +756,17 @@ impl<'a, 'm> FunctionChecker<'a, 'm> {
         }
 
         for (expected, arg) in params.iter().zip(args.iter()) {
-            if let Some(actual) = self.check_expr(arg) {
-                if !types_compatible(expected, &actual) {
-                    self.diagnostics.push(Diagnostic {
-                        message: format!(
-                            "argument to call in '{}' has type '{}' but parameter expects '{}'",
-                            self.name,
-                            actual.describe(),
-                            expected.describe()
-                        ),
-                    });
-                }
+            if let Some(actual) = self.check_expr(arg)
+                && !types_compatible(expected, &actual)
+            {
+                self.diagnostics.push(Diagnostic {
+                    message: format!(
+                        "argument to call in '{}' has type '{}' but parameter expects '{}'",
+                        self.name,
+                        actual.describe(),
+                        expected.describe()
+                    ),
+                });
             }
         }
 
@@ -809,17 +807,17 @@ impl<'a, 'm> FunctionChecker<'a, 'm> {
             }
 
             for (expected, expr) in info.fields.iter().zip(args.iter()) {
-                if let Some(actual) = self.check_expr(expr) {
-                    if !types_compatible(expected, &actual) {
-                        self.diagnostics.push(Diagnostic {
-                            message: format!(
-                                "constructor '{}' field expected '{}' but found '{}'",
-                                path.segments.join("::"),
-                                expected.describe(),
-                                actual.describe()
-                            ),
-                        });
-                    }
+                if let Some(actual) = self.check_expr(expr)
+                    && !types_compatible(expected, &actual)
+                {
+                    self.diagnostics.push(Diagnostic {
+                        message: format!(
+                            "constructor '{}' field expected '{}' but found '{}'",
+                            path.segments.join("::"),
+                            expected.describe(),
+                            actual.describe()
+                        ),
+                    });
                 }
             }
 

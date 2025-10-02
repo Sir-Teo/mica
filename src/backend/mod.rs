@@ -3,23 +3,14 @@ use std::fmt;
 use crate::ir;
 
 pub mod llvm;
+pub mod native;
 pub mod text;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BackendOptions {
     pub optimize: bool,
     pub debug_info: bool,
     pub target_triple: Option<String>,
-}
-
-impl Default for BackendOptions {
-    fn default() -> Self {
-        BackendOptions {
-            optimize: false,
-            debug_info: false,
-            target_triple: None,
-        }
-    }
 }
 
 pub trait Backend {

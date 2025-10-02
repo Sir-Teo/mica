@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 pub mod analysis;
 
@@ -130,6 +131,11 @@ pub enum Type {
 
 #[derive(Debug, Clone)]
 pub struct TypeTable {
+    inner: Arc<TypeTableInner>,
+}
+
+#[derive(Debug, Clone)]
+struct TypeTableInner {
     entries: Vec<Type>,
     index: HashMap<Type, TypeId>,
     named: HashMap<String, TypeId>,
@@ -138,6 +144,11 @@ pub struct TypeTable {
 
 #[derive(Debug, Clone, Default)]
 pub struct EffectTable {
+    inner: Arc<EffectTableInner>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct EffectTableInner {
     entries: Vec<String>,
     index: HashMap<String, EffectId>,
 }
@@ -328,11 +339,9 @@ impl<'a> FunctionLower<'a> {
                 }
 
                 let is_last = index + 1 == block.stmts.len();
-                if is_last {
-                    if let HStmt::Expr(expr) = stmt {
-                        this.lower_return(Some(expr));
-                        break;
-                    }
+                if is_last && let HStmt::Expr(expr) = stmt {
+                    this.lower_return(Some(expr));
+                    break;
                 }
 
                 this.lower_stmt(stmt);
@@ -382,19 +391,19 @@ impl<'a> FunctionLower<'a> {
                 (id, ty)
             }
             HExpr::Path(path) => {
-                if path.segments.len() == 1 {
-                    if let Some(id) = self.lookup(&path.segments[0]) {
-                        let ty = self.value_types.get(&id).copied().unwrap_or(self.unknown);
-                        return (id, ty);
-                    }
+                if path.segments.len() == 1
+                    && let Some(id) = self.lookup(&path.segments[0])
+                {
+                    let ty = self.value_types.get(&id).copied().unwrap_or(self.unknown);
+                    return (id, ty);
                 }
                 self.emit_instruction(InstKind::Path(path.clone()), self.unknown, Vec::new())
             }
             HExpr::Call { func, args } => {
-                if let HFuncRef::Method(name) = func {
-                    if name == "if" {
-                        return self.lower_if_call(args);
-                    }
+                if let HFuncRef::Method(name) = func
+                    && name == "if"
+                {
+                    return self.lower_if_call(args);
                 }
                 let mut lowered_args = Vec::with_capacity(args.len());
                 for arg in args {
@@ -736,7 +745,7 @@ impl BlockBuilder {
 
 impl Module {
     pub fn effect_name(&self, id: EffectId) -> &str {
-        self.effects.get(id)
+        self.effects.name(id)
     }
 
     pub fn type_of(&self, id: TypeId) -> &Type {
@@ -778,16 +787,22 @@ impl EffectId {
     }
 }
 
+impl Default for TypeTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TypeTable {
     pub fn new() -> Self {
-        let mut table = TypeTable {
+        let mut inner = TypeTableInner {
             entries: Vec::new(),
             index: HashMap::new(),
             named: HashMap::new(),
             unknown: TypeId(0),
         };
-        let unknown = table.insert_raw(Type::Unknown);
-        table.unknown = unknown;
+        let unknown = inner.insert_raw(Type::Unknown);
+        inner.unknown = unknown;
         for (name, builtin) in [
             ("Unit", Type::Unit),
             ("Int", Type::Int),
@@ -795,38 +810,19 @@ impl TypeTable {
             ("Bool", Type::Bool),
             ("String", Type::String),
         ] {
-            let id = table.insert_raw(builtin);
-            table.named.insert(name.to_string(), id);
+            let id = inner.insert_raw(builtin);
+            inner.named.insert(name.to_string(), id);
         }
-        table
-    }
-
-    fn insert_raw(&mut self, ty: Type) -> TypeId {
-        if let Some(id) = self.index.get(&ty) {
-            return *id;
+        TypeTable {
+            inner: Arc::new(inner),
         }
-        let id = TypeId(self.entries.len() as u32);
-        match &ty {
-            Type::Named(name) => {
-                self.named.insert(name.clone(), id);
-            }
-            Type::Record(record) => {
-                if let Some(name) = &record.name {
-                    self.named.insert(name.clone(), id);
-                }
-            }
-            _ => {}
-        }
-        self.index.insert(ty.clone(), id);
-        self.entries.push(ty);
-        id
     }
 
     pub fn intern(&mut self, ty: Type) -> TypeId {
-        if let Some(id) = self.index.get(&ty) {
+        if let Some(id) = self.inner.index.get(&ty) {
             *id
         } else {
-            self.insert_raw(ty)
+            Arc::make_mut(&mut self.inner).insert_raw(ty)
         }
     }
 
@@ -885,26 +881,29 @@ impl TypeTable {
     }
 
     pub fn define_alias(&mut self, name: &str, ty: TypeId) {
-        self.named.insert(name.to_string(), ty);
+        Arc::make_mut(&mut self.inner)
+            .named
+            .insert(name.to_string(), ty);
     }
 
     pub fn get(&self, id: TypeId) -> &Type {
-        &self.entries[id.index()]
+        &self.inner.entries[id.index()]
     }
 
     pub fn entries(&self) -> impl Iterator<Item = (TypeId, &Type)> {
-        self.entries
+        self.inner
+            .entries
             .iter()
             .enumerate()
             .map(|(index, ty)| (TypeId(index as u32), ty))
     }
 
     pub fn lookup_named(&self, name: &str) -> Option<TypeId> {
-        self.named.get(name).copied()
+        self.inner.named.get(name).copied()
     }
 
     pub fn unknown(&self) -> TypeId {
-        self.unknown
+        self.inner.unknown
     }
 
     pub fn size_of(&self, ty: TypeId) -> u32 {
@@ -927,20 +926,60 @@ impl TypeTable {
     }
 }
 
+impl TypeTableInner {
+    fn insert_raw(&mut self, ty: Type) -> TypeId {
+        if let Some(id) = self.index.get(&ty) {
+            return *id;
+        }
+        let id = TypeId(self.entries.len() as u32);
+        match &ty {
+            Type::Named(name) => {
+                self.named.insert(name.clone(), id);
+            }
+            Type::Record(record) => {
+                if let Some(name) = &record.name {
+                    self.named.insert(name.clone(), id);
+                }
+            }
+            _ => {}
+        }
+        self.index.insert(ty.clone(), id);
+        self.entries.push(ty);
+        id
+    }
+}
+
 impl EffectTable {
     pub fn intern(&mut self, name: String) -> EffectId {
-        if let Some(id) = self.index.get(&name) {
+        if let Some(id) = self.inner.index.get(&name) {
             *id
         } else {
-            let id = EffectId(self.entries.len() as u32);
-            self.entries.push(name.clone());
-            self.index.insert(name, id);
-            id
+            Arc::make_mut(&mut self.inner).insert(name)
         }
     }
 
-    pub fn get(&self, id: EffectId) -> &str {
-        &self.entries[id.index()]
+    pub fn entries(&self) -> impl Iterator<Item = (EffectId, &String)> {
+        self.inner
+            .entries
+            .iter()
+            .enumerate()
+            .map(|(index, name)| (EffectId(index as u32), name))
+    }
+
+    pub fn name(&self, id: EffectId) -> &str {
+        &self.inner.entries[id.index()]
+    }
+}
+
+impl EffectTableInner {
+    fn insert(&mut self, name: String) -> EffectId {
+        if let Some(id) = self.index.get(&name) {
+            return *id;
+        }
+        let id = EffectId(self.entries.len() as u32);
+        self.entries.push(name.clone());
+        self.index.insert(name, id);
+        id
     }
 }
 
@@ -971,6 +1010,6 @@ fn align_to(value: u32, align: u32) -> u32 {
     if align <= 1 {
         value
     } else {
-        ((value + align - 1) / align) * align
+        value.div_ceil(align) * align
     }
 }

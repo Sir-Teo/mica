@@ -334,9 +334,9 @@ impl<'a, 'g> Resolver<'a, 'g> {
 
     fn resolve_type_expr(&mut self, ty: &TypeExpr) {
         match ty {
-            TypeExpr::Name(name) => self.resolve_path(&[name.clone()], PathKind::Type),
+            TypeExpr::Name(name) => self.resolve_path(std::slice::from_ref(name), PathKind::Type),
             TypeExpr::Generic(name, args) => {
-                self.resolve_path(&[name.clone()], PathKind::Type);
+                self.resolve_path(std::slice::from_ref(name), PathKind::Type);
                 for arg in args {
                     self.resolve_type_expr(arg);
                 }
@@ -369,14 +369,14 @@ impl<'a, 'g> Resolver<'a, 'g> {
                     self.resolve_type_expr(param);
                 }
                 self.resolve_type_expr(return_type);
-                if !effect_row.is_empty() {
-                    if let Some(scope) = self.current_capability_scope() {
-                        for cap in effect_row {
-                            self.resolved.capabilities.push(CapabilityBinding {
-                                name: cap.clone(),
-                                scope: scope.clone(),
-                            });
-                        }
+                if !effect_row.is_empty()
+                    && let Some(scope) = self.current_capability_scope()
+                {
+                    for cap in effect_row {
+                        self.resolved.capabilities.push(CapabilityBinding {
+                            name: cap.clone(),
+                            scope: scope.clone(),
+                        });
                     }
                 }
             }

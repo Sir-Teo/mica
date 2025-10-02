@@ -142,6 +142,7 @@ Each module plan includes objectives, detailed tasks, dependencies, and exit cri
 
 **Step-by-step plan**
 1. Scaffold `src/backend/llvm.rs` with module/function emitters.
+   - ✅ A transitional native backend now emits portable C (`src/backend/native.rs`) and links binaries via the host toolchain, providing an end-to-end path while the direct LLVM integration matures.【F:src/backend/native.rs†L1-L400】
 2. Map capability usage to runtime calls; define `runtime/` crate for host services.
 3. Implement deterministic scheduler for structured tasks, respecting cancellation semantics.
 4. Hook build pipeline into `mica build` CLI command.

@@ -44,14 +44,14 @@ pub fn analyze_function_purity(function: &Function) -> PurityReport {
         let mut block_pure = true;
         for inst in &block.instructions {
             let mut effectful = !inst.effects.is_empty();
-            if let InstKind::Call { func, .. } = &inst.kind {
-                if inst.effects.is_empty() {
-                    // Calls without effect metadata are pure only when we can prove
-                    // they target another IR function. Method calls or unresolved
-                    // references remain conservatively effectful so future lowering
-                    // phases can attach metadata without breaking assumptions here.
-                    effectful = matches!(func, super::FuncRef::Method(_));
-                }
+            if let InstKind::Call { func, .. } = &inst.kind
+                && inst.effects.is_empty()
+            {
+                // Calls without effect metadata are pure only when we can prove
+                // they target another IR function. Method calls or unresolved
+                // references remain conservatively effectful so future lowering
+                // phases can attach metadata without breaking assumptions here.
+                effectful = matches!(func, super::FuncRef::Method(_));
             }
             if effectful {
                 block_pure = false;

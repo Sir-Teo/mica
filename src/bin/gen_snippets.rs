@@ -7,7 +7,9 @@ fn main() {
     let check_only = args.iter().any(|a| a == "--check");
 
     // Ensure the main binary is built
-    run(&mut Command::new("cargo").arg("build"));
+    let mut build = Command::new("cargo");
+    build.arg("build");
+    run(&mut build);
 
     let bin = PathBuf::from("target")
         .join("debug")

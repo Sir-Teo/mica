@@ -34,9 +34,8 @@ fn parse_using_try_and_chan() {
       }
     "#;
     let m = parse(src);
-    let f = match &m.items[0] {
-        Item::Function(f) => f,
-        _ => panic!(),
+    let Item::Function(f) = &m.items[0] else {
+        panic!();
     };
     let stmts = &f.body.statements;
     if let Stmt::Expr(Expr::Using {
@@ -64,7 +63,7 @@ fn parse_using_try_and_chan() {
                         TypeExpr::Name(n) => assert_eq!(n, "Int"),
                         _ => panic!(),
                     }
-                    assert!(matches!(capacity, Some(_)));
+                    assert!(capacity.is_some());
                 }
                 _ => panic!(),
             }
@@ -84,9 +83,8 @@ fn parse_cast_and_patterns() {
       fn work(p: Pair) -> Int { match p { { a, b: bb } => (a + bb) as Int } }
     "#;
     let m = parse(src);
-    let f = match &m.items[1] {
-        Item::Function(f) => f,
-        _ => panic!(),
+    let Item::Function(f) = &m.items[1] else {
+        panic!();
     };
     if let Stmt::Expr(Expr::Match { arms, .. }) = &f.body.statements[0] {
         match &arms[0].pattern {
@@ -148,22 +146,18 @@ fn parse_impl_and_self_receiver() {
       impl Addable for Vec2 { fn add(self, other: Vec2) -> Vec2 { other } }
     "#;
     let m = parse(src);
-    let ib = match &m.items[1] {
-        Item::Impl(ib) => ib,
-        _ => panic!(),
+    let Item::Impl(ib) = &m.items[1] else {
+        panic!();
     };
-    let f = match &ib.items[0] {
-        ImplItem::Function(f) => f,
-    };
+    let ImplItem::Function(f) = &ib.items[0];
     assert!(matches!(f.params[0].ty, TypeExpr::SelfType));
 }
 
 #[test]
 fn list_type_parses() {
     let m = parse("module m\nfn g(x: [Int]) { x }");
-    let f = match &m.items[0] {
-        Item::Function(f) => f,
-        _ => panic!(),
+    let Item::Function(f) = &m.items[0] else {
+        panic!();
     };
     match &f.params[0].ty {
         TypeExpr::List(inner) => match &**inner {
