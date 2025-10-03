@@ -140,3 +140,78 @@ fn runtime_validates_registered_capabilities() {
         RuntimeErrorKind::UnknownCapability { name } if name == "net"
     ));
 }
+
+#[test]
+fn runtime_produces_structured_telemetry() {
+    let runtime = Runtime::with_default_shims().expect("runtime setup");
+    let spec = TaskSpec::new("main").with_capabilities(["io"]);
+    let plan = TaskPlan::new().invoke("io", "write_line", Some(RuntimeValue::from("hello")));
+
+    runtime.spawn(spec, plan);
+    let trace = runtime
+        .run_with_telemetry()
+        .expect("runtime telemetry trace");
+
+    let events = trace.events();
+    assert_eq!(events.len(), 4, "expected task lifecycle events");
+
+    let telemetry = trace.telemetry();
+    assert_eq!(telemetry.len(), events.len());
+
+    for (index, (event, telemetry_entry)) in events.iter().zip(telemetry.iter()).enumerate() {
+        assert_eq!(telemetry_entry.sequence, index);
+        assert_eq!(&telemetry_entry.event, event);
+        assert!(
+            telemetry_entry.timestamp_micros.is_some(),
+            "telemetry entry should include a timestamp"
+        );
+    }
+
+    assert!(
+        telemetry
+            .windows(2)
+            .all(|pair| pair[0].sequence + 1 == pair[1].sequence)
+    );
+}
+
+#[test]
+fn runtime_filesystem_provider_reads_files() {
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let runtime = Runtime::with_default_shims().expect("runtime setup");
+    let spec = TaskSpec::new("reader").with_capabilities(["fs"]);
+
+    let temp_dir = std::env::temp_dir();
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let path = temp_dir.join(format!("mica_runtime_test_{unique}.txt"));
+    fs::write(&path, "filesystem contents").expect("write fixture");
+
+    let plan = TaskPlan::new().invoke(
+        "fs",
+        "read_to_string",
+        Some(RuntimeValue::from(path.to_string_lossy().to_string())),
+    );
+
+    runtime.spawn(spec, plan);
+    let events = runtime.run().expect("runtime events");
+    fs::remove_file(&path).ok();
+
+    let observed = events.iter().find_map(|event| match event {
+        RuntimeEvent::CapabilityEvent {
+            capability,
+            event: CapabilityEvent::Data(RuntimeValue::String(data)),
+            ..
+        } if capability == "fs" => Some(data.clone()),
+        _ => None,
+    });
+
+    assert_eq!(
+        observed.as_deref(),
+        Some("filesystem contents"),
+        "filesystem provider should surface file contents"
+    );
+}
