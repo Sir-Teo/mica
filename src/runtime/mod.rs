@@ -41,7 +41,7 @@ impl Runtime {
         let runtime = Runtime::new();
         runtime.register_provider(ConsoleProvider)?;
         runtime.register_provider(TimeProvider)?;
-        runtime.register_provider(FilesystemProvider::default())?;
+        runtime.register_provider(FilesystemProvider)?;
         Ok(runtime)
     }
 
