@@ -1,5 +1,7 @@
 use std::collections::{HashMap, VecDeque};
+use std::fs;
 use std::sync::{Arc, Mutex, RwLock};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::backend::BackendError;
 
@@ -39,6 +41,7 @@ impl Runtime {
         let runtime = Runtime::new();
         runtime.register_provider(ConsoleProvider)?;
         runtime.register_provider(TimeProvider)?;
+        runtime.register_provider(FilesystemProvider)?;
         Ok(runtime)
     }
 
@@ -69,12 +72,25 @@ impl Runtime {
     /// Executes all pending tasks, yielding the runtime events emitted during
     /// execution.
     pub fn run(&self) -> Result<Vec<RuntimeEvent>, RuntimeError> {
-        let mut all_events = Vec::new();
+        Ok(self.run_with_telemetry()?.into_events())
+    }
+
+    /// Executes all pending tasks and returns a structured trace capturing the
+    /// runtime events alongside telemetry metadata such as event sequence
+    /// numbers and coarse timestamps.
+    pub fn run_with_telemetry(&self) -> Result<RuntimeTrace, RuntimeError> {
+        let mut events = Vec::new();
+        let mut telemetry = Vec::new();
+        let mut sequence = 0usize;
         while let Some(entry) = self.inner.scheduler.pop() {
-            let mut events = self.execute_task(&entry.spec, &entry.plan)?;
-            all_events.append(&mut events);
+            let mut task_events = self.execute_task(&entry.spec, &entry.plan)?;
+            for event in &task_events {
+                telemetry.push(TelemetryEvent::new(sequence, event.clone()));
+                sequence += 1;
+            }
+            events.append(&mut task_events);
         }
-        Ok(all_events)
+        Ok(RuntimeTrace { events, telemetry })
     }
 
     /// Ensures all capabilities required by the provided task specification are
@@ -279,6 +295,50 @@ pub enum RuntimeEvent {
     TaskCompleted {
         task: String,
     },
+}
+
+/// Structured telemetry metadata describing an observed runtime event.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TelemetryEvent {
+    pub sequence: usize,
+    pub timestamp_micros: Option<u128>,
+    pub event: RuntimeEvent,
+}
+
+impl TelemetryEvent {
+    fn new(sequence: usize, event: RuntimeEvent) -> Self {
+        let timestamp_micros = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .ok()
+            .map(|duration| duration.as_micros());
+        TelemetryEvent {
+            sequence,
+            timestamp_micros,
+            event,
+        }
+    }
+}
+
+/// Complete trace of a runtime execution, pairing raw events with their
+/// telemetry representation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RuntimeTrace {
+    events: Vec<RuntimeEvent>,
+    telemetry: Vec<TelemetryEvent>,
+}
+
+impl RuntimeTrace {
+    pub fn events(&self) -> &[RuntimeEvent] {
+        &self.events
+    }
+
+    pub fn telemetry(&self) -> &[TelemetryEvent] {
+        &self.telemetry
+    }
+
+    pub fn into_events(self) -> Vec<RuntimeEvent> {
+        self.events
+    }
 }
 
 /// Provider-specific event surfaced to the runtime.
@@ -493,6 +553,47 @@ impl CapabilityProvider for ConsoleProvider {
                     })?;
                 Ok(ProviderResponse::new(RuntimeValue::unit())
                     .with_event(CapabilityEvent::Message(message)))
+            }
+            other => Err(RuntimeError::provider_failure(
+                self.name(),
+                format!("unsupported operation '{other}'"),
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct FilesystemProvider;
+
+impl CapabilityProvider for FilesystemProvider {
+    fn name(&self) -> &str {
+        "fs"
+    }
+
+    fn handle(&self, invocation: &CapabilityInvocation) -> Result<ProviderResponse, RuntimeError> {
+        match invocation.operation.as_str() {
+            "read_to_string" => {
+                let path = invocation
+                    .payload
+                    .as_ref()
+                    .and_then(|value| match value {
+                        RuntimeValue::String(path) => Some(path.clone()),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "read_to_string expects a string payload",
+                        )
+                    })?;
+                let contents = fs::read_to_string(&path).map_err(|err| {
+                    RuntimeError::provider_failure(
+                        self.name(),
+                        format!("failed to read '{path}': {err}"),
+                    )
+                })?;
+                Ok(ProviderResponse::new(RuntimeValue::from(contents.clone()))
+                    .with_event(CapabilityEvent::Data(RuntimeValue::from(contents))))
             }
             other => Err(RuntimeError::provider_failure(
                 self.name(),
