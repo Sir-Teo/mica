@@ -280,6 +280,8 @@ documented entry points to make exploratory reading easier.
   regression tests.
 - [`docs/roadmap/`](docs/roadmap) — Milestones, design notes, and implementation
   plans.
+- [`docs/modules/pipeline.md`](docs/modules/pipeline.md) — CLI entry points for
+  inspecting every compiler stage and exporting pipeline snapshots.
 - [`docs/modules/runtime.md`](docs/modules/runtime.md) — Runtime orchestrator,
   capability providers, and telemetry quickstart.
 - [`examples/`](examples) — Runnable programs referenced throughout the tour

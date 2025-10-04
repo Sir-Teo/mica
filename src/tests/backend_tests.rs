@@ -2,7 +2,9 @@ use super::helpers::*;
 use super::*;
 use std::fs;
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[test]
 fn text_backend_renders_effect_rows_and_types() {
@@ -409,6 +411,77 @@ fn caller() {
         "unit functions should not return temporary values: {}",
         artifact.c_source
     );
+}
+
+#[derive(Clone)]
+struct CountingBackend {
+    counter: Arc<AtomicUsize>,
+    delay: Duration,
+}
+
+impl CountingBackend {
+    fn new(delay: Duration) -> Self {
+        CountingBackend {
+            counter: Arc::new(AtomicUsize::new(0)),
+            delay,
+        }
+    }
+}
+
+impl backend::Backend for CountingBackend {
+    type Output = usize;
+
+    fn compile(
+        &self,
+        _module: &ir::Module,
+        _options: &backend::BackendOptions,
+    ) -> backend::BackendResult<Self::Output> {
+        let index = self.counter.fetch_add(1, Ordering::SeqCst);
+        if !self.delay.is_zero() {
+            std::thread::sleep(self.delay);
+        }
+        Ok(index)
+    }
+}
+
+#[test]
+fn parallel_backend_reports_worker_metrics() {
+    let backend = CountingBackend::new(Duration::from_millis(1));
+    let modules = ["alpha", "beta", "gamma", "delta"]
+        .iter()
+        .map(|name| {
+            let src = format!("module parallel.{name}\n\nfn entry() -> Int {{ 1 }}\n");
+            let module = parse(&src);
+            let hir = lower::lower_module(&module);
+            ir::lower_module(&hir)
+        })
+        .collect::<Vec<_>>();
+
+    let report = backend::run_parallel(&backend, &modules, &backend::BackendOptions::default())
+        .expect("parallel report");
+
+    assert_eq!(report.outputs.len(), modules.len());
+    assert_eq!(
+        report.metrics.worker_metrics.len(),
+        report.metrics.worker_count
+    );
+    let processed: usize = report
+        .metrics
+        .worker_metrics
+        .iter()
+        .map(|metrics| metrics.processed_modules)
+        .sum();
+    assert_eq!(processed, modules.len());
+    assert!(
+        report
+            .metrics
+            .schedule
+            .windows(2)
+            .all(|pair| pair[0].start_offset <= pair[1].start_offset)
+    );
+    for entry in &report.metrics.schedule {
+        assert!(entry.worker_index < report.metrics.worker_count);
+    }
 }
 
 #[test]
