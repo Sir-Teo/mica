@@ -542,6 +542,13 @@ fn parallel_backend_reports_metrics_for_many_modules() {
 
     assert_eq!(report.outputs.len(), modules.len());
     assert_eq!(report.metrics.modules.len(), modules.len());
+    let expected_workers = std::thread::available_parallelism()
+        .map(|count| count.get())
+        .unwrap_or(1)
+        .min(modules.len())
+        .max(1);
+    assert_eq!(report.metrics.worker_count, expected_workers);
+    assert_eq!(report.metrics.scheduled_modules, modules.len());
     assert!(report.metrics.total_duration >= delay);
     assert!(
         report

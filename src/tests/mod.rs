@@ -14,3 +14,4 @@ mod pipeline_tests;
 mod pretty_tests;
 mod resolve_and_check_tests;
 mod runtime_tests;
+mod tooling_tests;
