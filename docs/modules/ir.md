@@ -1,57 +1,56 @@
 # SSA Intermediate Representation
 
-## Scope
+> The SSA IR bridges desugared syntax and backend code generation.
 
-The SSA-oriented IR defined in `src/ir/mod.rs` lowers the high-level HIR into
-basic blocks, instructions, typed values, and capability-aware metadata. The
-design now doubles as living documentation for the backend contract thanks to
-the LLVM scaffolding backend added in this milestone.
+## Overview
 
-## Core Types
+`src/ir` defines a typed single static assignment (SSA) representation. It lowers
+HIR into functions, basic blocks, and instructions while preserving type and
+capability metadata. The module doubles as documentation for backend contracts.
 
-| Type | Purpose |
-| --- | --- |
-| `Module` | Owns lowered functions alongside shared type/effect tables and exposes helpers such as `unknown_type` so backends can recover canonical metadata without re-interning anything.【F:src/ir/mod.rs†L8-L174】 |
-| `Function` | Holds parameters, `TypeId` return metadata, basic blocks, and effect identifiers describing capability requirements for each body.【F:src/ir/mod.rs†L17-L225】 |
-| `BasicBlock` | Represents a control-flow node with instructions and a terminator (currently return).【F:src/ir/mod.rs†L32-L68】 |
-| `Instruction` | Encodes SSA values with IDs, referenced types, and instruction kinds such as literals, binary ops, calls, records, and resolved paths.【F:src/ir/mod.rs†L39-L63】【F:src/ir/mod.rs†L407-L416】 |
-| `TypeTable` & `TypeId` | Intern and reuse structural types so large modules share canonical IDs while keeping lookups O(1).【F:src/ir/mod.rs†L100-L170】【F:src/ir/mod.rs†L538-L584】 |
-| `EffectTable` & `EffectId` | Deduplicate effect names, allowing effect rows to scale linearly with references instead of strings.【F:src/ir/mod.rs†L106-L170】【F:src/ir/mod.rs†L586-L600】 |
+## Core Concepts
 
-## Lowering Process
+- **Module** – Owns lowered functions plus shared type and effect tables so
+  backends reuse canonical metadata.
+- **Function** – Stores parameters, return metadata, basic blocks, and required
+  capabilities.
+- **Basic block** – Groups SSA instructions with a single terminator.
+- **Instruction** – Encodes literals, binary operations, calls, record builders,
+  and resolved paths with explicit type IDs.
+- **Type/Effect tables** – Intern structural types and effect names so large
+  modules stay cheap to clone and inspect.
 
-- `lower_module` walks the HIR, interns every referenced type/effect, and then
-  lowers each function so the resulting module is fully self-contained.【F:src/ir/mod.rs†L112-L170】
-- `FunctionLower` maintains scope stacks, allocates SSA value IDs, attaches
-  `TypeId`s to every SSA value, and appends instructions while threading effect
-  metadata through returns.【F:src/ir/mod.rs†L173-L463】
-- Literal emission, binary operations, calls, records, and tail returns produce
-  typed instructions, defaulting to the shared `unknown` slot until inference can
-  refine them in later phases.【F:src/ir/mod.rs†L294-L416】【F:src/ir/mod.rs†L443-L455】
+## Lowering Flow
 
-## Integration Highlights
+1. `lower_module` walks the HIR, interns referenced types/effects, and lowers
+   each function.
+2. `FunctionLower` allocates SSA value IDs, attaches type metadata, and threads
+   effect information through returns.
+3. Literals, operations, calls, records, and returns emit typed instructions,
+   defaulting to `unknown` placeholders until later inference phases refine them.
 
-1. Consumes the HIR structures from the lowering stage, ensuring desugared
-   constructs map cleanly onto SSA building blocks.【F:src/ir/mod.rs†L3-L399】【F:src/lower/mod.rs†L3-L320】
-2. Ships canonical type and effect registries that backend integrations (text
-   dumps today, LLVM tomorrow) can query without re-resolving AST nodes.【F:src/ir/mod.rs†L498-L600】【F:src/backend/text.rs†L1-L129】【F:src/backend/llvm.rs†L1-L226】
-3. Tests under `src/tests` exercise IR typing, effect rows, and backend output,
-   preventing regressions as the IR evolves.【F:src/tests/ir_tests.rs†L1-L132】【F:src/tests/backend_tests.rs†L1-L96】
+## Integration Notes
+
+- Consumes HIR emitted by the lowering stage, ensuring desugared constructs map
+  cleanly onto SSA building blocks.
+- Provides canonical type/effect registries that textual, LLVM, and native
+  backends consume without re-resolving AST nodes.
+- Regression tests exercise IR typing, effect rows, and backend output to prevent
+  regressions as the IR evolves.
 
 ## Roadmap Alignment
 
-- **Phase 2:** Establishes SSA representation and lowering, enabling forthcoming
-  control-flow restructuring and analysis passes.【F:docs/roadmap/compiler.md†L126-L170】
-- **Phase 3:** Serves as the input to code generation, optimization, and runtime
-  integration tasks outlined for the compiler backend.【F:docs/roadmap/compiler.md†L170-L215】
-- **Tooling:** SSA dumps and diagnostics will be surfaced through CLI extensions
-  and IDE tooling to aid debugging, per the tooling roadmap.【F:docs/roadmap/tooling.md†L1-L60】
+- **Phase 2** – Establishes the SSA baseline required for control-flow analysis
+  and optimisation work.
+- **Phase 3** – Feeds code generation, optimisation, and runtime integration
+  tasks in the backend roadmap.
+- **Tooling** – SSA dumps and diagnostics are exposed through the CLI for future
+  IDE integrations.
 
 ## Next Steps
 
-- Expand terminators to include branches and structured control flow as SSA
+- Introduce additional terminators (branches, structured control flow) as SSA
   support matures.
-- Track precise types by integrating with the planned Hindley–Milner inference
-  and capability analysis.
-- Emit machine-readable dumps (JSON, DOT) to integrate with visualization tools
-  and future IDE plugins.
+- Integrate precise types via the planned inference work and capability analysis.
+- Emit machine-readable dumps (JSON, DOT) for visualisation tools and editor
+  plugins.

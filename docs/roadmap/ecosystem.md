@@ -1,7 +1,10 @@
 # Ecosystem & Interop Strategy
 
-The language succeeds only if developers can build real systems today and still feel ahead of the curve tomorrow. This plan
-focuses on libraries, package distribution, and interoperability tracks that future-proof the ecosystem.
+> Libraries, packages, and bridges that make the language viable in production.
+
+The language succeeds only if developers can build real systems today and still
+feel ahead of the curve tomorrow. This plan focuses on libraries, package
+distribution, and interoperability tracks that future-proof the ecosystem.
 
 ## Standard Library Growth
 

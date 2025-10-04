@@ -7,6 +7,23 @@
   <em>Minimal • Industrial • Composable • Auditable</em>
 </p>
 
+> **TL;DR** — One small repository contains the full compiler pipeline, runnable
+> examples, and documentation regenerated from real CLI output. Read it in a
+> weekend, extend it on Monday.
+
+**Why it exists**
+
+Mica is a learning-sized, industrially-inspired language playground. It is
+designed for readers who want to inspect a full compiler without wading through
+millions of lines of code. Every subsystem is intentionally compact, documented,
+and wired together so that you can:
+
+- Study real implementations of lexing, parsing, semantic analysis, lowering,
+  and code generation.
+- Experiment with effect systems and deterministic concurrency on small,
+  auditable programs.
+- Prototype new ideas quickly while keeping the entire pipeline in view.
+
 Mica ships as a compact prototype compiler front-end backed by runnable
 examples, language tour documentation, and snapshot-tested tooling. The project
 is intentionally small enough to read in a weekend while still demonstrating the
@@ -25,6 +42,17 @@ design patterns required for a production-grade compiler.
 - **Interop-friendly ABI** – C-compatible calling conventions and hooks for
   Python/JavaScript “foreign tasks” keep the language ecosystem-friendly.
 
+### Quick facts
+
+| Area | Details |
+| --- | --- |
+| Minimum toolchain | Latest stable Rust via `rustup` |
+| CLI help | `cargo run --bin mica -- --help` |
+| Docs tour | `docs/tour.md` pairs with `examples/` |
+| Status page | `docs/status.md` summarises current health |
+| Roadmap | `docs/roadmap/` tracks milestones |
+| Snapshot upkeep | `cargo run --bin gen_snippets -- --check` |
+
 ---
 
 ## Table of contents
@@ -32,6 +60,7 @@ design patterns required for a production-grade compiler.
 - [Highlights](#highlights)
 - [Project status](#project-status)
 - [Quickstart](#quickstart)
+- [Choose your path](#choose-your-path)
 - [CLI reference](#cli-reference)
 - [Language features](#language-features)
 - [Example gallery](#example-gallery)
@@ -58,6 +87,23 @@ Mica is a prototype under active design. Today the repository contains:
 
 See the [roadmap](#roadmap) for the longer-term build-out and current areas of
 focus.
+
+## Choose your path
+
+Pick the workflow that matches your goal today:
+
+- **Skim the architecture** — Start with the [repository layout](#repository-layout)
+  and open the corresponding modules in `src/` to see how each stage is wired.
+- **Observe the compiler in motion** — Run a program with `--tokens`, `--ast`,
+  or `--ir` flags (see [CLI reference](#cli-reference)) and compare the output
+  against [`docs/snippets.md`](docs/snippets.md).
+- **Learn the language surface** — Read [`docs/tour.md`](docs/tour.md) alongside
+  the programs in [`examples/`](examples/); every section links back to runnable
+  code.
+- **Track project health** — Check [`docs/status.md`](docs/status.md) for the
+  latest verification coverage and roadmap highlights.
+- **Hack on a feature** — Review [Development workflow](#development-workflow)
+  and [Roadmap](#roadmap), then open an issue or draft PR with your experiment.
 
 ## Quickstart
 
@@ -100,6 +146,11 @@ Or compile and execute one of the runnable samples end-to-end:
 ```bash
 cargo run --bin mica -- --run examples/methods.mica
 ```
+
+Need a refresher on the available stages? Run `cargo run --bin mica -- --help`
+for an up-to-date flag list. Prefer to experiment without leaving your editor?
+Pair the commands above with `cargo watch -x "run --bin mica -- --run <file>"`
+for tight feedback loops (install via `cargo install cargo-watch`).
 
 ### 5. Troubleshooting
 

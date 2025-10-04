@@ -1,6 +1,24 @@
 # Compiler Module Plans
 
-Each module plan includes objectives, detailed tasks, dependencies, and exit criteria. Work through the modules roughly in the order listed; later stages assume the prior ones are code-complete and tested.
+> High-level goals for each compiler subsystem, plus detailed checklists below.
+
+Use the quick reference table to orient yourself, then dive into the module
+sections for step-by-step plans.
+
+| Module | Focus | Primary Phase |
+| --- | --- | --- |
+| Lexer & Tokens | Streaming lexing with precise spans | Phase 0 |
+| Parser & AST | Recoverable recursive-descent parser | Phase 0 |
+| Resolver | Symbol graphs, capabilities, imports | Phase 1 |
+| Type & Effect Checker | Inference, borrow rules, diagnostics | Phase 1 |
+| Lowering & IR | HIR + SSA groundwork | Phase 2 |
+| Backend & Runtime | Code generation and capability shims | Phase 3 |
+| Formatter | Deterministic pretty-printing | Phase 0+ |
+| CLI | Developer workflows and integrations | Phase 0+ |
+
+Each module plan includes objectives, detailed tasks, dependencies, and exit
+criteria. Work through the modules roughly in the order listed; later stages
+assume the prior ones are code-complete and tested.
 
 ## 1. Lexer & Token Infrastructure (`src/lexer.rs`, `src/token.rs`)
 
