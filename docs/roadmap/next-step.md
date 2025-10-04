@@ -1,24 +1,27 @@
 # Immediate Next Step Recommendation
 
-The Phase 1 semantics milestone is complete: the resolver now builds cross-module
-workspaces with capability metadata, and the checker validates signatures,
-effects, and pattern exhaustiveness through `mica --check`.
+Phase 2 is complete: the typed IR, backend surface area, diagnostics, and
+pureness analysis have shipped. Mica is now firmly executing the Phase 3
+"Backend & Runtime" milestone, where the focus shifts to production-ready
+runtimes, native code generation, and contributor tooling.
 
-With that foundation in place, focus on the early Phase 2 deliverables:
+With that context, the next actions should reinforce Phase 3 outcomes:
 
-1. **Define the typed IR contract.** Finalise the SSA-inspired layout, encode
-effect metadata, and begin lowering typed ASTs so later passes can reason about
-drops and scheduling.
-2. **Sketch backend integration.** Outline the LLVM-oriented backend scaffolding
-that will consume the IR, ensuring the lowering data model preserves sufficient
-provenance for code generation and runtime hooks.
-3. **Expand the diagnostics playbook.** Capture the semantics of the new checker
-errors, refresh CLI examples, and document wording expectations so tooling work
-can consume consistent output.
+1. **Broaden deterministic capability providers.** Extend the runtime’s stock
+   shims with filesystem coverage, deterministic network fixtures, and the
+   accompanying smoke tests so compiled programs can exercise richer IO while
+   preserving repeatability.
+2. **Surface richer telemetry.** Emit aggregated runtime summaries (tasks,
+   spawned children, capability usage) and JSON tooling snapshots so IDEs and
+   continuous integration jobs can reason about executions without re-parsing
+   logs.
+3. **Track backend parallelism limits.** Capture worker concurrency and module
+   scheduling metrics from the parallel backend harness to guide scaling
+   experiments and capacity planning.
+4. **Document the pipeline entry points.** Keep CLI references and developer
+   notes aligned with the new `--pipeline-json` command and runtime fixtures so
+   contributors can quickly reproduce the current system behaviour.
 
-Completing these items transitions the project into Phase 2 and sets up the SSA
-lowering, backend, and optimisation research that follow.
-
-_Status update:_ The typed IR guide now lives in `docs/modules/ir.md`, the LLVM
-scaffolding backend exports its contract via `mica --llvm`, and the CLI snippets
-showcase the richer pipeline so contributors can iterate confidently.
+Staying disciplined on these items keeps Phase 3 deliverables aligned: richer
+runtime coverage, observable compiler behaviour, and ergonomic tooling that can
+underpin the subsequent IDE-focused Phase 4 work.
