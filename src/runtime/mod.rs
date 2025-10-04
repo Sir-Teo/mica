@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::env;
 use std::fs;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::backend::BackendError;
@@ -59,6 +59,7 @@ impl Runtime {
         runtime.register_provider(ConsoleProvider)?;
         runtime.register_provider(TimeProvider)?;
         runtime.register_provider(FilesystemProvider)?;
+        runtime.register_provider(NetworkProvider)?;
         runtime.register_provider(EnvProvider)?;
         Ok(runtime)
     }
@@ -437,8 +438,28 @@ impl RuntimeTrace {
         self.events
     }
 
+    /// Produces an aggregated summary capturing total tasks, events, spawned
+    /// children, and capability usage across the trace.
+    pub fn summary(&self) -> RuntimeTraceSummary {
+        let mut capability_totals: HashMap<String, usize> = HashMap::new();
+        let mut spawned = 0usize;
+        for metrics in &self.tasks {
+            spawned += metrics.spawned_tasks;
+            for (capability, count) in &metrics.capability_counts {
+                *capability_totals.entry(capability.clone()).or_insert(0) += *count;
+            }
+        }
+
+        RuntimeTraceSummary {
+            total_tasks: self.tasks.len(),
+            total_events: self.events.len(),
+            spawned_tasks: spawned,
+            capability_counts: capability_totals,
+        }
+    }
+
     /// Serializes the runtime trace into a JSON object containing the events,
-    /// telemetry timeline, and per-task metrics.
+    /// telemetry timeline, per-task metrics, and a summary section.
     ///
     /// # Examples
     ///
@@ -484,9 +505,20 @@ impl RuntimeTrace {
             json.push_str(&task_telemetry_to_json(metrics));
         }
         json.push(']');
+        json.push(',');
+        json.push_str("\"summary\":");
+        json.push_str(&runtime_trace_summary_to_json(&self.summary()));
         json.push('}');
         Ok(json)
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RuntimeTraceSummary {
+    pub total_tasks: usize,
+    pub total_events: usize,
+    pub spawned_tasks: usize,
+    pub capability_counts: HashMap<String, usize>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -623,6 +655,24 @@ fn task_telemetry_to_json(metrics: &TaskTelemetry) -> String {
     json.push(',');
     json.push_str("\"spawned_tasks\":");
     json.push_str(&metrics.spawned_tasks.to_string());
+    json.push('}');
+    json
+}
+
+fn runtime_trace_summary_to_json(summary: &RuntimeTraceSummary) -> String {
+    let mut json = String::new();
+    json.push('{');
+    json.push_str("\"total_tasks\":");
+    json.push_str(&summary.total_tasks.to_string());
+    json.push(',');
+    json.push_str("\"total_events\":");
+    json.push_str(&summary.total_events.to_string());
+    json.push(',');
+    json.push_str("\"spawned_tasks\":");
+    json.push_str(&summary.spawned_tasks.to_string());
+    json.push(',');
+    json.push_str("\"capability_counts\":");
+    json.push_str(&capability_counts_to_json(&summary.capability_counts));
     json.push('}');
     json
 }
@@ -988,6 +1038,127 @@ impl CapabilityProvider for FilesystemProvider {
             )),
         }
     }
+}
+
+#[derive(Debug, Default)]
+struct NetworkProvider;
+
+impl NetworkProvider {
+    fn load_fixture(&self, key: &str) -> Option<NetworkFixture> {
+        network_fixtures()
+            .read()
+            .expect("network fixtures poisoned")
+            .get(key)
+            .cloned()
+    }
+}
+
+impl CapabilityProvider for NetworkProvider {
+    fn name(&self) -> &str {
+        "net"
+    }
+
+    fn handle(&self, invocation: &CapabilityInvocation) -> Result<ProviderResponse, RuntimeError> {
+        match invocation.operation.as_str() {
+            "fetch" => {
+                let key = invocation
+                    .payload
+                    .as_ref()
+                    .and_then(|value| match value {
+                        RuntimeValue::String(value) => Some(value.clone()),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "fetch expects a string payload identifying a fixture",
+                        )
+                    })?;
+
+                let fixture = self.load_fixture(&key).ok_or_else(|| {
+                    RuntimeError::provider_failure(
+                        self.name(),
+                        format!("no fixture registered for '{key}'"),
+                    )
+                })?;
+
+                let mut response = ProviderResponse::new(RuntimeValue::from(fixture.body.clone()))
+                    .with_event(CapabilityEvent::Message(format!(
+                        "fixture {key} responded with status {}",
+                        fixture.status
+                    )))
+                    .with_event(CapabilityEvent::Data(RuntimeValue::from(i64::from(
+                        fixture.status,
+                    ))));
+
+                for (name, value) in fixture.sorted_headers() {
+                    response = response
+                        .with_event(CapabilityEvent::Message(format!("header {name}: {value}")));
+                }
+
+                Ok(response)
+            }
+            other => Err(RuntimeError::provider_failure(
+                self.name(),
+                format!("unsupported operation '{other}'"),
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NetworkFixture {
+    status: u16,
+    body: String,
+    headers: Vec<(String, String)>,
+}
+
+impl NetworkFixture {
+    pub fn new(status: u16, body: impl Into<String>) -> Self {
+        NetworkFixture {
+            status,
+            body: body.into(),
+            headers: Vec::new(),
+        }
+    }
+
+    pub fn with_header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
+        self.headers.push((name.into(), value.into()));
+        self
+    }
+
+    pub fn status(&self) -> u16 {
+        self.status
+    }
+
+    pub fn body(&self) -> &str {
+        &self.body
+    }
+
+    fn sorted_headers(&self) -> Vec<(String, String)> {
+        let mut headers = self.headers.clone();
+        headers.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+        headers
+    }
+}
+
+pub fn register_network_fixture(key: impl Into<String>, fixture: NetworkFixture) {
+    network_fixtures()
+        .write()
+        .expect("network fixtures poisoned")
+        .insert(key.into(), fixture);
+}
+
+pub fn reset_network_fixtures() {
+    network_fixtures()
+        .write()
+        .expect("network fixtures poisoned")
+        .clear();
+}
+
+fn network_fixtures() -> &'static RwLock<HashMap<String, NetworkFixture>> {
+    static FIXTURES: OnceLock<RwLock<HashMap<String, NetworkFixture>>> = OnceLock::new();
+    FIXTURES.get_or_init(|| RwLock::new(HashMap::new()))
 }
 
 #[derive(Debug, Default)]

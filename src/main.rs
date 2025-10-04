@@ -9,6 +9,7 @@ use mica::{
     resolve::{self, CapabilityScope, PathKind, SymbolCategory, SymbolScope},
     runtime,
     syntax::ast,
+    tooling,
 };
 
 fn main() {
@@ -54,6 +55,7 @@ impl CliArgs {
                 "--lower" => command = CommandKind::Lower,
                 "--ir" => command = CommandKind::Ir,
                 "--ir-json" => command = CommandKind::IrJson,
+                "--pipeline-json" => command = CommandKind::PipelineJson,
                 "--llvm" | "--emit-llvm" => command = CommandKind::Llvm,
                 "--build" => command = CommandKind::Build { output: None },
                 "--run" => command = CommandKind::Run { output: None },
@@ -116,6 +118,7 @@ enum CommandKind {
     Lower,
     Ir,
     IrJson,
+    PipelineJson,
     Llvm,
     Build { output: Option<PathBuf> },
     Run { output: Option<PathBuf> },
@@ -140,6 +143,7 @@ impl CommandKind {
             CommandKind::Lower => run_lower(&ctx),
             CommandKind::Ir => run_ir(&ctx),
             CommandKind::IrJson => run_ir_json(&ctx),
+            CommandKind::PipelineJson => run_pipeline_json(&ctx),
             CommandKind::Llvm => run_llvm(&ctx),
             CommandKind::Build { output } => run_build(&ctx, output),
             CommandKind::Run { output } => run_executable(&ctx, output),
@@ -315,6 +319,12 @@ fn run_ir_json(ctx: &CommandContext) -> Result<()> {
     let typed = ir::lower_module(&hir);
     let json = ir_module_to_json(&typed);
     println!("{}", json);
+    Ok(())
+}
+
+fn run_pipeline_json(ctx: &CommandContext) -> Result<()> {
+    let snapshot = tooling::PipelineSnapshot::capture(&ctx.source);
+    println!("{}", snapshot.to_json_string());
     Ok(())
 }
 

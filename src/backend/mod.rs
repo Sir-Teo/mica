@@ -70,6 +70,8 @@ pub struct ParallelCompileReport<T> {
 pub struct ParallelCompileMetrics {
     pub total_duration: Duration,
     pub modules: Vec<ModuleCompileMetrics>,
+    pub worker_count: usize,
+    pub scheduled_modules: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -177,6 +179,8 @@ where
     let metrics = ParallelCompileMetrics {
         total_duration: start.elapsed(),
         modules: module_metrics,
+        worker_count,
+        scheduled_modules: modules.len(),
     };
 
     Ok(ParallelCompileReport { outputs, metrics })
