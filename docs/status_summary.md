@@ -14,7 +14,7 @@ _Last refreshed: 2025-10-06 00:00 UTC_
 - Typed SSA IR modules now share their type/effect registries through copy-on-write arenas so multiple backends can consume a module without cloning metadata, paving the way for parallel compilation.【F:src/ir/mod.rs†L100-L215】【F:src/ir/mod.rs†L780-L940】
 - Lowering and IR tests assert coverage for method desugaring, structured expressions, effect rows, return behaviour, and purity reporting so we know the pipeline handles the language surface we ship today.【F:src/tests/lowering_tests.rs†L1-L200】【F:src/tests/ir_tests.rs†L1-L360】
 - The native backend now emits portable C for typed IR, including record aggregates, drives the system toolchain to produce binaries, and is covered by executable regression tests alongside the text and LLVM preview emitters.【F:src/backend/native.rs†L1-L640】【F:src/tests/backend_tests.rs†L300-L420】
-- A capability-aware runtime orchestrator binds IO/time/filesystem providers, emits structured telemetry for every scheduled task, and now backs the CLI `--run` path by validating entrypoint capability coverage before native binaries execute.【F:src/runtime/mod.rs†L1-L520】【F:src/main.rs†L210-L320】【F:src/tests/runtime_tests.rs†L1-L260】
+- A capability-aware runtime orchestrator binds IO/time/filesystem providers, emits structured telemetry for every scheduled task, and now backs the CLI `--run` path by validating entrypoint capability coverage before native binaries execute.【F:src/runtime/mod.rs†L1-L236】【F:src/runtime/mod.rs†L874-L1096】【F:src/main.rs†L210-L320】【F:src/tests/runtime_tests.rs†L1-L384】
 
 ### Tooling and Developer Experience
 - The `mica` CLI now includes native `--build` and `--run` flows in addition to lexing, resolving, lowering, IR dumps, and the LLVM preview so contributors can execute examples end-to-end through the new backend, with runtime-backed capability validation prior to execution.【F:src/main.rs†L17-L320】
@@ -32,8 +32,8 @@ _Last refreshed: 2025-10-06 00:00 UTC_
 - ✅ **Purity analysis**: SSA functions include connectivity-aware purity reports that identify effect-free regions for future parallelization work.【F:src/ir/analysis.rs†L1-L140】【F:src/tests/ir_tests.rs†L280-L360】
 
 ## Next Focus Areas
-1. **Provider breadth**: Extend the baked-in runtime shims beyond console/time to cover filesystem and networking scenarios now that executables consult capability providers at run time.【F:src/backend/native.rs†L1-L720】【F:src/runtime/mod.rs†L1-L520】
-2. **Runtime telemetry**: Emit structured execution events from generated binaries so downstream tooling can visualize capability flows and task scheduling decisions.【F:src/runtime/mod.rs†L260-L480】【F:src/backend/native.rs†L1-L720】
+1. **Provider breadth**: Extend the baked-in runtime shims beyond console/time to cover filesystem and networking scenarios now that executables consult capability providers at run time.【F:src/backend/native.rs†L1-L720】【F:src/runtime/mod.rs†L874-L1096】
+2. **Runtime telemetry**: Emit structured execution events from generated binaries so downstream tooling can visualize capability flows and task scheduling decisions.【F:src/runtime/mod.rs†L96-L489】【F:src/backend/native.rs†L1-L720】
 3. **Parallel backend scaling**: Stress the new parallel compile driver across workspace-sized module sets and instrument contention hotspots ahead of broader backend scaling.【F:src/backend/mod.rs†L1-L200】【F:src/ir/mod.rs†L1-L1120】
 4. **Tooling APIs**: Layer higher-level CLI entry points over the resolver/IR JSON dumps to unblock IDE integrations and automated audits.【F:src/main.rs†L20-L360】【F:docs/modules/cli.md†L60-L80】
 

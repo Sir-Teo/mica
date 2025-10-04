@@ -1,7 +1,8 @@
 use std::collections::{HashMap, VecDeque};
+use std::env;
 use std::fs;
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::backend::BackendError;
 
@@ -35,13 +36,30 @@ impl Runtime {
         Self::default()
     }
 
-    /// Registers the stock providers used in the language tour (console IO and
-    /// wall-clock time) so capability-driven examples can execute out of the box.
+    /// Registers the stock providers used in the language tour (console IO,
+    /// wall-clock time, filesystem, and environment access) so capability-driven
+    /// examples can execute out of the box.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use mica::runtime::{Runtime, RuntimeEvent, RuntimeValue, TaskPlan, TaskSpec};
+    /// let runtime = Runtime::with_default_shims().expect("runtime setup");
+    /// let spec = TaskSpec::new("main").with_capabilities(["io"]);
+    /// let plan = TaskPlan::new().invoke("io", "write_line", Some(RuntimeValue::from("hello")));
+    /// runtime.spawn(spec, plan);
+    /// let events = runtime.run().expect("runtime events");
+    /// assert!(matches!(
+    ///     events.last(),
+    ///     Some(RuntimeEvent::TaskCompleted { task }) if task == "main"
+    /// ));
+    /// ```
     pub fn with_default_shims() -> Result<Self, RuntimeError> {
         let runtime = Runtime::new();
         runtime.register_provider(ConsoleProvider)?;
         runtime.register_provider(TimeProvider)?;
         runtime.register_provider(FilesystemProvider)?;
+        runtime.register_provider(EnvProvider)?;
         Ok(runtime)
     }
 
@@ -78,19 +96,62 @@ impl Runtime {
     /// Executes all pending tasks and returns a structured trace capturing the
     /// runtime events alongside telemetry metadata such as event sequence
     /// numbers and coarse timestamps.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use mica::runtime::{Runtime, RuntimeValue, TaskPlan, TaskSpec};
+    /// let runtime = Runtime::with_default_shims().expect("runtime setup");
+    /// let spec = TaskSpec::new("main").with_capabilities(["io"]);
+    /// let plan = TaskPlan::new().invoke("io", "write_line", Some(RuntimeValue::from("hello")));
+    /// runtime.spawn(spec, plan);
+    /// let trace = runtime.run_with_telemetry().expect("runtime telemetry trace");
+    /// assert_eq!(trace.events().len(), trace.telemetry().len());
+    /// assert_eq!(trace.tasks()[0].task, "main");
+    /// ```
     pub fn run_with_telemetry(&self) -> Result<RuntimeTrace, RuntimeError> {
         let mut events = Vec::new();
         let mut telemetry = Vec::new();
+        let mut tasks = Vec::new();
         let mut sequence = 0usize;
         while let Some(entry) = self.inner.scheduler.pop() {
-            let mut task_events = self.execute_task(&entry.spec, &entry.plan)?;
+            let TaskExecutionResult {
+                events: mut task_events,
+                metrics,
+            } = self.execute_task(&entry.spec, &entry.plan)?;
             for event in &task_events {
                 telemetry.push(TelemetryEvent::new(sequence, event.clone()));
                 sequence += 1;
             }
             events.append(&mut task_events);
+            tasks.push(metrics);
         }
-        Ok(RuntimeTrace { events, telemetry })
+        Ok(RuntimeTrace {
+            events,
+            telemetry,
+            tasks,
+        })
+    }
+
+    /// Executes all pending tasks and returns a JSON representation of the
+    /// runtime trace, suitable for downstream tooling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use mica::runtime::{Runtime, RuntimeValue, TaskPlan, TaskSpec};
+    /// let runtime = Runtime::with_default_shims().expect("runtime setup");
+    /// let spec = TaskSpec::new("main").with_capabilities(["io"]);
+    /// let plan = TaskPlan::new().invoke("io", "write_line", Some(RuntimeValue::from("hello")));
+    /// runtime.spawn(spec, plan);
+    /// let json = runtime
+    ///     .run_with_trace_json()
+    ///     .expect("runtime should serialize trace");
+    /// assert!(json.contains("\"events\""));
+    /// assert!(json.contains("\"task\":\"main\""));
+    /// ```
+    pub fn run_with_trace_json(&self) -> Result<String, RuntimeError> {
+        self.run_with_telemetry()?.to_json_string()
     }
 
     /// Ensures all capabilities required by the provided task specification are
@@ -106,8 +167,12 @@ impl Runtime {
         &self,
         spec: &TaskSpec,
         plan: &TaskPlan,
-    ) -> Result<Vec<RuntimeEvent>, RuntimeError> {
+    ) -> Result<TaskExecutionResult, RuntimeError> {
         let mut events = Vec::new();
+        let mut capability_counts: HashMap<String, usize> = HashMap::new();
+        let mut spawned_tasks = 0usize;
+        let start_wall = SystemTime::now();
+        let start = Instant::now();
         events.push(RuntimeEvent::TaskStarted {
             task: spec.name.clone(),
         });
@@ -123,6 +188,7 @@ impl Runtime {
                         return Err(RuntimeError::missing_capability(&spec.name, capability));
                     }
                     let provider = self.lookup_provider(capability)?;
+                    *capability_counts.entry(capability.clone()).or_insert(0) += 1;
                     events.push(RuntimeEvent::CapabilityInvoked {
                         task: spec.name.clone(),
                         capability: capability.clone(),
@@ -146,6 +212,7 @@ impl Runtime {
                         spec: child.clone(),
                         plan: plan.clone(),
                     });
+                    spawned_tasks += 1;
                     events.push(RuntimeEvent::TaskScheduled {
                         parent: spec.name.clone(),
                         child: child.name.clone(),
@@ -157,7 +224,15 @@ impl Runtime {
         events.push(RuntimeEvent::TaskCompleted {
             task: spec.name.clone(),
         });
-        Ok(events)
+        let metrics = TaskTelemetry::new(
+            spec.name.clone(),
+            start_wall,
+            start.elapsed(),
+            events.len(),
+            capability_counts,
+            spawned_tasks,
+        );
+        Ok(TaskExecutionResult { events, metrics })
     }
 
     fn lookup_provider(&self, name: &str) -> Result<Arc<dyn CapabilityProvider>, RuntimeError> {
@@ -189,6 +264,11 @@ impl Scheduler {
     }
 }
 
+struct TaskExecutionResult {
+    events: Vec<RuntimeEvent>,
+    metrics: TaskTelemetry,
+}
+
 /// Capability-oriented error surfaced by the runtime.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeError {
@@ -201,6 +281,7 @@ pub enum RuntimeErrorKind {
     UnknownCapability { name: String },
     MissingCapability { task: String, capability: String },
     ProviderFailure { capability: String, message: String },
+    SerializationFailure { message: String },
 }
 
 impl RuntimeError {
@@ -236,6 +317,14 @@ impl RuntimeError {
         }
     }
 
+    pub fn serialization(message: impl Into<String>) -> Self {
+        RuntimeError {
+            kind: RuntimeErrorKind::SerializationFailure {
+                message: message.into(),
+            },
+        }
+    }
+
     pub fn kind(&self) -> &RuntimeErrorKind {
         &self.kind
     }
@@ -264,6 +353,9 @@ impl std::fmt::Display for RuntimeError {
                     f,
                     "capability provider '{capability}' reported an error: {message}"
                 )
+            }
+            RuntimeErrorKind::SerializationFailure { message } => {
+                write!(f, "failed to serialize runtime trace: {message}")
             }
         }
     }
@@ -325,6 +417,7 @@ impl TelemetryEvent {
 pub struct RuntimeTrace {
     events: Vec<RuntimeEvent>,
     telemetry: Vec<TelemetryEvent>,
+    tasks: Vec<TaskTelemetry>,
 }
 
 impl RuntimeTrace {
@@ -336,8 +429,97 @@ impl RuntimeTrace {
         &self.telemetry
     }
 
+    pub fn tasks(&self) -> &[TaskTelemetry] {
+        &self.tasks
+    }
+
     pub fn into_events(self) -> Vec<RuntimeEvent> {
         self.events
+    }
+
+    /// Serializes the runtime trace into a JSON object containing the events,
+    /// telemetry timeline, and per-task metrics.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use mica::runtime::{Runtime, RuntimeValue, TaskPlan, TaskSpec};
+    /// let runtime = Runtime::with_default_shims().expect("runtime setup");
+    /// let spec = TaskSpec::new("main").with_capabilities(["io"]);
+    /// let plan = TaskPlan::new().invoke("io", "write_line", Some(RuntimeValue::from("hello")));
+    /// runtime.spawn(spec, plan);
+    /// let trace = runtime
+    ///     .run_with_telemetry()
+    ///     .expect("runtime telemetry trace");
+    /// let json = trace.to_json_string().expect("trace JSON");
+    /// assert!(json.contains("\"telemetry\""));
+    /// assert!(json.contains("\"tasks\""));
+    /// ```
+    pub fn to_json_string(&self) -> Result<String, RuntimeError> {
+        let mut json = String::new();
+        json.push('{');
+        json.push_str("\"events\":[");
+        for (index, event) in self.events.iter().enumerate() {
+            if index > 0 {
+                json.push(',');
+            }
+            json.push_str(&runtime_event_to_json(event));
+        }
+        json.push(']');
+        json.push(',');
+        json.push_str("\"telemetry\":[");
+        for (index, entry) in self.telemetry.iter().enumerate() {
+            if index > 0 {
+                json.push(',');
+            }
+            json.push_str(&telemetry_event_to_json(entry));
+        }
+        json.push(']');
+        json.push(',');
+        json.push_str("\"tasks\":[");
+        for (index, metrics) in self.tasks.iter().enumerate() {
+            if index > 0 {
+                json.push(',');
+            }
+            json.push_str(&task_telemetry_to_json(metrics));
+        }
+        json.push(']');
+        json.push('}');
+        Ok(json)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskTelemetry {
+    pub task: String,
+    pub start_timestamp_micros: Option<u128>,
+    pub duration_micros: u128,
+    pub event_count: usize,
+    pub capability_counts: HashMap<String, usize>,
+    pub spawned_tasks: usize,
+}
+
+impl TaskTelemetry {
+    fn new(
+        task: String,
+        start: SystemTime,
+        duration: Duration,
+        event_count: usize,
+        capability_counts: HashMap<String, usize>,
+        spawned_tasks: usize,
+    ) -> Self {
+        let start_timestamp_micros = start
+            .duration_since(UNIX_EPOCH)
+            .ok()
+            .map(|duration| duration.as_micros());
+        TaskTelemetry {
+            task,
+            start_timestamp_micros,
+            duration_micros: duration.as_micros(),
+            event_count,
+            capability_counts,
+            spawned_tasks,
+        }
     }
 }
 
@@ -396,6 +578,168 @@ impl<'a> From<&'a str> for RuntimeValue {
     fn from(value: &'a str) -> Self {
         RuntimeValue::String(value.to_string())
     }
+}
+
+fn telemetry_event_to_json(entry: &TelemetryEvent) -> String {
+    let mut json = String::new();
+    json.push('{');
+    json.push_str("\"sequence\":");
+    json.push_str(&entry.sequence.to_string());
+    json.push(',');
+    json.push_str("\"timestamp_micros\":");
+    if let Some(value) = entry.timestamp_micros {
+        json.push_str(&value.to_string());
+    } else {
+        json.push_str("null");
+    }
+    json.push(',');
+    json.push_str("\"event\":");
+    json.push_str(&runtime_event_to_json(&entry.event));
+    json.push('}');
+    json
+}
+
+fn task_telemetry_to_json(metrics: &TaskTelemetry) -> String {
+    let mut json = String::new();
+    json.push('{');
+    json.push_str("\"task\":\"");
+    json.push_str(&escape_json_string(&metrics.task));
+    json.push_str("\",");
+    json.push_str("\"start_timestamp_micros\":");
+    if let Some(value) = metrics.start_timestamp_micros {
+        json.push_str(&value.to_string());
+    } else {
+        json.push_str("null");
+    }
+    json.push(',');
+    json.push_str("\"duration_micros\":");
+    json.push_str(&metrics.duration_micros.to_string());
+    json.push(',');
+    json.push_str("\"event_count\":");
+    json.push_str(&metrics.event_count.to_string());
+    json.push(',');
+    json.push_str("\"capability_counts\":");
+    json.push_str(&capability_counts_to_json(&metrics.capability_counts));
+    json.push(',');
+    json.push_str("\"spawned_tasks\":");
+    json.push_str(&metrics.spawned_tasks.to_string());
+    json.push('}');
+    json
+}
+
+fn capability_counts_to_json(map: &HashMap<String, usize>) -> String {
+    if map.is_empty() {
+        return "{}".to_string();
+    }
+    let mut entries = map.iter().collect::<Vec<_>>();
+    entries.sort_by(|a, b| a.0.cmp(b.0));
+    let mut json = String::from("{");
+    for (index, (key, value)) in entries.iter().enumerate() {
+        if index > 0 {
+            json.push(',');
+        }
+        json.push('"');
+        json.push_str(&escape_json_string(key));
+        json.push('"');
+        json.push(':');
+        json.push_str(&value.to_string());
+    }
+    json.push('}');
+    json
+}
+
+fn runtime_event_to_json(event: &RuntimeEvent) -> String {
+    match event {
+        RuntimeEvent::TaskStarted { task } => format!(
+            "{{\"type\":\"task_started\",\"task\":\"{}\"}}",
+            escape_json_string(task)
+        ),
+        RuntimeEvent::CapabilityInvoked {
+            task,
+            capability,
+            operation,
+        } => format!(
+            "{{\"type\":\"capability_invoked\",\"task\":\"{}\",\"capability\":\"{}\",\"operation\":\"{}\"}}",
+            escape_json_string(task),
+            escape_json_string(capability),
+            escape_json_string(operation)
+        ),
+        RuntimeEvent::CapabilityEvent {
+            task,
+            capability,
+            event,
+        } => format!(
+            "{{\"type\":\"capability_event\",\"task\":\"{}\",\"capability\":\"{}\",\"event\":{}}}",
+            escape_json_string(task),
+            escape_json_string(capability),
+            capability_event_to_json(event)
+        ),
+        RuntimeEvent::TaskScheduled { parent, child } => format!(
+            "{{\"type\":\"task_scheduled\",\"parent\":\"{}\",\"child\":\"{}\"}}",
+            escape_json_string(parent),
+            escape_json_string(child)
+        ),
+        RuntimeEvent::TaskCompleted { task } => format!(
+            "{{\"type\":\"task_completed\",\"task\":\"{}\"}}",
+            escape_json_string(task)
+        ),
+    }
+}
+
+fn capability_event_to_json(event: &CapabilityEvent) -> String {
+    match event {
+        CapabilityEvent::Message(value) => format!(
+            "{{\"type\":\"message\",\"value\":\"{}\"}}",
+            escape_json_string(value)
+        ),
+        CapabilityEvent::Data(value) => format!(
+            "{{\"type\":\"data\",\"value\":{}}}",
+            runtime_value_to_json(value)
+        ),
+    }
+}
+
+fn runtime_value_to_json(value: &RuntimeValue) -> String {
+    match value {
+        RuntimeValue::Unit => "null".to_string(),
+        RuntimeValue::Int(value) => value.to_string(),
+        RuntimeValue::Float(value) => {
+            if value.is_finite() {
+                value.to_string()
+            } else if value.is_nan() {
+                "\"NaN\"".to_string()
+            } else if value.is_sign_positive() {
+                "\"Infinity\"".to_string()
+            } else {
+                "\"-Infinity\"".to_string()
+            }
+        }
+        RuntimeValue::Bool(value) => value.to_string(),
+        RuntimeValue::String(value) => {
+            format!("\"{}\"", escape_json_string(value))
+        }
+    }
+}
+
+fn escape_json_string(input: &str) -> String {
+    let mut escaped = String::with_capacity(input.len());
+    for ch in input.chars() {
+        match ch {
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            '\u{08}' => escaped.push_str("\\b"),
+            '\u{0C}' => escaped.push_str("\\f"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            ch if (ch as u32) < 0x20 => {
+                use std::fmt::Write;
+                write!(&mut escaped, "\\u{:04X}", ch as u32).expect("json escape write");
+            }
+            _ => escaped.push(ch),
+        }
+    }
+    escaped
 }
 
 /// Capability provider interface implemented by concrete runtime shims.
@@ -594,6 +938,134 @@ impl CapabilityProvider for FilesystemProvider {
                 })?;
                 Ok(ProviderResponse::new(RuntimeValue::from(contents.clone()))
                     .with_event(CapabilityEvent::Data(RuntimeValue::from(contents))))
+            }
+            "write_string" => {
+                let path = invocation
+                    .payload
+                    .as_ref()
+                    .and_then(|value| match value {
+                        RuntimeValue::String(path) => Some(path.clone()),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "write_string expects a string payload",
+                        )
+                    })?;
+                let mut segments = path.splitn(2, '=');
+                let file_path = segments
+                    .next()
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "write_string payload must be 'path=contents'",
+                        )
+                    })?;
+                let contents = segments
+                    .next()
+                    .map(|value| value.to_string())
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "write_string payload must include file contents",
+                        )
+                    })?;
+                fs::write(&file_path, &contents).map_err(|err| {
+                    RuntimeError::provider_failure(
+                        self.name(),
+                        format!("failed to write '{file_path}': {err}"),
+                    )
+                })?;
+                Ok(ProviderResponse::new(RuntimeValue::unit())
+                    .with_event(CapabilityEvent::Message(format!("wrote {file_path}"))))
+            }
+            other => Err(RuntimeError::provider_failure(
+                self.name(),
+                format!("unsupported operation '{other}'"),
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct EnvProvider;
+
+impl EnvProvider {
+    fn string_payload(
+        &self,
+        invocation: &CapabilityInvocation,
+        operation: &str,
+    ) -> Result<String, RuntimeError> {
+        invocation
+            .payload
+            .as_ref()
+            .and_then(|value| match value {
+                RuntimeValue::String(value) => Some(value.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                RuntimeError::provider_failure(
+                    self.name(),
+                    format!("{operation} expects a string payload"),
+                )
+            })
+    }
+}
+
+impl CapabilityProvider for EnvProvider {
+    fn name(&self) -> &str {
+        "env"
+    }
+
+    fn handle(&self, invocation: &CapabilityInvocation) -> Result<ProviderResponse, RuntimeError> {
+        match invocation.operation.as_str() {
+            "get" => {
+                let key = self.string_payload(invocation, "get")?;
+                match env::var(&key) {
+                    Ok(value) => Ok(ProviderResponse::new(RuntimeValue::from(value.clone()))
+                        .with_event(CapabilityEvent::Data(RuntimeValue::from(value)))),
+                    Err(_) => Err(RuntimeError::provider_failure(
+                        self.name(),
+                        format!("environment variable '{key}' is not set"),
+                    )),
+                }
+            }
+            "set" => {
+                let assignment = self.string_payload(invocation, "set")?;
+                let mut parts = assignment.splitn(2, '=');
+                let key = parts
+                    .next()
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "set payload must be 'KEY=VALUE'",
+                        )
+                    })?;
+                let value = parts.next().ok_or_else(|| {
+                    RuntimeError::provider_failure(self.name(), "set payload must include a value")
+                })?;
+                let value = value.to_string();
+                // SAFETY: The runtime only writes UTF-8 key/value pairs provided by the
+                // compiled program, mirroring the behaviour of the previous implementation.
+                unsafe {
+                    env::set_var(&key, &value);
+                }
+                Ok(ProviderResponse::new(RuntimeValue::unit())
+                    .with_event(CapabilityEvent::Message(format!("set {key}"))))
+            }
+            "unset" => {
+                let key = self.string_payload(invocation, "unset")?;
+                // SAFETY: Removing the variable simply mirrors the task request.
+                unsafe {
+                    env::remove_var(&key);
+                }
+                Ok(ProviderResponse::new(RuntimeValue::unit())
+                    .with_event(CapabilityEvent::Message(format!("unset {key}"))))
             }
             other => Err(RuntimeError::provider_failure(
                 self.name(),
