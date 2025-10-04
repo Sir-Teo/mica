@@ -1,55 +1,55 @@
 # Lowering Pipeline
 
-## Scope
+> Lowering turns high-level syntax into a simplified HIR ready for SSA.
 
-The lowering stage (`src/lower/mod.rs`) transforms the high-level abstract syntax
-into a simplified high-level intermediate representation (HIR). This IR removes
-surface sugar, standardizes control flow, and prepares the program for SSA-based
-lowering in the next stage of the roadmap.
+## Overview
 
-## Data Structures
+`src/lower` transforms the AST into a high-level intermediate representation
+(HIR). This IR strips surface sugar, standardises control flow, and prepares the
+program for SSA lowering.
 
-| Structure | Purpose |
-| --- | --- |
-| `HModule` | Collects lowered items for a module, preserving the module path for downstream passes.【F:src/lower/mod.rs†L3-L71】 |
-| `HItem` | Enumerates the lowered item kinds currently supported (functions).【F:src/lower/mod.rs†L9-L13】 |
-| `HFunction` | Stores function names, parameter lists, and lowered bodies for SSA conversion.【F:src/lower/mod.rs†L14-L80】 |
-| `HBlock` / `HStmt` | Represent structured blocks with `let`, expression, and return statements after desugaring control flow constructs.【F:src/lower/mod.rs†L21-L96】 |
-| `HExpr` | Captures literals, paths, method-call desugarings, record literals, and binary operations in a uniform format.【F:src/lower/mod.rs†L33-L199】 |
-| `HFuncRef` | Distinguishes between direct function calls and method calls desugared into first-argument receivers.【F:src/lower/mod.rs†L54-L119】 |
+## Key Structures
 
-## Transformation Responsibilities
+- **HModule** – Collects lowered items while preserving module paths for
+  downstream passes.
+- **HItem / HFunction** – Represent lowered functions with parameter lists and
+  bodies ready for SSA conversion.
+- **HBlock / HStmt** – Model structured blocks with `let`, expression, and return
+  statements after desugaring control flow.
+- **HExpr** – Encodes literals, paths, record literals, method-call desugarings,
+  and binary operations in a uniform format.
+- **HFuncRef** – Distinguishes between direct calls and methods lowered to
+  receiver-first functions.
 
-- `lower_module` iterates over AST items and lowers functions, filtering out
-  unsupported constructs while preserving module identity.【F:src/lower/mod.rs†L60-L71】
-- `lower_function` copies parameter names and lowers the body using expression
-  helpers, ensuring the resulting IR no longer depends on AST-specific details.【F:src/lower/mod.rs†L73-L120】
-- `lower_block` and `lower_expr` recursively desugar method calls, indexing,
-  assignment, concurrency primitives (`spawn`, `await`, channels), and effect
-  helpers into canonical call forms.【F:src/lower/mod.rs†L82-L199】
+## Transformation Flow
 
-## Integration Highlights
+1. `lower_module` iterates over AST items and lowers supported constructs while
+   preserving module identity.
+2. `lower_function` copies parameter metadata and lowers bodies using expression
+   helpers so later phases no longer depend on AST details.
+3. `lower_block` / `lower_expr` desugar method calls, indexing, assignments,
+   concurrency primitives, and effect helpers into canonical call forms.
 
-1. Lowered functions feed directly into the SSA lowering stage to emit basic
-   blocks and instructions without re-traversing the original AST.【F:src/ir/mod.rs†L1-L208】
-2. The CLI’s `--lower` mode prints `hir_to_string` output for debugging, helping
-   validate that desugarings behave as expected across roadmap milestones.【F:src/main.rs†L176-L181】【F:src/lower/mod.rs†L200-L292】
-3. Tests under `src/tests` assert on lowering behavior to catch regressions as
-   new syntax or semantic rules are introduced.【F:src/tests/lowering_tests.rs†L1-L120】
+## Integration Notes
+
+- Lowered functions feed directly into SSA lowering without re-traversing the
+  AST.
+- CLI mode `--lower` prints `hir_to_string` output for debugging, ensuring
+  desugarings behave as expected.
+- Regression tests assert on lowering behaviour to catch regressions as new
+  syntax or semantics land.
 
 ## Roadmap Alignment
 
-- **Phase 2:** The roadmap calls for establishing a high-level IR prior to SSA;
-  this module already fulfills that requirement and isolates desugaring logic
-  from later optimization passes.【F:docs/roadmap/compiler.md†L126-L170】
-- **Phase 3:** As backend work begins, extend `HItem` to cover additional item
-  kinds (e.g., type declarations, global constants) so SSA lowering receives a
-  richer view of the module.【F:docs/roadmap/compiler.md†L170-L215】
+- **Phase 2** – Provides the high-level IR required before SSA work begins and
+  isolates desugaring logic from later optimisation passes.
+- **Phase 3** – Will grow to cover additional item kinds (types, constants) so
+  SSA lowering receives a richer view of each module.
 
 ## Next Steps
 
-- Introduce explicit control-flow constructs in HIR (conditional, loop nodes)
-  rather than encoding them via synthetic method calls, easing SSA generation.
-- Track source spans through lowering to enable better diagnostics downstream.
+- Introduce explicit control-flow nodes rather than encoding branches as helper
+  calls.
+- Track source spans through lowering to improve downstream diagnostics.
 - Provide hooks for incremental or cached lowering in anticipation of IDE
   integrations.

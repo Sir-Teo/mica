@@ -1,7 +1,10 @@
 # Tooling & Developer Experience Plan
 
-This plan covers everything around the core compiler that improves day-to-day ergonomics while laying a foundation for
-automation-heavy, next-decade developer workflows.
+> Ergonomics, automation, and integrations that surround the compiler core.
+
+This plan covers everything beyond the compiler itself. Each track focuses on
+making day-to-day development smoother while building toward automation-heavy
+workflows.
 
 ## Command-Line Interface Enhancements
 

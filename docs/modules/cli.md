@@ -1,65 +1,61 @@
 # CLI and Developer Tooling
 
-## Scope
+> `mica` and `gen_snippets` make the compiler explorable from the command line
+> while keeping the documentation trustworthy.
 
-This guide covers the `mica` command-line binary (`src/main.rs`) and the
-companion documentation helper `gen_snippets` (`src/bin/gen_snippets.rs`). These
-executables expose the compiler pipeline for day-to-day development and keep the
-written guides synchronized with reality.
+## Overview
 
-## Current Responsibilities
+Two binaries ship in this repository:
 
-| Area | Description |
-| --- | --- |
-| Argument parsing | `run()` parses flags such as `--tokens`, `--ast`, `--pretty`, `--check`, `--resolve`, `--resolve-json`, `--lower`, textual `--ir`, structured `--ir-json`, the LLVM preview `--llvm`, and the native `--build`/`--run` flows, validating that exactly one input path is supplied.【F:src/main.rs†L17-L120】 |
-| Mode dispatch | The `Mode` enum enumerates each compiler stage that can be surfaced through the CLI and makes it trivial to wire additional passes as roadmap milestones land.【F:src/main.rs†L212-L262】 |
-| Pipeline execution | Each mode reuses the same parse step and then calls into the relevant library module to print tokens, ASTs, semantic diagnostics, resolver output, lowered HIR strings, backend dumps, or native build artefacts.【F:src/main.rs†L105-L260】 |
-| Error reporting | CLI errors are normalized through the shared diagnostics helpers so messages remain consistent across modules.【F:src/main.rs†L35-L47】 |
-| Documentation snapshots | `gen_snippets` rebuilds the project, executes curated commands over `examples/`, and updates `docs/snippets.md` or verifies it in `--check` mode for CI.【F:src/bin/gen_snippets.rs†L1-L60】 |
+- `mica` — the main CLI that exposes each compiler stage behind feature flags.
+- `gen_snippets` — a helper used in CI to regenerate or verify documentation
+  snippets.
 
-## Key Data Structures and APIs
+Together they provide a fast feedback loop for day-to-day development and ensure
+that the written guides never drift from real compiler output.
 
-- `Mode`: Centralized enumeration of exposed stages; follow the established
-  pattern when adding backend or optimization passes from Phase 3 of the
-  compiler roadmap.【F:src/main.rs†L212-L262】【F:docs/roadmap/compiler.md†L126-L215】
-- `resolve::Resolved`: The resolver snapshot now prints human-readable output
-  (`--resolve`) and emits JSON (`--resolve-json`) for tooling consumption. Data
-  includes module path, imports, symbol metadata, capabilities, and resolved
-  paths.【F:src/main.rs†L75-L195】【F:docs/roadmap/tooling.md†L1-L60】
-- `ir::module_to_json`: Converts the typed SSA module into a structured payload
-  consumed by `--ir-json`, complementing the textual dump and paving the way for
-  richer backend tooling.【F:src/ir/mod.rs†L860-L1120】【F:src/main.rs†L150-L210】
-- Snapshot harness helpers in `gen_snippets`: Guarantee the docs remain accurate
-  by comparing generated output against committed snippets, a prerequisite for
-  the roadmap’s documentation quality goals.【F:src/bin/gen_snippets.rs†L24-L58】【F:docs/roadmap/tooling.md†L32-L60】
+## Responsibilities
 
-## Interactions with Other Modules
+- **Argument parsing** – Flags such as `--tokens`, `--ast`, `--pretty`,
+  `--resolve`, `--check`, `--lower`, `--ir`, `--ir-json`, `--llvm`, `--build`, and
+  `--run` map directly to compiler stages. The CLI validates that one mode is
+  selected and that an input path is provided.
+- **Mode dispatch** – A central enum encapsulates each stage so new passes can be
+  wired in with a single match arm.
+- **Pipeline execution** – Modes share the same parsing step and then call into
+  the relevant modules to print tokens, ASTs, diagnostics, lowered HIR, backend
+  dumps, or native build artefacts.
+- **Error reporting** – Diagnostic helpers normalise error formatting, giving
+  contributors consistent output across commands.
+- **Documentation snapshots** – `gen_snippets` executes curated commands against
+  `examples/` and either updates `docs/snippets.md` or verifies it in `--check`
+  mode for CI.
 
-1. The CLI always reads sources once, lexes and parses through `mica::parser`,
-   and then branches to semantic, lowering, or IR modules as necessary.【F:src/main.rs†L58-L200】
-2. The pretty-printer is used for `--pretty` output, ensuring round-tripping of
-   ASTs documented in the syntax roadmap.【F:src/main.rs†L56-L63】【F:docs/roadmap/compiler.md†L39-L74】
-3. Resolver and capability information is surfaced to prepare for language
-   server integrations described in the tooling roadmap.【F:src/main.rs†L75-L175】【F:docs/roadmap/tooling.md†L1-L60】
+## Working with the CLI
+
+1. Run `cargo run --bin mica -- --help` to see the current set of modes.
+2. Use `--resolve-json` or `--ir-json` when experimenting with tooling
+   integrations—these outputs are designed to be machine-consumable.
+3. Regenerate documentation snippets with `cargo run --bin gen_snippets` after
+   modifying CLI output or examples. Pair it with `--check` in CI to keep the
+   docs in sync.
 
 ## Roadmap Alignment
 
-- **Phase 0 (Front-end polish):** Existing flags satisfy the roadmap by exposing
-  lexing, parsing, and pretty-printing for manual validation and tutorial
-  generation.【F:docs/roadmap/compiler.md†L9-L74】
-- **Phase 1 (Static analysis):** The `--check` and `--resolve` modes already pipe
-  through type/effect checks and resolver output, providing scaffolding for more
-  advanced diagnostics and borrow checking planned in this phase.【F:docs/roadmap/compiler.md†L76-L125】
-- **Phase 2 (Lowering groundwork):** `--lower`, `--ir`, and `--llvm` expose both the HIR and the backend contracts, easing debugging as backend integrations mature.【F:src/main.rs†L184-L205】【F:docs/roadmap/compiler.md†L126-L170】
-- **Phase 3 (Backend and ecosystem tooling):** `--build` and `--run` exercise the new native backend while the structured `Mode` enum and
-  snapshot tooling leave room to add code generation, optimization, and package
-  manager commands outlined for later phases.【F:src/main.rs†L210-L260】【F:docs/roadmap/compiler.md†L170-L215】【F:docs/roadmap/ecosystem.md†L1-L78】
+- **Front-end polish** – Early phases rely on lexing, parsing, and pretty-print
+  modes to validate syntax and tutorial material.
+- **Static analysis** – `--check` and `--resolve` surface effect checking and
+  resolver output in preparation for advanced diagnostics.
+- **Lowering groundwork** – `--lower`, `--ir`, and `--llvm` expose the HIR and
+  backend contracts while integrations mature.
+- **Backend and ecosystem tooling** – `--build` and `--run` exercise the native
+  backend, and the structured mode enum leaves room for future optimisation or
+  package management commands.
 
 ## Next Steps
 
-- Extend the CLI help text and usage examples once additional passes are
-  implemented so users can quickly discover new capabilities.
-- Integrate structured (JSON/`serde`) output for `--resolve` to feed the planned
-  language server and IDE tooling efforts.【F:docs/roadmap/tooling.md†L20-L60】
-- Consider adding watch-mode or incremental recompilation hooks alongside the
-  roadmap’s incremental front-end work.
+- Extend the CLI help text with more examples as new passes land.
+- Offer structured output for additional modes to support forthcoming language
+  server work.
+- Explore watch-mode or incremental recompilation hooks alongside incremental
+  front-end improvements.

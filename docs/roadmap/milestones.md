@@ -1,8 +1,11 @@
 # Phased Execution Milestones
 
-This playbook sequences the workstreams so we can ship usable artifacts after each phase and keep sight of the longer-term
-language vision. Each milestone includes entry prerequisites, core work items, exit criteria, and the forward-looking signals we
-should observe before moving on.
+> A phase-by-phase plan with entry requirements, core work, exits, and signals.
+
+This playbook sequences the workstreams so we can ship usable artefacts after
+each phase and keep sight of the longer-term language vision. Each milestone
+lists entry prerequisites, core work items, exit criteria, and forward-looking
+signals to check before moving on.
 
 ## Phase 0 — Foundations
 
