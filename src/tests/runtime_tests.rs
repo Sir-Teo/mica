@@ -1,5 +1,6 @@
 use crate::runtime::{
-    CapabilityEvent, Runtime, RuntimeErrorKind, RuntimeEvent, RuntimeValue, TaskPlan, TaskSpec,
+    CapabilityEvent, NetworkFixture, Runtime, RuntimeErrorKind, RuntimeEvent, RuntimeValue,
+    TaskPlan, TaskSpec, register_network_fixture, reset_network_fixtures,
 };
 
 #[test]
@@ -131,13 +132,13 @@ fn runtime_validates_registered_capabilities() {
         .ensure_capabilities(&valid)
         .expect("io capability available");
 
-    let missing = TaskSpec::new("main").with_capabilities(["net"]);
+    let missing = TaskSpec::new("main").with_capabilities(["db"]);
     let err = runtime
         .ensure_capabilities(&missing)
         .expect_err("expected missing capability error");
     assert!(matches!(
         err.kind(),
-        RuntimeErrorKind::UnknownCapability { name } if name == "net"
+        RuntimeErrorKind::UnknownCapability { name } if name == "db"
     ));
 }
 
@@ -378,7 +379,86 @@ fn runtime_trace_serializes_to_json() {
     assert!(json.contains("\"events\""));
     assert!(json.contains("\"telemetry\""));
     assert!(json.contains("\"tasks\""));
+    assert!(json.contains("\"summary\""));
     assert!(json.contains("\"task\":\"main\""));
     assert!(json.contains("\"type\":\"task_started\""));
     assert!(json.contains("\"capability_counts\":{\"io\":1"));
+    assert!(json.contains("\"total_events\""));
+}
+
+#[test]
+fn runtime_trace_summary_accumulates_metrics() {
+    let runtime = Runtime::with_default_shims().expect("runtime setup");
+    let child_spec = TaskSpec::new("child").with_capabilities(["io"]);
+    let child_plan = TaskPlan::new().invoke("io", "write_line", Some(RuntimeValue::from("child")));
+    let parent_plan = TaskPlan::new()
+        .invoke("io", "write_line", Some(RuntimeValue::from("parent")))
+        .spawn(child_spec.clone(), child_plan);
+    let parent_spec = TaskSpec::new("parent").with_capabilities(["io"]);
+
+    runtime.spawn(parent_spec, parent_plan);
+    let trace = runtime
+        .run_with_telemetry()
+        .expect("runtime telemetry trace");
+
+    let summary = trace.summary();
+    assert_eq!(summary.total_tasks, 2);
+    assert_eq!(summary.total_events, trace.events().len());
+    assert_eq!(summary.spawned_tasks, 1);
+    assert_eq!(summary.capability_counts.get("io"), Some(&2));
+}
+
+#[test]
+fn runtime_network_provider_serves_registered_fixtures() {
+    reset_network_fixtures();
+    register_network_fixture(
+        "example",
+        NetworkFixture::new(200, "payload").with_header("content-type", "text/plain"),
+    );
+
+    let runtime = Runtime::with_default_shims().expect("runtime setup");
+    let spec = TaskSpec::new("net").with_capabilities(["net"]);
+    let plan = TaskPlan::new().invoke("net", "fetch", Some(RuntimeValue::from("example")));
+
+    runtime.spawn(spec, plan);
+    let events = runtime.run().expect("runtime events");
+
+    assert!(events.iter().any(|event| {
+        matches!(
+            event,
+            RuntimeEvent::CapabilityEvent {
+                capability,
+                event: CapabilityEvent::Data(RuntimeValue::Int(status)),
+                ..
+            } if capability == "net" && *status == 200
+        )
+    }));
+
+    assert!(events.iter().any(|event| {
+        matches!(
+            event,
+            RuntimeEvent::CapabilityEvent {
+                capability,
+                event: CapabilityEvent::Message(message),
+                ..
+            } if capability == "net" && message.contains("content-type: text/plain")
+        )
+    }));
+}
+
+#[test]
+fn runtime_network_provider_reports_missing_fixtures() {
+    reset_network_fixtures();
+
+    let runtime = Runtime::with_default_shims().expect("runtime setup");
+    let spec = TaskSpec::new("net").with_capabilities(["net"]);
+    let plan = TaskPlan::new().invoke("net", "fetch", Some(RuntimeValue::from("missing")));
+
+    runtime.spawn(spec, plan);
+    let err = runtime.run().expect_err("expected missing fixture error");
+
+    assert!(matches!(
+        err.kind(),
+        RuntimeErrorKind::ProviderFailure { capability, .. } if capability == "net"
+    ));
 }

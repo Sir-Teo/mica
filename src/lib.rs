@@ -6,6 +6,7 @@ pub mod pretty;
 pub mod runtime;
 pub mod semantics;
 pub mod syntax;
+pub mod tooling;
 
 pub use diagnostics::error;
 pub use diagnostics::{Error, ErrorKind, Result};
