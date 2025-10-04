@@ -487,3 +487,93 @@ fn build(x: Int, y: Int) -> Vec2 {
         artifact.c_source
     );
 }
+
+#[test]
+fn parallel_backend_reports_metrics_for_many_modules() {
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+
+    #[derive(Clone)]
+    struct RecordingBackend {
+        delay: Duration,
+        log: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl backend::Backend for RecordingBackend {
+        type Output = String;
+
+        fn compile(
+            &self,
+            module: &ir::Module,
+            _options: &backend::BackendOptions,
+        ) -> backend::BackendResult<Self::Output> {
+            std::thread::sleep(self.delay);
+            let name = if module.name.is_empty() {
+                "<root>".to_string()
+            } else {
+                module.name.join("::")
+            };
+            self.log.lock().unwrap().push(name.clone());
+            Ok(name)
+        }
+    }
+
+    let delay = Duration::from_millis(5);
+    let backend = RecordingBackend {
+        delay,
+        log: Arc::new(Mutex::new(Vec::new())),
+    };
+
+    let sources = (0..8)
+        .map(|index| format!("module backend.parallel{index}\n\nfn value() -> Int {{ {index} }}\n"))
+        .collect::<Vec<_>>();
+
+    let modules = sources
+        .iter()
+        .map(|src| {
+            let module = parse(src);
+            let hir = lower::lower_module(&module);
+            ir::lower_module(&hir)
+        })
+        .collect::<Vec<_>>();
+
+    let report = backend::run_parallel(&backend, &modules, &backend::BackendOptions::default())
+        .expect("parallel backend report");
+
+    assert_eq!(report.outputs.len(), modules.len());
+    assert_eq!(report.metrics.modules.len(), modules.len());
+    assert!(report.metrics.total_duration >= delay);
+    assert!(
+        report
+            .metrics
+            .modules
+            .iter()
+            .all(|metric| metric.duration >= Duration::from_millis(1))
+    );
+
+    let expected_names = modules
+        .iter()
+        .map(|module| {
+            if module.name.is_empty() {
+                "<root>".to_string()
+            } else {
+                module.name.join("::")
+            }
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(report.outputs, expected_names);
+    let metric_names = report
+        .metrics
+        .modules
+        .iter()
+        .map(|metric| metric.module.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(metric_names, expected_names);
+
+    let log = backend.log.lock().unwrap().clone();
+    assert_eq!(log.len(), modules.len());
+    for name in expected_names {
+        assert!(log.contains(&name));
+    }
+}

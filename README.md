@@ -229,6 +229,8 @@ documented entry points to make exploratory reading easier.
   regression tests.
 - [`docs/roadmap/`](docs/roadmap) — Milestones, design notes, and implementation
   plans.
+- [`docs/modules/runtime.md`](docs/modules/runtime.md) — Runtime orchestrator,
+  capability providers, and telemetry quickstart.
 - [`examples/`](examples) — Runnable programs referenced throughout the tour
   and used in integration tests.
 - [Issues](https://github.com/zesterer/mica/issues) — Discussion of active work,
