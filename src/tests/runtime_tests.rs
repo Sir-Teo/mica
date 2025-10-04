@@ -186,6 +186,18 @@ fn runtime_produces_structured_telemetry() {
         metrics.start_timestamp_micros.is_some(),
         "task metrics should include a start timestamp"
     );
+    assert_eq!(metrics.capability_counts.get("io"), Some(&1));
+    assert_eq!(metrics.operation_counts.get("io::write_line"), Some(&1));
+    assert!(
+        metrics.capability_durations_micros.contains_key("io"),
+        "expected capability duration entry for io"
+    );
+    assert!(
+        metrics
+            .operation_durations_micros
+            .contains_key("io::write_line"),
+        "expected operation duration entry for io::write_line"
+    );
 }
 
 #[test]
@@ -383,6 +395,9 @@ fn runtime_trace_serializes_to_json() {
     assert!(json.contains("\"task\":\"main\""));
     assert!(json.contains("\"type\":\"task_started\""));
     assert!(json.contains("\"capability_counts\":{\"io\":1"));
+    assert!(json.contains("\"operation_counts\""));
+    assert!(json.contains("\"capability_durations_micros\""));
+    assert!(json.contains("\"operation_durations_micros\""));
     assert!(json.contains("\"total_events\""));
 }
 
@@ -406,6 +421,81 @@ fn runtime_trace_summary_accumulates_metrics() {
     assert_eq!(summary.total_events, trace.events().len());
     assert_eq!(summary.spawned_tasks, 1);
     assert_eq!(summary.capability_counts.get("io"), Some(&2));
+    assert_eq!(summary.operation_counts.get("io::write_line"), Some(&2));
+    assert!(
+        summary.capability_durations_micros.contains_key("io"),
+        "expected aggregated io duration",
+    );
+    assert!(
+        summary
+            .operation_durations_micros
+            .contains_key("io::write_line"),
+        "expected aggregated io::write_line duration",
+    );
+}
+
+#[test]
+fn runtime_deterministic_shims_capture_state() {
+    let bundle = Runtime::with_deterministic_shims().expect("runtime setup");
+    let runtime = bundle.runtime();
+
+    bundle.console.clear_writes();
+    bundle.console.queue_input("scripted input");
+    bundle.time.push_time(42);
+
+    let spec = TaskSpec::new("main").with_capabilities(["io", "fs", "env", "time"]);
+    let plan = TaskPlan::new()
+        .invoke("io", "write_line", Some(RuntimeValue::from("hi")))
+        .invoke("io", "read_line", None)
+        .invoke(
+            "fs",
+            "write_string",
+            Some(RuntimeValue::from("deterministic.txt=payload")),
+        )
+        .invoke(
+            "fs",
+            "read_to_string",
+            Some(RuntimeValue::from("deterministic.txt")),
+        )
+        .invoke("env", "set", Some(RuntimeValue::from("TEMP=deterministic")))
+        .invoke("env", "get", Some(RuntimeValue::from("TEMP")))
+        .invoke("time", "now_millis", None)
+        .invoke("time", "now_millis", None);
+
+    runtime.spawn(spec, plan);
+    let events = runtime.run().expect("runtime events");
+
+    assert_eq!(bundle.console.writes(), vec!["hi".to_string()]);
+    assert_eq!(
+        bundle.filesystem.read_file("deterministic.txt"),
+        Some("payload".to_string())
+    );
+    assert_eq!(bundle.env.get("TEMP"), Some("deterministic".to_string()));
+    assert_eq!(bundle.time.last_emitted(), Some(43));
+
+    let mut seen_time_values = Vec::new();
+    let mut seen_input = false;
+    for event in events {
+        if let RuntimeEvent::CapabilityEvent {
+            capability, event, ..
+        } = event
+        {
+            match (capability.as_str(), event) {
+                ("time", CapabilityEvent::Data(RuntimeValue::Int(value))) => {
+                    seen_time_values.push(value);
+                }
+                ("io", CapabilityEvent::Data(RuntimeValue::String(value))) => {
+                    if value == "scripted input" {
+                        seen_input = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    assert_eq!(seen_time_values, vec![42, 43]);
+    assert!(seen_input, "expected scripted input to be surfaced");
 }
 
 #[test]

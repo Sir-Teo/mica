@@ -1,6 +1,6 @@
 # Phase 3 Kickoff Status
 
-_Last refreshed: 2024-06-25_
+_Last refreshed: 2024-07-01_
 
 This summary condenses the current Phase 3 health report for quick scanning. It
 highlights what is stable, how we validate it, and where contributors can have
@@ -26,8 +26,10 @@ the most impact next.
   expressions, effect rows, return behaviour, and purity reporting.
 - The native backend emits portable C for typed IR, including record aggregates,
   and drives the system toolchain to produce runnable binaries.
-- The runtime orchestrator binds IO/time providers and validates capability
-  coverage before native binaries execute.
+- The runtime orchestrator binds IO/time providers, now including deterministic
+  in-memory shims, and validates capability coverage before native binaries
+  execute. Telemetry captures per-capability counts and durations for
+  downstream analysis.
 
 ### Tooling and Developer Experience
 - The `mica` CLI exposes lexing, resolving, lowering, IR dumps, LLVM previews,
@@ -59,18 +61,18 @@ the most impact next.
 
 ## Next Focus Areas
 
-1. **Provider breadth** – Extend runtime shims beyond console/time to cover
-   filesystem and networking scenarios.
-2. **Runtime telemetry** – Emit structured execution events from generated
-   binaries for downstream observability tooling.
-3. **Parallel backend scaling** – Stress the parallel compile driver across
-   workspace-sized module sets and instrument contention hotspots.
-4. **Tooling APIs** – Layer higher-level CLI entry points over the resolver and
-   IR JSON dumps to unblock IDE integrations and automated audits.
+1. **Process providers** – Introduce scripted process/task orchestration so the
+   deterministic runtime can model multi-process workloads safely.
+2. **Telemetry exporters** – Wire the richer runtime metrics into CLI flags and
+   document how downstream tooling consumes the JSON traces.
+3. **Parallel backend scaling** – Use the new worker metrics to tune scheduling
+   heuristics on workspace-sized module sets and publish guidance.
+4. **Pipeline documentation** – Expand the freshly documented pipeline entry
+   points with end-to-end walkthroughs for editor integrations and audits.
 
 ## Watch Items
 
-- Runtime provider coverage is intentionally narrow; broaden it only with new
-  smoke tests to avoid surprising consumers.
+- Runtime provider coverage still requires care: process orchestration must ship
+  with deterministic fixtures and smoke tests to avoid surprising consumers.
 - Evaluate portable coverage collectors that work across the CI matrix so we can
   reintroduce reporting without bespoke tooling.

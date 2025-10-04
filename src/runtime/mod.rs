@@ -13,6 +13,39 @@ pub struct Runtime {
     inner: Arc<RuntimeInner>,
 }
 
+/// Convenience bundle returned by [`Runtime::with_deterministic_shims`] that
+/// exposes the deterministic providers alongside the configured runtime so
+/// tests can observe captured state.
+#[derive(Debug, Clone)]
+pub struct DeterministicRuntime {
+    runtime: Runtime,
+    pub console: DeterministicConsoleProvider,
+    pub filesystem: InMemoryFilesystemProvider,
+    pub env: DeterministicEnvProvider,
+    pub time: DeterministicTimeProvider,
+}
+
+impl std::ops::Deref for DeterministicRuntime {
+    type Target = Runtime;
+
+    fn deref(&self) -> &Self::Target {
+        &self.runtime
+    }
+}
+
+impl DeterministicRuntime {
+    /// Returns a clone of the configured runtime for ergonomic chaining in
+    /// tests without exposing the internal Arc directly.
+    pub fn runtime(&self) -> Runtime {
+        self.runtime.clone()
+    }
+
+    /// Consumes the bundle and returns the owned runtime.
+    pub fn into_runtime(self) -> Runtime {
+        self.runtime
+    }
+}
+
 #[derive(Debug, Default)]
 struct RuntimeInner {
     providers: RwLock<HashMap<String, Arc<dyn CapabilityProvider>>>,
@@ -62,6 +95,31 @@ impl Runtime {
         runtime.register_provider(NetworkProvider)?;
         runtime.register_provider(EnvProvider)?;
         Ok(runtime)
+    }
+
+    /// Registers deterministic, in-memory capability providers that are safe to
+    /// use in tests. The returned bundle includes handles to each provider so
+    /// callers can seed fixtures or assert on captured state.
+    pub fn with_deterministic_shims() -> Result<DeterministicRuntime, RuntimeError> {
+        let runtime = Runtime::new();
+        let console = DeterministicConsoleProvider::default();
+        let filesystem = InMemoryFilesystemProvider::default();
+        let env = DeterministicEnvProvider::default();
+        let time = DeterministicTimeProvider::monotonic(0, 1);
+
+        runtime.register_provider(console.clone())?;
+        runtime.register_provider(time.clone())?;
+        runtime.register_provider(filesystem.clone())?;
+        runtime.register_provider(NetworkProvider)?;
+        runtime.register_provider(env.clone())?;
+
+        Ok(DeterministicRuntime {
+            runtime,
+            console,
+            filesystem,
+            env,
+            time,
+        })
     }
 
     /// Registers a capability provider.
@@ -171,6 +229,9 @@ impl Runtime {
     ) -> Result<TaskExecutionResult, RuntimeError> {
         let mut events = Vec::new();
         let mut capability_counts: HashMap<String, usize> = HashMap::new();
+        let mut operation_counts: HashMap<String, usize> = HashMap::new();
+        let mut capability_durations: HashMap<String, u128> = HashMap::new();
+        let mut operation_durations: HashMap<String, u128> = HashMap::new();
         let mut spawned_tasks = 0usize;
         let start_wall = SystemTime::now();
         let start = Instant::now();
@@ -190,16 +251,22 @@ impl Runtime {
                     }
                     let provider = self.lookup_provider(capability)?;
                     *capability_counts.entry(capability.clone()).or_insert(0) += 1;
+                    let op_key = format!("{}::{}", capability, operation);
+                    *operation_counts.entry(op_key.clone()).or_insert(0) += 1;
                     events.push(RuntimeEvent::CapabilityInvoked {
                         task: spec.name.clone(),
                         capability: capability.clone(),
                         operation: operation.clone(),
                     });
+                    let op_start = Instant::now();
                     let response = provider.handle(&CapabilityInvocation {
                         capability: capability.clone(),
                         operation: operation.clone(),
                         payload: payload.clone(),
                     })?;
+                    let op_duration = op_start.elapsed().as_micros();
+                    *capability_durations.entry(capability.clone()).or_insert(0) += op_duration;
+                    *operation_durations.entry(op_key).or_insert(0) += op_duration;
                     for event in response.events {
                         events.push(RuntimeEvent::CapabilityEvent {
                             task: spec.name.clone(),
@@ -227,10 +294,14 @@ impl Runtime {
         });
         let metrics = TaskTelemetry::new(
             spec.name.clone(),
-            start_wall,
-            start.elapsed(),
+            TaskTiming::new(start_wall, start.elapsed()),
             events.len(),
-            capability_counts,
+            TaskAggregates::new(
+                capability_counts,
+                operation_counts,
+                capability_durations,
+                operation_durations,
+            ),
             spawned_tasks,
         );
         Ok(TaskExecutionResult { events, metrics })
@@ -442,11 +513,27 @@ impl RuntimeTrace {
     /// children, and capability usage across the trace.
     pub fn summary(&self) -> RuntimeTraceSummary {
         let mut capability_totals: HashMap<String, usize> = HashMap::new();
+        let mut operation_totals: HashMap<String, usize> = HashMap::new();
+        let mut capability_duration_totals: HashMap<String, u128> = HashMap::new();
+        let mut operation_duration_totals: HashMap<String, u128> = HashMap::new();
         let mut spawned = 0usize;
         for metrics in &self.tasks {
             spawned += metrics.spawned_tasks;
             for (capability, count) in &metrics.capability_counts {
                 *capability_totals.entry(capability.clone()).or_insert(0) += *count;
+            }
+            for (operation, count) in &metrics.operation_counts {
+                *operation_totals.entry(operation.clone()).or_insert(0) += *count;
+            }
+            for (capability, duration) in &metrics.capability_durations_micros {
+                *capability_duration_totals
+                    .entry(capability.clone())
+                    .or_insert(0) += *duration;
+            }
+            for (operation, duration) in &metrics.operation_durations_micros {
+                *operation_duration_totals
+                    .entry(operation.clone())
+                    .or_insert(0) += *duration;
             }
         }
 
@@ -455,6 +542,9 @@ impl RuntimeTrace {
             total_events: self.events.len(),
             spawned_tasks: spawned,
             capability_counts: capability_totals,
+            operation_counts: operation_totals,
+            capability_durations_micros: capability_duration_totals,
+            operation_durations_micros: operation_duration_totals,
         }
     }
 
@@ -519,6 +609,9 @@ pub struct RuntimeTraceSummary {
     pub total_events: usize,
     pub spawned_tasks: usize,
     pub capability_counts: HashMap<String, usize>,
+    pub operation_counts: HashMap<String, usize>,
+    pub capability_durations_micros: HashMap<String, u128>,
+    pub operation_durations_micros: HashMap<String, u128>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -528,29 +621,71 @@ pub struct TaskTelemetry {
     pub duration_micros: u128,
     pub event_count: usize,
     pub capability_counts: HashMap<String, usize>,
+    pub operation_counts: HashMap<String, usize>,
+    pub capability_durations_micros: HashMap<String, u128>,
+    pub operation_durations_micros: HashMap<String, u128>,
     pub spawned_tasks: usize,
 }
 
 impl TaskTelemetry {
     fn new(
         task: String,
-        start: SystemTime,
-        duration: Duration,
+        timing: TaskTiming,
         event_count: usize,
-        capability_counts: HashMap<String, usize>,
+        aggregates: TaskAggregates,
         spawned_tasks: usize,
     ) -> Self {
-        let start_timestamp_micros = start
+        let start_timestamp_micros = timing
+            .start
             .duration_since(UNIX_EPOCH)
             .ok()
             .map(|duration| duration.as_micros());
         TaskTelemetry {
             task,
             start_timestamp_micros,
-            duration_micros: duration.as_micros(),
+            duration_micros: timing.duration.as_micros(),
             event_count,
-            capability_counts,
+            capability_counts: aggregates.capability_counts,
+            operation_counts: aggregates.operation_counts,
+            capability_durations_micros: aggregates.capability_durations_micros,
+            operation_durations_micros: aggregates.operation_durations_micros,
             spawned_tasks,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct TaskTiming {
+    start: SystemTime,
+    duration: Duration,
+}
+
+impl TaskTiming {
+    fn new(start: SystemTime, duration: Duration) -> Self {
+        TaskTiming { start, duration }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct TaskAggregates {
+    capability_counts: HashMap<String, usize>,
+    operation_counts: HashMap<String, usize>,
+    capability_durations_micros: HashMap<String, u128>,
+    operation_durations_micros: HashMap<String, u128>,
+}
+
+impl TaskAggregates {
+    fn new(
+        capability_counts: HashMap<String, usize>,
+        operation_counts: HashMap<String, usize>,
+        capability_durations_micros: HashMap<String, u128>,
+        operation_durations_micros: HashMap<String, u128>,
+    ) -> Self {
+        TaskAggregates {
+            capability_counts,
+            operation_counts,
+            capability_durations_micros,
+            operation_durations_micros,
         }
     }
 }
@@ -653,6 +788,15 @@ fn task_telemetry_to_json(metrics: &TaskTelemetry) -> String {
     json.push_str("\"capability_counts\":");
     json.push_str(&capability_counts_to_json(&metrics.capability_counts));
     json.push(',');
+    json.push_str("\"operation_counts\":");
+    json.push_str(&capability_counts_to_json(&metrics.operation_counts));
+    json.push(',');
+    json.push_str("\"capability_durations_micros\":");
+    json.push_str(&duration_map_to_json(&metrics.capability_durations_micros));
+    json.push(',');
+    json.push_str("\"operation_durations_micros\":");
+    json.push_str(&duration_map_to_json(&metrics.operation_durations_micros));
+    json.push(',');
     json.push_str("\"spawned_tasks\":");
     json.push_str(&metrics.spawned_tasks.to_string());
     json.push('}');
@@ -673,11 +817,41 @@ fn runtime_trace_summary_to_json(summary: &RuntimeTraceSummary) -> String {
     json.push(',');
     json.push_str("\"capability_counts\":");
     json.push_str(&capability_counts_to_json(&summary.capability_counts));
+    json.push(',');
+    json.push_str("\"operation_counts\":");
+    json.push_str(&capability_counts_to_json(&summary.operation_counts));
+    json.push(',');
+    json.push_str("\"capability_durations_micros\":");
+    json.push_str(&duration_map_to_json(&summary.capability_durations_micros));
+    json.push(',');
+    json.push_str("\"operation_durations_micros\":");
+    json.push_str(&duration_map_to_json(&summary.operation_durations_micros));
     json.push('}');
     json
 }
 
 fn capability_counts_to_json(map: &HashMap<String, usize>) -> String {
+    if map.is_empty() {
+        return "{}".to_string();
+    }
+    let mut entries = map.iter().collect::<Vec<_>>();
+    entries.sort_by(|a, b| a.0.cmp(b.0));
+    let mut json = String::from("{");
+    for (index, (key, value)) in entries.iter().enumerate() {
+        if index > 0 {
+            json.push(',');
+        }
+        json.push('"');
+        json.push_str(&escape_json_string(key));
+        json.push('"');
+        json.push(':');
+        json.push_str(&value.to_string());
+    }
+    json.push('}');
+    json
+}
+
+fn duration_map_to_json(map: &HashMap<String, u128>) -> String {
     if map.is_empty() {
         return "{}".to_string();
     }
@@ -918,6 +1092,448 @@ impl TaskSpec {
 
     pub fn capabilities(&self) -> &[String] {
         &self.capabilities
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DeterministicConsoleProvider {
+    inner: Arc<DeterministicConsoleInner>,
+}
+
+#[derive(Debug, Default)]
+struct DeterministicConsoleInner {
+    writes: Mutex<Vec<String>>,
+    inputs: Mutex<VecDeque<String>>,
+}
+
+impl DeterministicConsoleProvider {
+    pub fn with_inputs<I, S>(inputs: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let provider = DeterministicConsoleProvider::default();
+        {
+            let mut guard = provider
+                .inner
+                .inputs
+                .lock()
+                .expect("console inputs poisoned");
+            guard.extend(inputs.into_iter().map(Into::into));
+        }
+        provider
+    }
+
+    pub fn queue_input(&self, value: impl Into<String>) {
+        self.inner
+            .inputs
+            .lock()
+            .expect("console inputs poisoned")
+            .push_back(value.into());
+    }
+
+    pub fn writes(&self) -> Vec<String> {
+        self.inner
+            .writes
+            .lock()
+            .expect("console writes poisoned")
+            .clone()
+    }
+
+    pub fn clear_writes(&self) {
+        self.inner
+            .writes
+            .lock()
+            .expect("console writes poisoned")
+            .clear();
+    }
+}
+
+impl CapabilityProvider for DeterministicConsoleProvider {
+    fn name(&self) -> &str {
+        "io"
+    }
+
+    fn handle(&self, invocation: &CapabilityInvocation) -> Result<ProviderResponse, RuntimeError> {
+        match invocation.operation.as_str() {
+            "write_line" => {
+                let message = invocation
+                    .payload
+                    .as_ref()
+                    .and_then(|value| match value {
+                        RuntimeValue::String(s) => Some(s.clone()),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "write_line expects a string payload",
+                        )
+                    })?;
+                self.inner
+                    .writes
+                    .lock()
+                    .expect("console writes poisoned")
+                    .push(message.clone());
+                Ok(ProviderResponse::new(RuntimeValue::unit())
+                    .with_event(CapabilityEvent::Message(message)))
+            }
+            "read_line" => {
+                let line = self
+                    .inner
+                    .inputs
+                    .lock()
+                    .expect("console inputs poisoned")
+                    .pop_front()
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "read_line requires scripted input",
+                        )
+                    })?;
+                Ok(ProviderResponse::new(RuntimeValue::from(line.clone()))
+                    .with_event(CapabilityEvent::Data(RuntimeValue::from(line))))
+            }
+            other => Err(RuntimeError::provider_failure(
+                self.name(),
+                format!("unsupported operation '{other}'"),
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct InMemoryFilesystemProvider {
+    files: Arc<RwLock<HashMap<String, String>>>,
+}
+
+impl InMemoryFilesystemProvider {
+    pub fn write_file(&self, path: impl Into<String>, contents: impl Into<String>) {
+        self.files
+            .write()
+            .expect("filesystem store poisoned")
+            .insert(path.into(), contents.into());
+    }
+
+    pub fn read_file(&self, path: &str) -> Option<String> {
+        self.files
+            .read()
+            .expect("filesystem store poisoned")
+            .get(path)
+            .cloned()
+    }
+
+    pub fn snapshot(&self) -> HashMap<String, String> {
+        self.files
+            .read()
+            .expect("filesystem store poisoned")
+            .clone()
+    }
+}
+
+impl CapabilityProvider for InMemoryFilesystemProvider {
+    fn name(&self) -> &str {
+        "fs"
+    }
+
+    fn handle(&self, invocation: &CapabilityInvocation) -> Result<ProviderResponse, RuntimeError> {
+        match invocation.operation.as_str() {
+            "read_to_string" => {
+                let path = invocation
+                    .payload
+                    .as_ref()
+                    .and_then(|value| match value {
+                        RuntimeValue::String(path) => Some(path.clone()),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "read_to_string expects a string payload",
+                        )
+                    })?;
+                let contents = self
+                    .files
+                    .read()
+                    .expect("filesystem store poisoned")
+                    .get(&path)
+                    .cloned()
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            format!("no in-memory file registered for '{path}'"),
+                        )
+                    })?;
+                Ok(ProviderResponse::new(RuntimeValue::from(contents.clone()))
+                    .with_event(CapabilityEvent::Data(RuntimeValue::from(contents))))
+            }
+            "write_string" => {
+                let path = invocation
+                    .payload
+                    .as_ref()
+                    .and_then(|value| match value {
+                        RuntimeValue::String(path) => Some(path.clone()),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "write_string expects a string payload",
+                        )
+                    })?;
+                let mut segments = path.splitn(2, '=');
+                let file_path = segments
+                    .next()
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "write_string payload must be 'path=contents'",
+                        )
+                    })?;
+                let contents = segments
+                    .next()
+                    .map(|value| value.to_string())
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "write_string payload must include file contents",
+                        )
+                    })?;
+                self.write_file(file_path.clone(), contents.clone());
+                Ok(ProviderResponse::new(RuntimeValue::unit())
+                    .with_event(CapabilityEvent::Message(format!("wrote {file_path}"))))
+            }
+            other => Err(RuntimeError::provider_failure(
+                self.name(),
+                format!("unsupported operation '{other}'"),
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DeterministicEnvProvider {
+    values: Arc<RwLock<HashMap<String, String>>>,
+}
+
+impl DeterministicEnvProvider {
+    pub fn set(&self, key: impl Into<String>, value: impl Into<String>) {
+        self.values
+            .write()
+            .expect("env store poisoned")
+            .insert(key.into(), value.into());
+    }
+
+    pub fn get(&self, key: &str) -> Option<String> {
+        self.values
+            .read()
+            .expect("env store poisoned")
+            .get(key)
+            .cloned()
+    }
+
+    pub fn unset(&self, key: &str) {
+        self.values.write().expect("env store poisoned").remove(key);
+    }
+
+    pub fn snapshot(&self) -> HashMap<String, String> {
+        self.values.read().expect("env store poisoned").clone()
+    }
+}
+
+impl CapabilityProvider for DeterministicEnvProvider {
+    fn name(&self) -> &str {
+        "env"
+    }
+
+    fn handle(&self, invocation: &CapabilityInvocation) -> Result<ProviderResponse, RuntimeError> {
+        match invocation.operation.as_str() {
+            "get" => {
+                let key = invocation
+                    .payload
+                    .as_ref()
+                    .and_then(|value| match value {
+                        RuntimeValue::String(value) => Some(value.clone()),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(self.name(), "get expects a string payload")
+                    })?;
+                let value = self
+                    .values
+                    .read()
+                    .expect("env store poisoned")
+                    .get(&key)
+                    .cloned()
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            format!("environment variable '{key}' is not scripted"),
+                        )
+                    })?;
+                Ok(ProviderResponse::new(RuntimeValue::from(value.clone()))
+                    .with_event(CapabilityEvent::Data(RuntimeValue::from(value))))
+            }
+            "set" => {
+                let assignment = invocation
+                    .payload
+                    .as_ref()
+                    .and_then(|value| match value {
+                        RuntimeValue::String(value) => Some(value.clone()),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(self.name(), "set expects a string payload")
+                    })?;
+                let mut parts = assignment.splitn(2, '=');
+                let key = parts
+                    .next()
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty())
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "set payload must be 'KEY=VALUE'",
+                        )
+                    })?;
+                let value = parts.next().ok_or_else(|| {
+                    RuntimeError::provider_failure(self.name(), "set payload must include a value")
+                })?;
+                self.set(key.clone(), value);
+                Ok(ProviderResponse::new(RuntimeValue::unit())
+                    .with_event(CapabilityEvent::Message(format!("set {key}"))))
+            }
+            "unset" => {
+                let key = invocation
+                    .payload
+                    .as_ref()
+                    .and_then(|value| match value {
+                        RuntimeValue::String(value) => Some(value.clone()),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "unset expects a string payload",
+                        )
+                    })?;
+                self.unset(&key);
+                Ok(ProviderResponse::new(RuntimeValue::unit())
+                    .with_event(CapabilityEvent::Message(format!("unset {key}"))))
+            }
+            other => Err(RuntimeError::provider_failure(
+                self.name(),
+                format!("unsupported operation '{other}'"),
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DeterministicTimeProvider {
+    state: Arc<DeterministicTimeState>,
+}
+
+#[derive(Debug)]
+struct DeterministicTimeState {
+    inner: Mutex<DeterministicTimeInner>,
+}
+
+#[derive(Debug)]
+struct DeterministicTimeInner {
+    next: i64,
+    step: i64,
+    scripted: VecDeque<i64>,
+    last_emitted: Option<i64>,
+}
+
+impl Default for DeterministicTimeProvider {
+    fn default() -> Self {
+        Self::monotonic(0, 1)
+    }
+}
+
+impl DeterministicTimeProvider {
+    pub fn monotonic(start: i64, step: i64) -> Self {
+        DeterministicTimeProvider {
+            state: Arc::new(DeterministicTimeState {
+                inner: Mutex::new(DeterministicTimeInner {
+                    next: start,
+                    step,
+                    scripted: VecDeque::new(),
+                    last_emitted: None,
+                }),
+            }),
+        }
+    }
+
+    pub fn scripted<I>(values: I) -> Self
+    where
+        I: IntoIterator<Item = i64>,
+    {
+        let provider = DeterministicTimeProvider::monotonic(0, 1);
+        {
+            let mut guard = provider.state.inner.lock().expect("time state poisoned");
+            guard.scripted = values.into_iter().collect();
+        }
+        provider
+    }
+
+    pub fn push_time(&self, value: i64) {
+        self.state
+            .inner
+            .lock()
+            .expect("time state poisoned")
+            .scripted
+            .push_back(value);
+    }
+
+    pub fn set_step(&self, step: i64) {
+        self.state.inner.lock().expect("time state poisoned").step = step;
+    }
+
+    pub fn last_emitted(&self) -> Option<i64> {
+        self.state
+            .inner
+            .lock()
+            .expect("time state poisoned")
+            .last_emitted
+    }
+
+    fn next_timestamp(&self) -> i64 {
+        let mut guard = self.state.inner.lock().expect("time state poisoned");
+        let value = if let Some(scripted) = guard.scripted.pop_front() {
+            guard.next = scripted.saturating_add(guard.step);
+            scripted
+        } else {
+            let current = guard.next;
+            guard.next = guard.next.saturating_add(guard.step);
+            current
+        };
+        guard.last_emitted = Some(value);
+        value
+    }
+}
+
+impl CapabilityProvider for DeterministicTimeProvider {
+    fn name(&self) -> &str {
+        "time"
+    }
+
+    fn handle(&self, invocation: &CapabilityInvocation) -> Result<ProviderResponse, RuntimeError> {
+        match invocation.operation.as_str() {
+            "now_millis" => {
+                let value = self.next_timestamp();
+                Ok(ProviderResponse::new(RuntimeValue::from(value))
+                    .with_event(CapabilityEvent::Data(RuntimeValue::from(value))))
+            }
+            other => Err(RuntimeError::provider_failure(
+                self.name(),
+                format!("unsupported operation '{other}'"),
+            )),
+        }
     }
 }
 
