@@ -9,7 +9,12 @@
 
 > **TL;DR** — One small repository contains the full compiler pipeline, runnable
 > examples, and documentation regenerated from real CLI output. Read it in a
-> weekend, extend it on Monday.
+> weekend, extend it on Monday, and rely on the GitHub Pages site for a guided
+> tour.
+>
+> 📚 **Docs at a glance:** browse the published site at
+> <https://mica-lang.github.io/mica/> or open the same content locally under
+> [`docs/`](docs/).
 
 **Why it exists**
 
@@ -24,23 +29,30 @@ and wired together so that you can:
   auditable programs.
 - Prototype new ideas quickly while keeping the entire pipeline in view.
 
-Mica ships as a compact prototype compiler front-end backed by runnable
-examples, language tour documentation, and snapshot-tested tooling. The project
-is intentionally small enough to read in a weekend while still demonstrating the
-design patterns required for a production-grade compiler.
+The repository doubles as a field guide: runnable examples, snapshot-tested
+documentation, and a GitHub Pages site stay in sync with the CLI so that what
+you read is what the compiler actually does. The project is intentionally small
+enough to read in a weekend while still demonstrating the design patterns
+required for a production-grade compiler.
 
-## Highlights
+### Who is Mica for?
 
-- **Tiny but expressive core** – Learn the entire syntax in an afternoon and
-  extend behaviour via standard libraries instead of bespoke keywords.
-- **Deterministic concurrency** – Structured `spawn`/`await` with effect
-  tracking ensures reproducible outcomes.
-- **Capability-based effects** – Explicit `using` clauses make side effects and
-  resource access auditable.
-- **Ahead-of-time tooling** – The CLI exposes every compiler stage from tokens
-  to native code generation, each backed by golden-file snapshots.
-- **Interop-friendly ABI** – C-compatible calling conventions and hooks for
-  Python/JavaScript “foreign tasks” keep the language ecosystem-friendly.
+- **Language tinkerers** who want to see how a complete front-end fits together
+  without scaffolding a runtime or building infrastructure from scratch.
+- **Educators** interested in a compact, auditable corpus they can walk through
+  with a class or study group.
+- **Systems programmers** exploring deterministic concurrency, capability
+  tracking, and SSA-based lowering techniques in a familiar Rust codebase.
+
+## Highlights at a glance
+
+| Pillar | What it means in practice |
+| --- | --- |
+| **Tiny but expressive core** | Learn the syntax in an afternoon and extend behaviour via standard libraries rather than bespoke keywords. |
+| **Deterministic concurrency** | Structured `spawn`/`await` with effect tracking ensures reproducible outcomes and debuggable traces. |
+| **Capability-based effects** | Explicit `using` clauses make side effects and resource access auditable for reviews and teaching. |
+| **Ahead-of-time tooling** | One CLI binary surfaces every compiler stage, each backed by snapshot tests in [`docs/snippets.md`](docs/snippets.md). |
+| **Interop-friendly ABI** | C-compatible calling conventions and hooks for Python/JavaScript “foreign tasks” keep the language ecosystem-friendly. |
 
 ### Quick facts
 
@@ -49,6 +61,7 @@ design patterns required for a production-grade compiler.
 | Minimum toolchain | Latest stable Rust via `rustup` |
 | CLI help | `cargo run --bin mica -- --help` |
 | Docs tour | `docs/tour.md` pairs with `examples/` |
+| GitHub Pages | <https://mica-lang.github.io/mica/> mirrors this README with an interactive tour |
 | Status page | `docs/status.md` summarises current health |
 | Roadmap | `docs/roadmap/` tracks milestones |
 | Snapshot upkeep | `cargo run --bin gen_snippets -- --check` |
@@ -57,7 +70,7 @@ design patterns required for a production-grade compiler.
 
 ## Table of contents
 
-- [Highlights](#highlights)
+- [Highlights at a glance](#highlights-at-a-glance)
 - [Project status](#project-status)
 - [Quickstart](#quickstart)
 - [Choose your path](#choose-your-path)
@@ -107,52 +120,46 @@ Pick the workflow that matches your goal today:
 
 ## Quickstart
 
+Get a working environment and your first compiler run in minutes.
+
 ### 1. Install prerequisites
 
 - Install a recent stable Rust toolchain via <https://rustup.rs/>.
-- LLVM is bundled with Rust, so no additional native dependencies are required
-  for the current prototype.
+- LLVM ships with Rust, so no additional native dependencies are required for
+  this prototype.
 
-### 2. Clone and build
+### 2. Clone, build, and smoke-test
 
 ```bash
 git clone https://github.com/<you>/mica.git
 cd mica
 cargo build
-```
-
-The initial build downloads the Rust dependencies. Subsequent builds and runs
-are incremental and fast.
-
-### 3. Run the test suite
-
-```bash
 cargo test
 ```
 
-The tests execute integration flows that cover lexing, parsing, lowering, the
-IR pipeline, and snapshot comparisons.
+`cargo test` exercises lexing, parsing, lowering, the IR pipeline, and snapshot
+comparisons so you can trust subsequent experiments.
 
-### 4. Explore the CLI
+### 3. Explore the CLI
 
-Inspect the AST of a demo program:
+- Inspect the AST of a demo program:
 
-```bash
-cargo run --bin mica -- examples/demo.mica
-```
+  ```bash
+  cargo run --bin mica -- examples/demo.mica
+  ```
 
-Or compile and execute one of the runnable samples end-to-end:
+- Compile and execute one of the runnable samples end-to-end:
 
-```bash
-cargo run --bin mica -- --run examples/methods.mica
-```
+  ```bash
+  cargo run --bin mica -- --run examples/methods.mica
+  ```
 
 Need a refresher on the available stages? Run `cargo run --bin mica -- --help`
 for an up-to-date flag list. Prefer to experiment without leaving your editor?
 Pair the commands above with `cargo watch -x "run --bin mica -- --run <file>"`
 for tight feedback loops (install via `cargo install cargo-watch`).
 
-### 5. Troubleshooting
+### Troubleshooting
 
 - If builds fail due to an outdated toolchain, run `rustup update` and retry.
 - Regenerate CLI snapshots when golden files drift: `cargo run --bin gen_snippets`.
@@ -227,8 +234,8 @@ expressions, even in small standalone modules.
 
 ## Example gallery
 
-The `examples/` directory showcases the current surface of the language,
-including:
+The `examples/` directory showcases the current surface of the language, each
+paired with a section in the tour:
 
 - `adt.mica` — defining algebraic data types and matching over them.
 - `concurrency_pipeline.mica` — coordinated `spawn`/`await` workflows, pattern
@@ -248,7 +255,8 @@ including:
 
 Use the CLI commands above to inspect each example and explore how the
 capabilities compose across files. Pair them with the [language tour](#documentation--resources)
-for guided explanations.
+or the [GitHub Pages walkthrough](https://mica-lang.github.io/mica/) for guided
+explanations.
 
 ## Repository layout
 
