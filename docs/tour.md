@@ -1,9 +1,10 @@
-# Mica Tour (Prototype)
+# Mica Language Tour
 
 > A rapid, example-driven overview of the language surface and tooling.
 
-Use this tour to explore the prototype. Every section includes runnable snippets
-from `examples/` so you can experiment with the compiler immediately.
+Use this tour to explore Mica. Every section includes runnable snippets from `examples/` so you can experiment with the compiler immediately.
+
+[← Back to Documentation Home](index.html)
 
 ## Modules
 - Declare one module per file with `module a.b.c`.
@@ -27,7 +28,7 @@ module demo.matching
 
 type Color = Red | Green | Blue
 
-fn to_text(c: Color) -> String {
+func to_text(c: Color) -> String {
   match c { Red => "red", Green => "green", Blue => "blue" }
 }
 ```
@@ -38,11 +39,11 @@ missing. For a larger pipeline that combines match guards with logging, try
 ## Effects and `using`
 Effects are explicit through effect rows and capability values.
 ```mica
-fn open_and_print(io: IO) !{io} {
+func open_and_print(io: IO) !{io} {
   using File::open("/tmp/example.txt", io)? { io.println("opened ok") }
 }
 
-fn run_with(callback: fn(Int) -> Int !{io}, io: IO) !{io} {
+func run_with(callback: func(Int) -> Int !{io}, io: IO) !{io} {
   let _ = callback(42)
 }
 ```
@@ -52,7 +53,7 @@ Nested scopes with higher-order helpers appear in
 ## Concurrency
 Structured tasks use `spawn`/`await`.
 ```mica
-fn fetch(u: String, net: Net) -> Bytes !{net} {
+func fetch(u: String, net: Net) -> Bytes !{net} {
   await spawn http::get(u, net)
 }
 ```
@@ -63,30 +64,48 @@ concurrency, nested `using`, and auditing, explore
 
 ## Generics and Bounds
 ```mica
-fn max[T: Ord](a: T, b: T) -> T { if a < b { b } else { a } }
+func max[T: Ord](a: T, b: T) -> T { if a < b { b } else { a } }
 ```
 Recursive ADTs with traversal helpers appear in
 `examples/generics_tree_algorithms.mica`.
 
 ## Collections and Loops
 ```mica
-fn sum(xs: [Int]) -> Int { let mut s = 0; for x in xs { s = s + x }; s }
+func sum(xs: [Int]) -> Int { let mut s = 0; for x in xs { s = s + x }; s }
 ```
 
 ## Methods and Receivers
 `impl` blocks introduce receiver-based methods that lower to simple HIR when you
 run `--lower`.
 ```mica
-impl Addable for Vec2 { fn add(self, other: Vec2) -> Vec2 { other } }
-fn use_method(a: Vec2, b: Vec2) -> Vec2 { a.add(b) }
+impl Addable for Vec2 { func add(self, other: Vec2) -> Vec2 { other } }
+func use_method(a: Vec2, b: Vec2) -> Vec2 { a.add(b) }
 ```
 
 ## CLI Shortcuts
-- `--tokens`
-- `--ast`
-- `--ast --pretty`
-- `--resolve`
-- `--check`
-- `--lower`
 
-See `docs/snippets.md` for real CLI output.
+Explore different compiler stages:
+
+- `--tokens` — Lex the source file
+- `--ast` — Parse into an AST (default mode)
+- `--ast --pretty` — Pretty-print the AST
+- `--resolve` — Inspect bindings and capabilities
+- `--check` — Run exhaustiveness checks
+- `--lower` — Lower to the simple HIR
+- `--ir` — Dump the typed SSA IR
+- `--llvm` — Emit the LLVM scaffolding preview
+- `--build` — Produce a native binary
+- `--run` — Compile and run via the native backend
+
+See [CLI snippets](snippets.html) for real compiler output.
+
+---
+
+## Next Steps
+
+- **[Examples](https://github.com/Sir-Teo/mica/tree/main/examples)** — Runnable programs showcasing all features
+- **[CLI Reference](module_reference.html)** — Deep dives into compiler modules
+- **[Roadmap](roadmap/index.html)** — Future milestones and development plans
+- **[Status](status.html)** — Current project health and priorities
+
+[← Back to Documentation Home](index.html)

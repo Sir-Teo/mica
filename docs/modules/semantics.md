@@ -1,5 +1,7 @@
 # Semantic Analysis
 
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)
+
 > Resolution and effect checking turn parsed syntax into meaningful program
 > structure with actionable diagnostics.
 
@@ -50,3 +52,13 @@ All functionality lives under `src/semantics`.
   borrow-checking milestones.
 - Emit machine-readable diagnostics to integrate with the planned LSP.
 - Add caching and incremental recomputation hooks to scale to large workspaces.
+
+---
+
+## Related Modules
+
+- **[Syntax Front-End](syntax.html)** — Provides the AST for resolution
+- **[Lowering Pipeline](lowering.html)** — Consumes resolved metadata
+- **[Diagnostics](diagnostics.html)** — Error reporting infrastructure
+
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)

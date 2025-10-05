@@ -1,5 +1,7 @@
 # Testing Harness
 
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)
+
 > The regression suite mirrors the entire compiler pipeline so feature work has
 > fast, reliable feedback.
 
@@ -47,3 +49,13 @@ code.
 - Explore property-based tests for lowering and SSA transformations to catch
   subtle corner cases.
 - Re-introduce coverage reporting to visualise progress toward roadmap goals.
+
+---
+
+## Related Modules
+
+- **[CLI Tooling](cli.html)** — Test execution via CLI
+- **[Runtime](runtime.html)** — Deterministic shims for tests
+- **[Documentation](documentation.html)** — Snapshot verification
+
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)

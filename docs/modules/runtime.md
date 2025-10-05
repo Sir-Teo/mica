@@ -1,5 +1,7 @@
 # Runtime and Capability Providers
 
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)
+
 > Capability-aware shims let generated binaries access host resources in a
 > controlled, observable way.
 
@@ -98,3 +100,13 @@ Serialise the trace when you need to persist telemetry or feed observability
 pipelines. The stable JSON structure makes it easy to plug into custom tools.
 Pair the deterministic shims with the JSON output to snapshot runtime behaviour
 in tests and continuous integration.
+
+---
+
+## Related Modules
+
+- **[SSA IR](ir.html)** — Backend code generation target
+- **[CLI Tooling](cli.html)** — Runtime invocation via `--run`
+- **[Testing Harness](testing.html)** — Deterministic shim usage
+
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)

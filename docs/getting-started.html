@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Getting Started with Mica - Installation, quickstart, and first program">
+    <title>Getting Started - Mica Language</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary: #64748b;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --text: #0f172a;
+            --text-muted: #475569;
+            --border: #e2e8f0;
+            --code-bg: #1e293b;
+            --accent: #8b5cf6;
+            --success: #10b981;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            padding: 3rem 0;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .breadcrumb {
+            padding: 1rem 0;
+            background: var(--bg-alt);
+        }
+        
+        .breadcrumb a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .content {
+            padding: 3rem 0;
+        }
+        
+        .step {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border-left: 4px solid var(--primary);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        
+        .step-number {
+            display: inline-block;
+            background: var(--primary);
+            color: white;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 2rem;
+            font-weight: bold;
+            margin-right: 1rem;
+        }
+        
+        .step h2 {
+            display: inline-block;
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .step p {
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            line-height: 1.7;
+        }
+        
+        .code-block {
+            background: var(--code-bg);
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        .tip {
+            background: var(--bg-alt);
+            border-left: 4px solid var(--accent);
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0.25rem;
+        }
+        
+        .tip strong {
+            color: var(--accent);
+        }
+        
+        .success-box {
+            background: #d1fae5;
+            border-left: 4px solid var(--success);
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0.25rem;
+            color: #065f46;
+        }
+        
+        .next-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        
+        .next-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            border: 2px solid var(--border);
+            text-decoration: none;
+            color: var(--text);
+            transition: all 0.2s;
+        }
+        
+        .next-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+        
+        .next-card h3 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        footer {
+            background: var(--text);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            margin-top: 4rem;
+        }
+        
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+            
+            header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🚀 Getting Started</h1>
+            <p>Set up Mica and write your first program</p>
+        </div>
+    </header>
+
+    <div class="breadcrumb">
+        <div class="container">
+            <a href="index.html">← Back to Home</a>
+        </div>
+    </div>
+
+    <div class="content container">
+        <div class="step">
+            <span class="step-number">1</span>
+            <h2>Install Prerequisites</h2>
+            <p>Mica requires a recent stable Rust toolchain. LLVM is bundled with Rust, so no additional native dependencies are needed.</p>
+            
+            <div class="code-block">
+# Install Rust via rustup
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Verify installation
+rustc --version
+cargo --version
+            </div>
+            
+            <p>Rust 1.70+ is recommended. Update your toolchain if needed:</p>
+            <div class="code-block">rustup update</div>
+        </div>
+
+        <div class="step">
+            <span class="step-number">2</span>
+            <h2>Clone and Build</h2>
+            <p>Clone the Mica repository and build the compiler:</p>
+            
+            <div class="code-block">
+# Clone the repository
+git clone https://github.com/Sir-Teo/mica.git
+cd mica
+
+# Build the compiler (first build will download dependencies)
+cargo build --release
+
+# The compiler binary will be at: target/release/mica
+            </div>
+            
+            <div class="tip">
+                <strong>💡 Tip:</strong> The first build takes a few minutes as it downloads and compiles dependencies. Subsequent builds are incremental and much faster.
+            </div>
+        </div>
+
+        <div class="step">
+            <span class="step-number">3</span>
+            <h2>Verify Installation</h2>
+            <p>Run the test suite to ensure everything is working correctly:</p>
+            
+            <div class="code-block">
+cargo test
+            </div>
+            
+            <p>Check the CLI help to see available commands:</p>
+            <div class="code-block">
+cargo run --bin mica -- --help
+            </div>
+            
+            <div class="success-box">
+                <strong>✓ Success!</strong> If all tests pass, you're ready to start programming in Mica.
+            </div>
+        </div>
+
+        <div class="step">
+            <span class="step-number">4</span>
+            <h2>Write Your First Program</h2>
+            <p>Create a file named <code>hello.mica</code>:</p>
+            
+            <div class="code-block">
+module hello
+
+capability Console
+
+func main(using Console console) -> Result[Int, Error] {
+  let hour = 14
+  let message = match hour {
+    hour if hour < 12 -> "Good morning"
+    hour if hour < 18 -> "Good afternoon"
+    _                 -> "Good evening"
+  }
+
+  console.println(message)
+  Ok(0)
+}
+            </div>
+            
+            <p>This program demonstrates:</p>
+            <ul style="margin-left: 2rem; color: var(--text-muted); margin-top: 0.5rem;">
+                <li>Module declaration</li>
+                <li>Capability declaration (Console)</li>
+                <li>Pattern matching with guards</li>
+                <li>Explicit capability usage</li>
+                <li>Result type for error handling</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <span class="step-number">5</span>
+            <h2>Compile and Run</h2>
+            <p>There are several ways to work with your program:</p>
+            
+            <div class="code-block">
+# View the AST (Abstract Syntax Tree)
+cargo run --bin mica -- --ast hello.mica
+
+# Pretty-print the AST
+cargo run --bin mica -- --ast --pretty hello.mica
+
+# Check for errors (type checking, exhaustiveness)
+cargo run --bin mica -- --check hello.mica
+
+# Lower to HIR (High-level IR)
+cargo run --bin mica -- --lower hello.mica
+
+# View typed SSA IR
+cargo run --bin mica -- --ir hello.mica
+
+# View LLVM scaffold
+cargo run --bin mica -- --llvm hello.mica
+
+# Build a native binary
+cargo run --bin mica -- --build hello.mica
+
+# Compile and run immediately
+cargo run --bin mica -- --run hello.mica
+            </div>
+        </div>
+
+        <div class="step">
+            <span class="step-number">6</span>
+            <h2>Explore Examples</h2>
+            <p>The <code>examples/</code> directory contains many sample programs demonstrating different features:</p>
+            
+            <div class="code-block">
+# Algebraic data types
+cargo run --bin mica -- --run examples/adt.mica
+
+# Concurrency with spawn/await
+cargo run --bin mica -- --run examples/concurrency_pipeline.mica
+
+# Generic tree algorithms
+cargo run --bin mica -- --run examples/generics_tree_algorithms.mica
+
+# Effects and resource management
+cargo run --bin mica -- --run examples/effects_resource_pool.mica
+
+# Comprehensive deployment example
+cargo run --bin mica -- --run examples/comprehensive_deployment.mica
+            </div>
+            
+            <p>See the <a href="examples.html" style="color: var(--primary);">Examples page</a> for a complete catalog with descriptions.</p>
+        </div>
+
+        <div class="step">
+            <span class="step-number">7</span>
+            <h2>Development Workflow</h2>
+            <p>For a smooth development experience, consider using <code>cargo-watch</code>:</p>
+            
+            <div class="code-block">
+# Install cargo-watch
+cargo install cargo-watch
+
+# Auto-run on file changes
+cargo watch -x "run --bin mica -- --run hello.mica"
+            </div>
+            
+            <div class="tip">
+                <strong>💡 Editor Support:</strong> While a dedicated LSP is in development, you can use the CLI tools 
+                for quick feedback. The pretty-printer ensures consistent code style.
+            </div>
+        </div>
+
+        <div class="success-box" style="margin-top: 2rem;">
+            <h3 style="margin-bottom: 0.5rem;">🎉 You're All Set!</h3>
+            <p>You now have a working Mica installation and have written your first program.</p>
+        </div>
+
+        <h2 style="font-size: 2rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--primary);">Next Steps</h2>
+        
+        <div class="next-steps">
+            <a href="tour.html" class="next-card">
+                <h3>📖 Language Tour</h3>
+                <p>Learn the syntax, semantics, and idioms through guided examples</p>
+            </a>
+            
+            <a href="examples.html" class="next-card">
+                <h3>💻 Examples</h3>
+                <p>Browse 20+ runnable programs showcasing all features</p>
+            </a>
+            
+            <a href="snippets.html" class="next-card">
+                <h3>🔧 CLI Reference</h3>
+                <p>See real compiler output for every stage of the pipeline</p>
+            </a>
+            
+            <a href="module_reference.html" class="next-card">
+                <h3>🏗️ Architecture</h3>
+                <p>Dive into compiler internals and module documentation</p>
+            </a>
+            
+            <a href="roadmap/index.html" class="next-card">
+                <h3>🗺️ Roadmap</h3>
+                <p>Understand the development plan and future features</p>
+            </a>
+            
+            <a href="https://github.com/Sir-Teo/mica/issues" class="next-card">
+                <h3>🐛 Contribute</h3>
+                <p>Report issues, suggest features, or submit pull requests</p>
+            </a>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>
+                <a href="index.html">Home</a> • 
+                <a href="tour.html">Tour</a> • 
+                <a href="https://github.com/Sir-Teo/mica">GitHub</a>
+            </p>
+        </div>
+    </footer>
+</body>
+</html>

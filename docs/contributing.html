@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Contributing to Mica - Join the development">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://sir-teo.github.io/mica/contributing.html">
+    <meta property="og:title" content="Contributing to Mica Language">
+    <meta property="og:description" content="Help build the future of systems programming">
+    <meta property="og:image" content="https://sir-teo.github.io/mica/assets/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://sir-teo.github.io/mica/contributing.html">
+    <meta property="twitter:title" content="Contributing to Mica Language">
+    <meta property="twitter:description" content="Help build the future of systems programming">
+    
+    <title>Contributing - Mica Language</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --accent: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --text: #0f172a;
+            --text-muted: #475569;
+            --border: #e2e8f0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            padding: 3rem 0;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .breadcrumb {
+            padding: 1rem 0;
+            background: var(--bg-alt);
+        }
+        
+        .breadcrumb a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .content {
+            padding: 3rem 0;
+        }
+        
+        .section {
+            margin-bottom: 4rem;
+        }
+        
+        .section h2 {
+            color: var(--primary);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .section p {
+            color: var(--text-muted);
+            line-height: 1.8;
+            margin-bottom: 1rem;
+        }
+        
+        .contribution-ways {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        
+        .contribution-card {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-top: 4px solid var(--primary);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .contribution-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+        }
+        
+        .contribution-card .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .contribution-card h3 {
+            color: var(--primary);
+            margin-bottom: 0.75rem;
+            font-size: 1.3rem;
+        }
+        
+        .contribution-card ul {
+            list-style: none;
+            margin-left: 0;
+        }
+        
+        .contribution-card li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+            color: var(--text-muted);
+        }
+        
+        .contribution-card li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+            font-weight: bold;
+        }
+        
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        .steps {
+            counter-reset: step;
+        }
+        
+        .step {
+            position: relative;
+            background: white;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            padding-left: 4rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-left: 4px solid var(--primary);
+        }
+        
+        .step:before {
+            counter-increment: step;
+            content: counter(step);
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 2rem;
+            height: 2rem;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .step h4 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .best-practices {
+            background: var(--bg-alt);
+            border-left: 4px solid var(--success);
+            padding: 1.5rem;
+            border-radius: 0.25rem;
+            margin: 2rem 0;
+        }
+        
+        .best-practices h3 {
+            color: var(--success);
+            margin-bottom: 1rem;
+        }
+        
+        .best-practices ul {
+            margin-left: 2rem;
+        }
+        
+        .best-practices li {
+            margin-bottom: 0.5rem;
+            color: var(--text-muted);
+        }
+        
+        .warning-box {
+            background: #fef3c7;
+            border-left: 4px solid var(--warning);
+            padding: 1rem;
+            border-radius: 0.25rem;
+            margin: 1rem 0;
+            color: #92400e;
+        }
+        
+        footer {
+            background: var(--text);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            margin-top: 4rem;
+        }
+        
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .contribution-ways {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🤝 Contributing to Mica</h1>
+            <p>Help build the future of systems programming</p>
+        </div>
+    </header>
+
+    <div class="breadcrumb">
+        <div class="container">
+            <a href="index.html">← Back to Home</a>
+        </div>
+    </div>
+
+    <div class="content container">
+        <div class="section">
+            <h2>Welcome Contributors!</h2>
+            <p>
+                Mica is an open-source project that thrives on community contributions. Whether you're fixing typos, 
+                implementing features, or improving documentation, your help is valued and appreciated.
+            </p>
+            <p>
+                This guide will help you get started contributing to Mica. We follow a friendly, inclusive approach 
+                that welcomes developers of all experience levels.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>Ways to Contribute</h2>
+            
+            <div class="contribution-ways">
+                <div class="contribution-card">
+                    <div class="icon">💻</div>
+                    <h3>Code Contributions</h3>
+                    <ul>
+                        <li>Fix bugs and issues</li>
+                        <li>Implement new features</li>
+                        <li>Optimize performance</li>
+                        <li>Write tests</li>
+                        <li>Improve error messages</li>
+                    </ul>
+                </div>
+
+                <div class="contribution-card">
+                    <div class="icon">📚</div>
+                    <h3>Documentation</h3>
+                    <ul>
+                        <li>Improve existing docs</li>
+                        <li>Write tutorials</li>
+                        <li>Create examples</li>
+                        <li>Fix typos</li>
+                        <li>Translate content</li>
+                    </ul>
+                </div>
+
+                <div class="contribution-card">
+                    <div class="icon">🐛</div>
+                    <h3>Testing & QA</h3>
+                    <ul>
+                        <li>Report bugs</li>
+                        <li>Write test cases</li>
+                        <li>Test on different platforms</li>
+                        <li>Verify fixes</li>
+                        <li>Performance testing</li>
+                    </ul>
+                </div>
+
+                <div class="contribution-card">
+                    <div class="icon">💡</div>
+                    <h3>Design & Ideas</h3>
+                    <ul>
+                        <li>Propose features</li>
+                        <li>Design discussions</li>
+                        <li>API feedback</li>
+                        <li>Usability improvements</li>
+                        <li>RFC authoring</li>
+                    </ul>
+                </div>
+
+                <div class="contribution-card">
+                    <div class="icon">🎨</div>
+                    <h3>Community</h3>
+                    <ul>
+                        <li>Answer questions</li>
+                        <li>Help newcomers</li>
+                        <li>Write blog posts</li>
+                        <li>Create videos</li>
+                        <li>Share on social media</li>
+                    </ul>
+                </div>
+
+                <div class="contribution-card">
+                    <div class="icon">🔧</div>
+                    <h3>Tooling</h3>
+                    <ul>
+                        <li>IDE plugins</li>
+                        <li>Build tools</li>
+                        <li>CI/CD improvements</li>
+                        <li>Editor integrations</li>
+                        <li>Development scripts</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Getting Started</h2>
+            
+            <div class="steps">
+                <div class="step">
+                    <h4>Fork and Clone</h4>
+                    <p>Fork the repository on GitHub, then clone your fork:</p>
+                    <div class="code-block">
+git clone https://github.com/YOUR_USERNAME/mica.git
+cd mica
+git remote add upstream https://github.com/Sir-Teo/mica.git
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h4>Build and Test</h4>
+                    <p>Ensure everything works on your system:</p>
+                    <div class="code-block">
+cargo build
+cargo test
+cargo run --bin mica -- --help
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h4>Create a Branch</h4>
+                    <p>Create a descriptive branch for your work:</p>
+                    <div class="code-block">
+git checkout -b feature/your-feature-name
+# or
+git checkout -b fix/issue-123
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h4>Make Changes</h4>
+                    <p>Write code, add tests, update documentation:</p>
+                    <div class="code-block">
+# Edit files...
+cargo fmt              # Format code
+cargo clippy           # Run linter
+cargo test            # Run tests
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h4>Commit and Push</h4>
+                    <p>Commit with a clear message:</p>
+                    <div class="code-block">
+git add .
+git commit -m "feat: add capability X to module Y"
+git push origin feature/your-feature-name
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h4>Open Pull Request</h4>
+                    <p>Go to GitHub and open a PR from your branch to main. Fill out the PR template with:</p>
+                    <ul style="margin-left: 2rem; margin-top: 0.5rem;">
+                        <li>What changes you made</li>
+                        <li>Why the changes are needed</li>
+                        <li>How to test the changes</li>
+                        <li>Related issues (if any)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Contribution Guidelines</h2>
+            
+            <div class="best-practices">
+                <h3>✓ Best Practices</h3>
+                <ul>
+                    <li><strong>Small, focused PRs:</strong> One feature or fix per PR</li>
+                    <li><strong>Tests required:</strong> Add tests for new features and bug fixes</li>
+                    <li><strong>Documentation:</strong> Update docs when changing public APIs</li>
+                    <li><strong>Code style:</strong> Run <code>cargo fmt</code> before committing</li>
+                    <li><strong>Lint clean:</strong> Fix <code>cargo clippy</code> warnings</li>
+                    <li><strong>Clear commits:</strong> Write descriptive commit messages</li>
+                    <li><strong>Respectful discussion:</strong> Be kind and constructive</li>
+                </ul>
+            </div>
+
+            <div class="warning-box">
+                <strong>⚠️ Before Starting Large Features:</strong> Open an issue first to discuss the design. 
+                This prevents wasted effort if the feature isn't aligned with project goals.
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Commit Message Format</h2>
+            <p>We use conventional commits for clarity:</p>
+            
+            <div class="code-block">
+type(scope): description
+
+[optional body]
+
+[optional footer]
+            </div>
+
+            <p><strong>Types:</strong></p>
+            <ul style="margin-left: 2rem; color: var(--text-muted);">
+                <li><code>feat</code>: New feature</li>
+                <li><code>fix</code>: Bug fix</li>
+                <li><code>docs</code>: Documentation changes</li>
+                <li><code>style</code>: Code style changes (formatting, etc.)</li>
+                <li><code>refactor</code>: Code refactoring</li>
+                <li><code>test</code>: Adding or fixing tests</li>
+                <li><code>chore</code>: Build process, dependencies, etc.</li>
+            </ul>
+
+            <p style="margin-top: 1rem;"><strong>Examples:</strong></p>
+            <div class="code-block">
+feat(parser): add support for match guards
+fix(resolver): handle circular imports correctly
+docs(tour): add concurrency examples
+test(ir): add SSA lowering test cases
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Code Review Process</h2>
+            <p>After submitting a PR:</p>
+            <ol style="margin-left: 2rem; color: var(--text-muted); margin-top: 1rem;">
+                <li style="margin-bottom: 0.5rem;"><strong>Automated checks run:</strong> CI verifies tests, formatting, and linting</li>
+                <li style="margin-bottom: 0.5rem;"><strong>Maintainer review:</strong> A core team member reviews your code</li>
+                <li style="margin-bottom: 0.5rem;"><strong>Discussion:</strong> Address feedback and make changes if needed</li>
+                <li style="margin-bottom: 0.5rem;"><strong>Approval:</strong> Once approved, your PR is merged</li>
+                <li style="margin-bottom: 0.5rem;"><strong>Recognition:</strong> You're added to contributors list!</li>
+            </ol>
+
+            <p style="margin-top: 1rem;">
+                Reviews typically happen within 2-3 days. If you haven't heard back in a week, feel free to ping the PR.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>Areas Needing Help</h2>
+            <p>Current priority areas (check <a href="https://github.com/Sir-Teo/mica/issues" style="color: var(--primary);">issues</a> for details):</p>
+            
+            <div class="contribution-ways" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+                <div class="contribution-card">
+                    <h3>Phase 3 Focus</h3>
+                    <ul>
+                        <li>Runtime providers</li>
+                        <li>Telemetry exporters</li>
+                        <li>Parallel backend tuning</li>
+                        <li>Pipeline documentation</li>
+                    </ul>
+                </div>
+
+                <div class="contribution-card">
+                    <h3>Examples</h3>
+                    <ul>
+                        <li>More use cases</li>
+                        <li>Real-world patterns</li>
+                        <li>Best practices</li>
+                        <li>Benchmarks</li>
+                    </ul>
+                </div>
+
+                <div class="contribution-card">
+                    <h3>Testing</h3>
+                    <ul>
+                        <li>Edge cases</li>
+                        <li>Negative tests</li>
+                        <li>Integration tests</li>
+                        <li>Fuzzing</li>
+                    </ul>
+                </div>
+
+                <div class="contribution-card">
+                    <h3>Documentation</h3>
+                    <ul>
+                        <li>Tutorials</li>
+                        <li>Migration guides</li>
+                        <li>Video content</li>
+                        <li>Translations</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Community Guidelines</h2>
+            <p>We are committed to providing a welcoming and inclusive environment:</p>
+            
+            <div class="best-practices" style="border-left-color: var(--accent);">
+                <h3 style="color: var(--accent);">Code of Conduct</h3>
+                <ul>
+                    <li><strong>Be respectful:</strong> Treat everyone with kindness and respect</li>
+                    <li><strong>Be constructive:</strong> Focus on ideas, not people</li>
+                    <li><strong>Be patient:</strong> Remember that everyone is learning</li>
+                    <li><strong>Be inclusive:</strong> Welcome diverse perspectives</li>
+                    <li><strong>Be professional:</strong> Keep discussions on-topic</li>
+                </ul>
+            </div>
+
+            <p>
+                Violations of these guidelines should be reported to the project maintainers. 
+                We take reports seriously and will take appropriate action.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>Getting Help</h2>
+            <p>Need assistance with your contribution?</p>
+            <ul style="margin-left: 2rem; color: var(--text-muted); margin-top: 1rem;">
+                <li><strong>Documentation:</strong> Read the <a href="tour.html" style="color: var(--primary);">Language Tour</a> and <a href="architecture.html" style="color: var(--primary);">Architecture Guide</a></li>
+                <li><strong>Issues:</strong> Ask questions on <a href="https://github.com/Sir-Teo/mica/issues" style="color: var(--primary);">GitHub Issues</a></li>
+                <li><strong>Examples:</strong> Study the <a href="examples.html" style="color: var(--primary);">Examples Gallery</a></li>
+                <li><strong>Module Docs:</strong> Explore <a href="module_reference.html" style="color: var(--primary);">compiler internals</a></li>
+            </ul>
+        </div>
+
+        <div class="best-practices" style="background: linear-gradient(135deg, #dbeafe 0%, #e9d5ff 100%); border: none; margin-top: 3rem;">
+            <h3 style="color: var(--primary);">🎉 Thank You!</h3>
+            <p style="margin-bottom: 0; color: var(--text);">
+                Every contribution, no matter how small, makes Mica better. Your time and effort are genuinely appreciated. 
+                Welcome to the Mica community!
+            </p>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>Ready to contribute? <a href="https://github.com/Sir-Teo/mica">Visit the GitHub repository</a></p>
+            <p style="margin-top: 1rem;">
+                <a href="index.html">Home</a> • 
+                <a href="getting-started.html">Getting Started</a> • 
+                <a href="faq.html">FAQ</a>
+            </p>
+        </div>
+    </footer>
+</body>
+</html>

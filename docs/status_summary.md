@@ -1,6 +1,8 @@
 # Phase 3 Kickoff Status
 
-_Last refreshed: 2024-07-01_
+_Last refreshed: 2025-10-04_
+
+[← Back to Documentation Home](index.html)
 
 This summary condenses the current Phase 3 health report for quick scanning. It
 highlights what is stable, how we validate it, and where contributors can have
@@ -76,3 +78,13 @@ the most impact next.
   with deterministic fixtures and smoke tests to avoid surprising consumers.
 - Evaluate portable coverage collectors that work across the CI matrix so we can
   reintroduce reporting without bespoke tooling.
+
+---
+
+## Related Documentation
+
+- **[Full Status Report](status.html)** — Detailed Phase 3 health check
+- **[Roadmap](roadmap/index.html)** — Chronological milestone plans
+- **[Module Reference](module_reference.html)** — Deep dives into each subsystem
+
+[← Back to Documentation Home](index.html)

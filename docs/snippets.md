@@ -1,6 +1,8 @@
 # CLI Snippets
 
-This page shows short outputs from the CLI for selected examples.
+[← Back to Documentation Home](index.html)
+
+This page shows short outputs from the CLI for selected examples. These snippets are automatically generated from real compiler output and verified in CI.
 
 ## Pretty AST (`--ast --pretty`)
 
@@ -68,7 +70,16 @@ Command: `cargo run --bin mica -- --lower examples/spawn_await.mica`
 
 ```
 hir module demo.concurrent
-fn fetch(u, net) !{net}
+func fetch(u, net) !{net}
   await(spawn(http::get(u, net)))
 ```
 
+---
+
+## Related Documentation
+
+- **[Language Tour](tour.html)** — Learn the language syntax and semantics
+- **[CLI Reference](modules/cli.html)** — Detailed CLI documentation
+- **[Pipeline Entry Points](modules/pipeline.html)** — JSON exports and tooling integration
+
+[← Back to Documentation Home](index.html)

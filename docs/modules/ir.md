@@ -1,5 +1,7 @@
 # SSA Intermediate Representation
 
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)
+
 > The SSA IR bridges desugared syntax and backend code generation.
 
 ## Overview
@@ -54,3 +56,13 @@ capability metadata. The module doubles as documentation for backend contracts.
 - Integrate precise types via the planned inference work and capability analysis.
 - Emit machine-readable dumps (JSON, DOT) for visualisation tools and editor
   plugins.
+
+---
+
+## Related Modules
+
+- **[Lowering Pipeline](lowering.html)** — Provides the HIR input
+- **[Runtime](runtime.html)** — Executes generated code
+- **[Pipeline Entry Points](pipeline.html)** — Exports IR as JSON
+
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)

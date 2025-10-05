@@ -1,5 +1,7 @@
 # Module Reference Index
 
+[← Back to Documentation Home](index.html)
+
 > Use this index to jump to deep dives for each subsystem in the compiler.
 
 Each guide explains the component’s responsibilities, key types, and roadmap
@@ -20,3 +22,13 @@ how the pieces evolve over time.
 
 Refer back to this list whenever you need to orient yourself across the compiler
 pipeline or explore how upcoming roadmap work will extend each area.
+
+---
+
+## Related Documentation
+
+- **[Language Tour](tour.html)** — Quick introduction to Mica's features
+- **[Roadmap](roadmap/index.html)** — Development milestones and plans
+- **[Project Status](status.html)** — Current health and priorities
+
+[← Back to Documentation Home](index.html)

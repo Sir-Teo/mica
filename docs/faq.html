@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Mica Language FAQ - Frequently Asked Questions">
+    <title>FAQ - Mica Language</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --accent: #8b5cf6;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --text: #0f172a;
+            --text-muted: #475569;
+            --border: #e2e8f0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            padding: 3rem 0;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .breadcrumb {
+            padding: 1rem 0;
+            background: var(--bg-alt);
+        }
+        
+        .breadcrumb a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .content {
+            padding: 3rem 0;
+        }
+        
+        .faq-category {
+            margin-bottom: 3rem;
+        }
+        
+        .faq-category h2 {
+            color: var(--primary);
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .faq-item {
+            background: white;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            transition: all 0.3s;
+        }
+        
+        .faq-item:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-color: var(--primary);
+        }
+        
+        .faq-question {
+            padding: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            color: var(--text);
+            user-select: none;
+        }
+        
+        .faq-question:hover {
+            background: var(--bg-alt);
+        }
+        
+        .faq-icon {
+            font-size: 1.5rem;
+            color: var(--primary);
+            transition: transform 0.3s;
+        }
+        
+        .faq-item.active .faq-icon {
+            transform: rotate(45deg);
+        }
+        
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .faq-answer-content {
+            padding: 0 1.5rem 1.5rem;
+            color: var(--text-muted);
+            line-height: 1.8;
+        }
+        
+        .faq-answer-content p {
+            margin-bottom: 1rem;
+        }
+        
+        .faq-answer-content ul {
+            margin-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .faq-answer-content code {
+            background: var(--bg-alt);
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            font-family: 'Monaco', monospace;
+            font-size: 0.9em;
+        }
+        
+        .faq-answer-content a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .faq-answer-content a:hover {
+            text-decoration: underline;
+        }
+        
+        .search-box {
+            position: sticky;
+            top: 0;
+            background: white;
+            padding: 2rem 0;
+            z-index: 10;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            font-size: 1rem;
+            border: 2px solid var(--border);
+            border-radius: 0.5rem;
+            transition: border-color 0.3s;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+            display: none;
+        }
+        
+        footer {
+            background: var(--text);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            margin-top: 4rem;
+        }
+        
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+            
+            header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>❓ Frequently Asked Questions</h1>
+            <p>Everything you need to know about Mica</p>
+        </div>
+    </header>
+
+    <div class="breadcrumb">
+        <div class="container">
+            <a href="index.html">← Back to Home</a>
+        </div>
+    </div>
+
+    <div class="content container">
+        <div class="search-box">
+            <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search FAQs...">
+        </div>
+
+        <div class="no-results" id="noResults">
+            <h3>No results found</h3>
+            <p>Try a different search term</p>
+        </div>
+
+        <div class="faq-category">
+            <h2>Getting Started</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>Is Mica production ready?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p>Mica is currently a <strong>prototype under active development</strong> (Phase 3). While the compiler works and can generate native binaries, the language is still iterating on core semantics and tooling.</p>
+                        <p>You should expect:</p>
+                        <ul>
+                            <li>Breaking changes between releases</li>
+                            <li>Incomplete standard library</li>
+                            <li>Evolving best practices</li>
+                            <li>Active experimentation with language features</li>
+                        </ul>
+                        <p>Mica is perfect for learning compiler design, experimenting with effect systems, or prototyping language ideas—but not yet recommended for production systems.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>How long does it take to learn Mica?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p>Mica is designed to be <strong>learned in an afternoon</strong>:</p>
+                        <ul>
+                            <li><strong>Syntax:</strong> 2-3 hours (10 core constructs)</li>
+                            <li><strong>Effect system:</strong> 1-2 hours (capabilities and using blocks)</li>
+                            <li><strong>Concurrency:</strong> 1 hour (spawn/await patterns)</li>
+                            <li><strong>Complete tour:</strong> 4-6 hours</li>
+                        </ul>
+                        <p>The <a href="tour.html">Language Tour</a> covers everything with runnable examples. The <a href="examples.html">Examples Gallery</a> provides 20+ programs to study.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>What are the system requirements?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p><strong>Minimum requirements:</strong></p>
+                        <ul>
+                            <li>Rust 1.70+ (install via rustup)</li>
+                            <li>4 GB RAM (for compilation)</li>
+                            <li>macOS, Linux, or Windows with WSL2</li>
+                            <li>~500 MB disk space</li>
+                        </ul>
+                        <p>LLVM is bundled with Rust, so no additional dependencies are needed.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="faq-category">
+            <h2>Language Design</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>What makes Mica different from Rust?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p>While both are systems languages with memory safety, key differences include:</p>
+                        <ul>
+                            <li><strong>Explicit effects:</strong> Mica tracks all side effects at the type level with capabilities</li>
+                            <li><strong>Deterministic concurrency:</strong> Built-in spawn/await with reproducible execution</li>
+                            <li><strong>Simplicity:</strong> 10 core constructs vs Rust's extensive syntax</li>
+                            <li><strong>Learning curve:</strong> Weekend to learn vs months for Rust</li>
+                            <li><strong>Inspectable compiler:</strong> Every stage exposed via CLI</li>
+                        </ul>
+                        <p>Mica prioritizes <strong>explicitness and auditability</strong> over maximum performance optimization.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>Does Mica have a garbage collector?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p><strong>No.</strong> Mica uses <strong>move semantics</strong> and RAII (Resource Acquisition Is Initialization) for memory management:</p>
+                        <ul>
+                            <li>Values are moved by default</li>
+                            <li><code>using</code> blocks provide automatic cleanup</li>
+                            <li>No garbage collection pauses</li>
+                            <li>Predictable performance</li>
+                        </ul>
+                        <p>A Rust-style borrow checker is planned for Phase 4 to prevent use-after-move errors at compile time.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>Why explicit effect tracking?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p>Explicit effects make programs <strong>auditable and testable</strong>:</p>
+                        <ul>
+                            <li><strong>Security:</strong> Know exactly what resources a function can access</li>
+                            <li><strong>Testing:</strong> Mock capabilities with deterministic shims</li>
+                            <li><strong>Reasoning:</strong> Function signatures tell the full story</li>
+                            <li><strong>Composition:</strong> Effects propagate automatically through call chains</li>
+                        </ul>
+                        <p>Example: <code>func process(io: IO) !{io}</code> declares that this function performs IO operations.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>What is deterministic concurrency?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p>Mica's concurrency model guarantees <strong>reproducible results</strong>:</p>
+                        <ul>
+                            <li><strong>Structured tasks:</strong> spawn/await with clear lifetimes</li>
+                            <li><strong>No data races:</strong> Effect system prevents shared mutable state</li>
+                            <li><strong>Deterministic scheduling:</strong> Same inputs = same outputs</li>
+                            <li><strong>Testability:</strong> Concurrent code can be unit tested reliably</li>
+                        </ul>
+                        <p>This makes debugging and testing concurrent programs much easier than traditional threading models.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="faq-category">
+            <h2>Development & Tooling</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>Is there IDE support?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p>A dedicated Language Server Protocol (LSP) implementation is <strong>planned for Phase 4</strong>. Currently available:</p>
+                        <ul>
+                            <li><strong>CLI tools:</strong> Inspect every compiler stage</li>
+                            <li><strong>Pretty-printer:</strong> Format code consistently</li>
+                            <li><strong>JSON output:</strong> Machine-readable diagnostics</li>
+                            <li><strong>cargo watch:</strong> Auto-run on file changes</li>
+                        </ul>
+                        <p>See the <a href="roadmap/tooling.html">Tooling Roadmap</a> for LSP plans.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>How do I debug Mica programs?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p>Debugging strategies:</p>
+                        <ul>
+                            <li><strong>Compiler stages:</strong> Use <code>--ast</code>, <code>--ir</code>, <code>--llvm</code> to inspect transformations</li>
+                            <li><strong>Capability logging:</strong> Trace IO/network operations through capability providers</li>
+                            <li><strong>Deterministic execution:</strong> Bugs reproduce reliably</li>
+                            <li><strong>Testing shims:</strong> Mock capabilities for isolated testing</li>
+                            <li><strong>Rich diagnostics:</strong> Compiler provides detailed error messages</li>
+                        </ul>
+                        <p>Future: Time-travel debugging with deterministic replay is planned.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>Can I use Mica libraries in other languages?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p><strong>Yes!</strong> Interop options:</p>
+                        <ul>
+                            <li><strong>C ABI:</strong> Export functions with C-compatible signatures</li>
+                            <li><strong>Python bridges:</strong> Planned via FFI (Phase 5)</li>
+                            <li><strong>JavaScript:</strong> WASM target planned</li>
+                            <li><strong>Rust:</strong> Compatible memory model</li>
+                        </ul>
+                        <p>See the <a href="roadmap/ecosystem.html">Ecosystem Roadmap</a> for interop plans.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="faq-category">
+            <h2>Performance</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>How fast is Mica?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p>Mica compiles to native code via LLVM with <strong>zero-cost abstractions</strong>:</p>
+                        <ul>
+                            <li><strong>AOT compilation:</strong> No JIT overhead</li>
+                            <li><strong>LLVM optimization:</strong> Industry-standard optimizations</li>
+                            <li><strong>No GC:</strong> Predictable latency</li>
+                            <li><strong>Effect analysis:</strong> Enables parallelization</li>
+                        </ul>
+                        <p>Target: Within 10% of equivalent Rust for most workloads. Benchmarks coming in Phase 4.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>How fast does the compiler build?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p>Mica prioritizes <strong>fast compile times</strong>:</p>
+                        <ul>
+                            <li><strong>Small examples:</strong> &lt;1 second</li>
+                            <li><strong>Medium projects:</strong> 5-10 seconds</li>
+                            <li><strong>Incremental builds:</strong> Very fast (caching planned)</li>
+                        </ul>
+                        <p>Much faster than Rust due to simpler type system and smaller surface area.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="faq-category">
+            <h2>Community & Contributing</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>How can I contribute?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p>Contributions are welcome! Ways to help:</p>
+                        <ul>
+                            <li><strong>Code:</strong> Fix bugs, implement features (check <a href="https://github.com/Sir-Teo/mica/issues">issues</a>)</li>
+                            <li><strong>Documentation:</strong> Improve guides, add examples</li>
+                            <li><strong>Testing:</strong> Write test cases, find bugs</li>
+                            <li><strong>Design:</strong> Propose language features via RFCs</li>
+                            <li><strong>Tutorials:</strong> Create learning materials</li>
+                        </ul>
+                        <p>See the <a href="contributing.html">Contributing Guide</a> for details.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>Where can I ask questions?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p>Get help through:</p>
+                        <ul>
+                            <li><strong>GitHub Issues:</strong> <a href="https://github.com/Sir-Teo/mica/issues">Bug reports and questions</a></li>
+                            <li><strong>Discussions:</strong> Coming soon on GitHub</li>
+                            <li><strong>Documentation:</strong> Comprehensive guides here</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>What's the license?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p>Mica does not yet declare a license. Until one is added, please reach out to the maintainers before using Mica in production settings.</p>
+                        <p>A permissive open-source license is planned before the Phase 5 ecosystem launch.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="faq-category">
+            <h2>Roadmap & Future</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>When will Mica 1.0 be released?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p>There's no fixed timeline, but the <a href="roadmap/milestones.html">roadmap</a> outlines:</p>
+                        <ul>
+                            <li><strong>Phase 3 (Current):</strong> Backend & runtime</li>
+                            <li><strong>Phase 4:</strong> Tooling & IDE support</li>
+                            <li><strong>Phase 5:</strong> Ecosystem & standard library</li>
+                            <li><strong>Phase 6:</strong> Community growth</li>
+                        </ul>
+                        <p>1.0 will likely come after Phase 5, when the language is stable and production-tested.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>Will there be a package manager?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p><strong>Yes!</strong> Planned for Phase 5:</p>
+                        <ul>
+                            <li><code>mica.toml</code> manifest format</li>
+                            <li><code>mica package</code> CLI commands</li>
+                            <li>Hosted registry with signed packages</li>
+                            <li>Capability declarations in manifests</li>
+                            <li>Reproducible builds</li>
+                        </ul>
+                        <p>See the <a href="roadmap/ecosystem.html">Ecosystem Roadmap</a> for details.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span>What platforms will be supported?</span>
+                    <span class="faq-icon">+</span>
+                </div>
+                <div class="faq-answer">
+                    <div class="faq-answer-content">
+                        <p><strong>Current:</strong> macOS, Linux, Windows (via WSL2)</p>
+                        <p><strong>Planned:</strong></p>
+                        <ul>
+                            <li>Native Windows support</li>
+                            <li>WebAssembly target</li>
+                            <li>Embedded systems (ARM)</li>
+                            <li>Mobile (iOS, Android via cross-compilation)</li>
+                        </ul>
+                        <p>LLVM backend provides excellent platform support out of the box.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>Still have questions? <a href="https://github.com/Sir-Teo/mica/issues">Open an issue on GitHub</a></p>
+            <p style="margin-top: 1rem;">
+                <a href="index.html">Home</a> • 
+                <a href="getting-started.html">Getting Started</a> • 
+                <a href="tour.html">Tour</a>
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // FAQ accordion functionality
+        document.querySelectorAll('.faq-question').forEach(question => {
+            question.addEventListener('click', () => {
+                const item = question.parentElement;
+                const answer = item.querySelector('.faq-answer');
+                const isActive = item.classList.contains('active');
+                
+                // Close all other items
+                document.querySelectorAll('.faq-item').forEach(otherItem => {
+                    if (otherItem !== item) {
+                        otherItem.classList.remove('active');
+                        otherItem.querySelector('.faq-answer').style.maxHeight = '0';
+                    }
+                });
+                
+                // Toggle current item
+                if (isActive) {
+                    item.classList.remove('active');
+                    answer.style.maxHeight = '0';
+                } else {
+                    item.classList.add('active');
+                    answer.style.maxHeight = answer.scrollHeight + 'px';
+                }
+            });
+        });
+        
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        const noResults = document.getElementById('noResults');
+        
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const faqItems = document.querySelectorAll('.faq-item');
+            let visibleCount = 0;
+            
+            faqItems.forEach(item => {
+                const question = item.querySelector('.faq-question span:first-child').textContent.toLowerCase();
+                const answer = item.querySelector('.faq-answer-content').textContent.toLowerCase();
+                
+                if (question.includes(searchTerm) || answer.includes(searchTerm)) {
+                    item.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            // Show/hide categories based on visible items
+            document.querySelectorAll('.faq-category').forEach(category => {
+                const visibleItems = category.querySelectorAll('.faq-item[style="display: block;"], .faq-item:not([style*="display"])');
+                category.style.display = visibleItems.length > 0 ? 'block' : 'none';
+            });
+            
+            // Show no results message
+            noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+        });
+    </script>
+</body>
+</html>

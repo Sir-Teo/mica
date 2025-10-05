@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Mica Language Examples - Runnable code showcasing all features">
+    <title>Examples - Mica Language</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary: #64748b;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --text: #0f172a;
+            --text-muted: #475569;
+            --border: #e2e8f0;
+            --code-bg: #1e293b;
+            --accent: #8b5cf6;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            padding: 3rem 0;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .breadcrumb {
+            padding: 1rem 0;
+            background: var(--bg-alt);
+        }
+        
+        .breadcrumb a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        
+        .section {
+            padding: 4rem 0;
+        }
+        
+        .section:nth-child(even) {
+            background: var(--bg-alt);
+        }
+        
+        .section-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+        
+        .section-intro {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .example-card {
+            background: white;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+            transition: all 0.3s;
+        }
+        
+        .example-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+            border-color: var(--primary);
+        }
+        
+        .example-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            padding: 1.5rem;
+        }
+        
+        .example-header h3 {
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .example-header .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.85rem;
+            margin-right: 0.5rem;
+        }
+        
+        .example-body {
+            padding: 1.5rem;
+        }
+        
+        .example-body p {
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            line-height: 1.7;
+        }
+        
+        .example-features {
+            list-style: none;
+            margin-bottom: 1rem;
+        }
+        
+        .example-features li {
+            color: var(--text-muted);
+            padding: 0.25rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        
+        .example-features li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: bold;
+        }
+        
+        .example-footer {
+            padding: 1rem 1.5rem;
+            background: var(--bg-alt);
+            border-top: 1px solid var(--border);
+        }
+        
+        .example-footer a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .example-footer a:hover {
+            text-decoration: underline;
+        }
+        
+        .code-example {
+            background: var(--code-bg);
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        .keyword { color: #c792ea; }
+        .function { color: #82aaff; }
+        .string { color: #c3e88d; }
+        .comment { color: #546e7a; font-style: italic; }
+        .type { color: #ffcb6b; }
+        .number { color: #f78c6c; }
+        
+        footer {
+            background: var(--text);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+        }
+        
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        @media (max-width: 768px) {
+            .examples-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>📚 Mica Examples</h1>
+            <p>Runnable programs showcasing language features</p>
+        </div>
+    </header>
+
+    <div class="breadcrumb">
+        <div class="container">
+            <a href="index.html">← Back to Home</a>
+        </div>
+    </div>
+
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">Featured Examples</h2>
+            <p class="section-intro">
+                All examples are runnable with <code>cargo run --bin mica -- --run examples/&lt;filename&gt;.mica</code>
+            </p>
+
+            <div class="examples-grid">
+                <!-- Comprehensive Deployment -->
+                <div class="example-card">
+                    <div class="example-header">
+                        <h3>Comprehensive Deployment</h3>
+                        <span class="badge">Advanced</span>
+                        <span class="badge">166 lines</span>
+                    </div>
+                    <div class="example-body">
+                        <p>An end-to-end deployment pipeline demonstrating:</p>
+                        <ul class="example-features">
+                            <li>Structured concurrency with spawn/await</li>
+                            <li>Nested using blocks with RAII semantics</li>
+                            <li>Pattern matching with guards</li>
+                            <li>Capability-aware error propagation</li>
+                            <li>Retry logic with exponential backoff</li>
+                        </ul>
+                    </div>
+                    <div class="example-footer">
+                        <a href="https://github.com/Sir-Teo/mica/blob/main/examples/comprehensive_deployment.mica">
+                            View Source →
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Concurrency Pipeline -->
+                <div class="example-card">
+                    <div class="example-header">
+                        <h3>Concurrency Pipeline</h3>
+                        <span class="badge">Intermediate</span>
+                        <span class="badge">56 lines</span>
+                    </div>
+                    <div class="example-body">
+                        <p>A fan-out/fan-in pipeline showing:</p>
+                        <ul class="example-features">
+                            <li>Task spawning and awaiting</li>
+                            <li>Pattern matching on results</li>
+                            <li>Capability-checked IO operations</li>
+                            <li>Structured error handling</li>
+                        </ul>
+                    </div>
+                    <div class="example-footer">
+                        <a href="https://github.com/Sir-Teo/mica/blob/main/examples/concurrency_pipeline.mica">
+                            View Source →
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Generics & Tree Algorithms -->
+                <div class="example-card">
+                    <div class="example-header">
+                        <h3>Generic Tree Algorithms</h3>
+                        <span class="badge">Intermediate</span>
+                        <span class="badge">45 lines</span>
+                    </div>
+                    <div class="example-body">
+                        <p>Recursive ADTs with generic functions:</p>
+                        <ul class="example-features">
+                            <li>Generic type parameters</li>
+                            <li>Recursive algebraic data types</li>
+                            <li>Higher-order functions (map, fold)</li>
+                            <li>Type inference</li>
+                        </ul>
+                    </div>
+                    <div class="example-footer">
+                        <a href="https://github.com/Sir-Teo/mica/blob/main/examples/generics_tree_algorithms.mica">
+                            View Source →
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Effects Resource Pool -->
+                <div class="example-card">
+                    <div class="example-header">
+                        <h3>Effects & Resource Pool</h3>
+                        <span class="badge">Intermediate</span>
+                        <span class="badge">~1KB</span>
+                    </div>
+                    <div class="example-body">
+                        <p>Higher-order effect management:</p>
+                        <ul class="example-features">
+                            <li>Resource pooling with RAII</li>
+                            <li>Higher-order capability helpers</li>
+                            <li>Cross-capability tasks</li>
+                            <li>Structured error propagation</li>
+                        </ul>
+                    </div>
+                    <div class="example-footer">
+                        <a href="https://github.com/Sir-Teo/mica/blob/main/examples/effects_resource_pool.mica">
+                            View Source →
+                        </a>
+                    </div>
+                </div>
+
+                <!-- ADT & Pattern Matching -->
+                <div class="example-card">
+                    <div class="example-header">
+                        <h3>Algebraic Data Types</h3>
+                        <span class="badge">Beginner</span>
+                        <span class="badge">~240 bytes</span>
+                    </div>
+                    <div class="example-body">
+                        <p>Core ADT features:</p>
+                        <ul class="example-features">
+                            <li>Type definitions (Option, Result)</li>
+                            <li>Generic type parameters</li>
+                            <li>Pattern matching</li>
+                            <li>Exhaustiveness checking</li>
+                        </ul>
+                    </div>
+                    <div class="example-footer">
+                        <a href="https://github.com/Sir-Teo/mica/blob/main/examples/adt.mica">
+                            View Source →
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Methods & Impls -->
+                <div class="example-card">
+                    <div class="example-header">
+                        <h3>Methods & Implementations</h3>
+                        <span class="badge">Beginner</span>
+                        <span class="badge">~226 bytes</span>
+                    </div>
+                    <div class="example-body">
+                        <p>Object-oriented features:</p>
+                        <ul class="example-features">
+                            <li>Impl blocks</li>
+                            <li>Method receivers</li>
+                            <li>Method call syntax</li>
+                            <li>Lowering to functions</li>
+                        </ul>
+                    </div>
+                    <div class="example-footer">
+                        <a href="https://github.com/Sir-Teo/mica/blob/main/examples/methods.mica">
+                            View Source →
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Match Guards -->
+                <div class="example-card">
+                    <div class="example-header">
+                        <h3>Match with Guards</h3>
+                        <span class="badge">Beginner</span>
+                        <span class="badge">~359 bytes</span>
+                    </div>
+                    <div class="example-body">
+                        <p>Advanced pattern matching:</p>
+                        <ul class="example-features">
+                            <li>Pattern guards (if conditions)</li>
+                            <li>Exhaustiveness with guards</li>
+                            <li>Nested patterns</li>
+                            <li>Wildcard matching</li>
+                        </ul>
+                    </div>
+                    <div class="example-footer">
+                        <a href="https://github.com/Sir-Teo/mica/blob/main/examples/match_guards.mica">
+                            View Source →
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Lists & Loops -->
+                <div class="example-card">
+                    <div class="example-header">
+                        <h3>Lists & Loops</h3>
+                        <span class="badge">Beginner</span>
+                        <span class="badge">~167 bytes</span>
+                    </div>
+                    <div class="example-body">
+                        <p>Collection manipulation:</p>
+                        <ul class="example-features">
+                            <li>List literals</li>
+                            <li>For loops</li>
+                            <li>Mutable variables</li>
+                            <li>Iteration patterns</li>
+                        </ul>
+                    </div>
+                    <div class="example-footer">
+                        <a href="https://github.com/Sir-Teo/mica/blob/main/examples/lists_and_loops.mica">
+                            View Source →
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Loop Control -->
+                <div class="example-card">
+                    <div class="example-header">
+                        <h3>Loop Control Flow</h3>
+                        <span class="badge">Beginner</span>
+                        <span class="badge">~475 bytes</span>
+                    </div>
+                    <div class="example-body">
+                        <p>Control flow constructs:</p>
+                        <ul class="example-features">
+                            <li>While loops</li>
+                            <li>Break statements</li>
+                            <li>Continue statements</li>
+                            <li>Conditional logic</li>
+                        </ul>
+                    </div>
+                    <div class="example-footer">
+                        <a href="https://github.com/Sir-Teo/mica/blob/main/examples/loop_control.mica">
+                            View Source →
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Results & Try -->
+                <div class="example-card">
+                    <div class="example-header">
+                        <h3>Results & Try Operator</h3>
+                        <span class="badge">Intermediate</span>
+                        <span class="badge">~586 bytes</span>
+                    </div>
+                    <div class="example-body">
+                        <p>Error handling patterns:</p>
+                        <ul class="example-features">
+                            <li>Result type usage</li>
+                            <li>Try operator (?)</li>
+                            <li>Error propagation</li>
+                            <li>Recoverable errors</li>
+                        </ul>
+                    </div>
+                    <div class="example-footer">
+                        <a href="https://github.com/Sir-Teo/mica/blob/main/examples/results_try.mica">
+                            View Source →
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Effects & Using -->
+                <div class="example-card">
+                    <div class="example-header">
+                        <h3>Effects & Using Blocks</h3>
+                        <span class="badge">Intermediate</span>
+                        <span class="badge">~268 bytes</span>
+                    </div>
+                    <div class="example-body">
+                        <p>Capability system basics:</p>
+                        <ul class="example-features">
+                            <li>Effect annotations</li>
+                            <li>Using blocks (RAII)</li>
+                            <li>Resource management</li>
+                            <li>Explicit capabilities</li>
+                        </ul>
+                    </div>
+                    <div class="example-footer">
+                        <a href="https://github.com/Sir-Teo/mica/blob/main/examples/effects_and_using.mica">
+                            View Source →
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Native Entry -->
+                <div class="example-card">
+                    <div class="example-header">
+                        <h3>Native Binary Entry</h3>
+                        <span class="badge">Beginner</span>
+                        <span class="badge">~150 bytes</span>
+                    </div>
+                    <div class="example-body">
+                        <p>Minimal native compilation:</p>
+                        <ul class="example-features">
+                            <li>Main function entry point</li>
+                            <li>Native --build workflow</li>
+                            <li>Binary generation</li>
+                            <li>End-to-end compilation</li>
+                        </ul>
+                    </div>
+                    <div class="example-footer">
+                        <a href="https://github.com/Sir-Teo/mica/blob/main/examples/native_entry.mica">
+                            View Source →
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">Running Examples</h2>
+            
+            <div class="code-example">
+<span class="comment"># View AST</span>
+cargo run --bin mica -- --ast examples/adt.mica
+
+<span class="comment"># Check for errors</span>
+cargo run --bin mica -- --check examples/concurrency_pipeline.mica
+
+<span class="comment"># Lower to HIR</span>
+cargo run --bin mica -- --lower examples/methods.mica
+
+<span class="comment"># View typed IR</span>
+cargo run --bin mica -- --ir examples/generics_tree_algorithms.mica
+
+<span class="comment"># Build native binary</span>
+cargo run --bin mica -- --build examples/native_entry.mica
+
+<span class="comment"># Compile and run</span>
+cargo run --bin mica -- --run examples/comprehensive_deployment.mica
+            </div>
+            
+            <p class="section-intro">
+                For more details, see the <a href="tour.html" style="color: var(--primary);">Language Tour</a> 
+                and <a href="snippets.html" style="color: var(--primary);">CLI Snippets</a>.
+            </p>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>
+                <a href="index.html">Home</a> • 
+                <a href="tour.html">Tour</a> • 
+                <a href="https://github.com/Sir-Teo/mica">GitHub</a>
+            </p>
+        </div>
+    </footer>
+</body>
+</html>

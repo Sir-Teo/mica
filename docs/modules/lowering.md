@@ -1,5 +1,7 @@
 # Lowering Pipeline
 
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)
+
 > Lowering turns high-level syntax into a simplified HIR ready for SSA.
 
 ## Overview
@@ -53,3 +55,13 @@ program for SSA lowering.
 - Track source spans through lowering to improve downstream diagnostics.
 - Provide hooks for incremental or cached lowering in anticipation of IDE
   integrations.
+
+---
+
+## Related Modules
+
+- **[Syntax Front-End](syntax.html)** — Provides the AST input
+- **[Semantic Analysis](semantics.html)** — Supplies resolved metadata
+- **[SSA IR](ir.html)** — Consumes the HIR output
+
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)

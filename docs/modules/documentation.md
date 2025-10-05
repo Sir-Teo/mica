@@ -1,5 +1,7 @@
 # Documentation and Examples
 
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)
+
 > The written guides and runnable programs stay in lockstep through automation
 > and snapshot testing.
 
@@ -44,3 +46,14 @@ keeps both assets accurate as the compiler evolves.
   document or test.
 - Publish lightweight changelogs alongside roadmap updates to keep readers
   informed of progress.
+
+---
+
+## Related Documentation
+
+- **[Language Tour](../tour.html)** — Narrative walkthrough with examples
+- **[CLI Snippets](../snippets.html)** — Generated compiler output
+- **[Roadmap](../roadmap/index.html)** — Development milestones
+- **[Testing Harness](testing.html)** — Example verification
+
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)

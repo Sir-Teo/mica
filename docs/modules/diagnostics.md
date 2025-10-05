@@ -1,5 +1,7 @@
 # Diagnostics Infrastructure
 
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)
+
 > A single diagnostics vocabulary keeps user-facing errors consistent across all
 > compiler stages.
 
@@ -45,3 +47,13 @@ structure.
    unified surface area.
 3. Explore warning levels and categories that downstream tools can filter or
    promote to hard errors.
+
+---
+
+## Related Modules
+
+- **[Syntax Front-End](syntax.html)** — Lexer and parser errors
+- **[Semantic Analysis](semantics.html)** — Type and effect errors
+- **[CLI Tooling](cli.html)** — Formats diagnostics for output
+
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)

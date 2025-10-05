@@ -1,5 +1,7 @@
 # Phased Execution Milestones
 
+[← Back to Roadmap](index.html) | [← Documentation Home](../index.html)
+
 > A phase-by-phase plan with entry requirements, core work, exits, and signals.
 
 This playbook sequences the workstreams so we can ship usable artefacts after
@@ -98,6 +100,18 @@ signals to check before moving on.
   - Quarterly roadmap review produces updated documents in this folder.
   - Adoption metrics tracked (downloads, RFC throughput, issue burn-down).
   - **Future signal**: Community feeds verified case studies back into governance and roadmap updates.
+
+---
+
+## Related Documentation
+
+- **[Compiler Roadmap](compiler.html)** — Deep dives for compiler modules
+- **[Tooling Roadmap](tooling.html)** — CLI, formatter, and LSP plans
+- **[Ecosystem Roadmap](ecosystem.html)** — Standard library and package manager
+- **[Next Steps](next-step.html)** — Immediate action items
+- **[Project Status](../status.html)** — Current Phase 3 health
+
+[← Back to Roadmap](index.html) | [← Documentation Home](../index.html)
 
 ---
 

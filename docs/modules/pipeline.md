@@ -1,5 +1,7 @@
 # Compiler Pipeline Entry Points
 
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)
+
 > The CLI exposes every stage of the compiler pipeline so tools can plug in
 > without re-implementing compiler internals.
 
@@ -54,3 +56,13 @@ runtime behaviour.
 - Extend `mica run` with `--trace-json <path>` to persist telemetry without
   piping stdout.
 - Add worked examples to the language tour that reference the pipeline dumps.
+
+---
+
+## Related Modules
+
+- **[CLI Tooling](cli.html)** — Command-line interface implementation
+- **[Runtime](runtime.html)** — Telemetry generation
+- **[SSA IR](ir.html)** — Intermediate representation exports
+
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)

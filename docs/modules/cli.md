@@ -1,5 +1,7 @@
 # CLI and Developer Tooling
 
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)
+
 > `mica` and `gen_snippets` make the compiler explorable from the command line
 > while keeping the documentation trustworthy.
 
@@ -59,3 +61,13 @@ that the written guides never drift from real compiler output.
   server work.
 - Explore watch-mode or incremental recompilation hooks alongside incremental
   front-end improvements.
+
+---
+
+## Related Modules
+
+- **[Pipeline Entry Points](pipeline.html)** — JSON exports and tooling integration
+- **[Syntax Front-End](syntax.html)** — Lexer and parser invoked by CLI
+- **[Diagnostics](diagnostics.html)** — Error formatting in CLI output
+
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)

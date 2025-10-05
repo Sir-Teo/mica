@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Mica Language Features - Comprehensive overview of capabilities and design">
+    <title>Features - Mica Language</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --accent: #8b5cf6;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --text: #0f172a;
+            --text-muted: #475569;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            padding: 3rem 0;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .breadcrumb {
+            padding: 1rem 0;
+            background: var(--bg-alt);
+        }
+        
+        .breadcrumb a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .section {
+            padding: 4rem 0;
+        }
+        
+        .section:nth-child(even) {
+            background: var(--bg-alt);
+        }
+        
+        .section-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-align: center;
+            color: var(--text);
+        }
+        
+        .section-intro {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            max-width: 700px;
+            margin: 0 auto 3rem;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .feature-detail {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-top: 4px solid var(--primary);
+        }
+        
+        .feature-detail h3 {
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .feature-detail p {
+            color: var(--text-muted);
+            line-height: 1.7;
+            margin-bottom: 1rem;
+        }
+        
+        .feature-detail ul {
+            list-style: none;
+            margin-left: 0;
+        }
+        
+        .feature-detail li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+            color: var(--text-muted);
+        }
+        
+        .feature-detail li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: var(--success);
+            font-weight: bold;
+        }
+        
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        
+        .comparison-table th {
+            background: var(--primary);
+            color: white;
+            padding: 1rem;
+            text-align: left;
+        }
+        
+        .comparison-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .check {
+            color: var(--success);
+            font-weight: bold;
+        }
+        
+        footer {
+            background: var(--text);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+        }
+        
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        @media (max-width: 768px) {
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>⚡ Language Features</h1>
+            <p>What makes Mica unique and powerful</p>
+        </div>
+    </header>
+
+    <div class="breadcrumb">
+        <div class="container">
+            <a href="index.html">← Back to Home</a>
+        </div>
+    </div>
+
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">Core Language Features</h2>
+            
+            <div class="feature-grid">
+                <div class="feature-detail">
+                    <h3>🎯 Explicit Effects & Capabilities</h3>
+                    <p>Side effects are tracked at the type level through an explicit capability system:</p>
+                    <ul>
+                        <li>Functions declare required capabilities (IO, Net, Time)</li>
+                        <li>Effect rows track all side effects</li>
+                        <li>Using blocks provide RAII semantics</li>
+                        <li>Capability providers can be mocked for testing</li>
+                    </ul>
+                    <div class="code-example">
+<span style="color: #c792ea;">func</span> <span style="color: #82aaff;">process</span>(io: IO) <span style="color: #c792ea;">!</span>{io} {
+  <span style="color: #c792ea;">using</span> File::open(<span style="color: #c3e88d;">"/tmp/data"</span>, io)? {
+    io.println(<span style="color: #c3e88d;">"opened"</span>)
+  } <span style="color: #546e7a;">// file closed automatically</span>
+}</div>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>🔒 Deterministic Concurrency</h3>
+                    <p>Structured concurrency with guaranteed determinism:</p>
+                    <ul>
+                        <li>Spawn/await with effect tracking</li>
+                        <li>No data races by design</li>
+                        <li>Reproducible execution</li>
+                        <li>Automatic task scheduling</li>
+                    </ul>
+                    <div class="code-example">
+<span style="color: #c792ea;">func</span> <span style="color: #82aaff;">parallel_fetch</span>(urls: [String], net: Net) <span style="color: #c792ea;">!</span>{net} {
+  <span style="color: #c792ea;">for</span> url <span style="color: #c792ea;">in</span> urls {
+    <span style="color: #c792ea;">let</span> result = <span style="color: #c792ea;">await spawn</span> http::get(url, net)
+    handle_result(result)
+  }
+}</div>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>📦 Algebraic Data Types</h3>
+                    <p>First-class ADTs with exhaustive pattern matching:</p>
+                    <ul>
+                        <li>Sum types (enums) with data</li>
+                        <li>Product types (records)</li>
+                        <li>Generic type parameters</li>
+                        <li>Compiler-enforced exhaustiveness</li>
+                    </ul>
+                    <div class="code-example">
+<span style="color: #c792ea;">type</span> <span style="color: #ffcb6b;">Result</span>[T, E] = <span style="color: #ffcb6b;">Ok</span>(T) | <span style="color: #ffcb6b;">Err</span>(E)
+
+<span style="color: #c792ea;">func</span> <span style="color: #82aaff;">handle</span>[T](r: <span style="color: #ffcb6b;">Result</span>[T, String]) -> T {
+  <span style="color: #c792ea;">match</span> r {
+    <span style="color: #ffcb6b;">Ok</span>(value) => value,
+    <span style="color: #ffcb6b;">Err</span>(msg) => panic(msg),
+  }
+}</div>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>🎨 Powerful Generics</h3>
+                    <p>Zero-cost abstractions with full type inference:</p>
+                    <ul>
+                        <li>Generic functions and types</li>
+                        <li>Trait bounds and constraints</li>
+                        <li>Higher-order functions</li>
+                        <li>Type inference (Hindley-Milner)</li>
+                    </ul>
+                    <div class="code-example">
+<span style="color: #c792ea;">func</span> <span style="color: #82aaff;">map</span>[T, U](list: [T], f: <span style="color: #c792ea;">func</span>(T) -> U) -> [U] {
+  <span style="color: #c792ea;">let mut</span> result = []
+  <span style="color: #c792ea;">for</span> item <span style="color: #c792ea;">in</span> list {
+    result.push(f(item))
+  }
+  result
+}</div>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>🛡️ Memory Safety</h3>
+                    <p>Move semantics and borrow checking (planned):</p>
+                    <ul>
+                        <li>No null pointers</li>
+                        <li>Move-by-default semantics</li>
+                        <li>Planned: Rust-style borrow checker</li>
+                        <li>RAII for resource management</li>
+                    </ul>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>⚡ Predictable Performance</h3>
+                    <p>Ahead-of-time compilation with no surprises:</p>
+                    <ul>
+                        <li>LLVM backend for optimization</li>
+                        <li>Zero-cost abstractions</li>
+                        <li>Purity analysis for parallelization</li>
+                        <li>No garbage collection pauses</li>
+                    </ul>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>🔧 Inspectable Compilation</h3>
+                    <p>Every compiler stage is exposed:</p>
+                    <ul>
+                        <li>View tokens, AST, HIR, IR, LLVM</li>
+                        <li>JSON output for tooling</li>
+                        <li>Detailed error messages</li>
+                        <li>Compile-time guarantees</li>
+                    </ul>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>📚 Minimal Surface Area</h3>
+                    <p>Small, learnable language core:</p>
+                    <ul>
+                        <li>10 fundamental constructs</li>
+                        <li>Learn the whole syntax in an afternoon</li>
+                        <li>Extend via libraries, not keywords</li>
+                        <li>Read the compiler in a weekend</li>
+                    </ul>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>🧪 Testing-First Design</h3>
+                    <p>Built for reliability:</p>
+                    <ul>
+                        <li>Deterministic shims for testing</li>
+                        <li>50+ integration tests</li>
+                        <li>Golden snapshot testing</li>
+                        <li>Exhaustiveness checking</li>
+                    </ul>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>🌐 Interop-Friendly</h3>
+                    <p>Play well with existing ecosystems:</p>
+                    <ul>
+                        <li>C-compatible ABI</li>
+                        <li>Python/JavaScript bridges (planned)</li>
+                        <li>Foreign function interface</li>
+                        <li>Standard calling conventions</li>
+                    </ul>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>📖 Documentation-Driven</h3>
+                    <p>Keep code and docs in sync:</p>
+                    <ul>
+                        <li>Auto-generated CLI docs</li>
+                        <li>Snapshot-tested examples</li>
+                        <li>Comprehensive language tour</li>
+                        <li>Inline documentation</li>
+                    </ul>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>🚀 Extensible Architecture</h3>
+                    <p>Designed for experimentation:</p>
+                    <ul>
+                        <li>Modular compiler design</li>
+                        <li>Plugin-friendly capability system</li>
+                        <li>Alternative backend support</li>
+                        <li>Clean separation of concerns</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">Language Comparison</h2>
+            <p class="section-intro">How Mica compares to other languages</p>
+            
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>Mica</th>
+                        <th>Rust</th>
+                        <th>Go</th>
+                        <th>Haskell</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Memory Safety</strong></td>
+                        <td><span class="check">✓</span> Move semantics</td>
+                        <td><span class="check">✓</span> Borrow checker</td>
+                        <td><span class="check">✓</span> GC</td>
+                        <td><span class="check">✓</span> GC</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Effect System</strong></td>
+                        <td><span class="check">✓</span> Explicit capabilities</td>
+                        <td>Traits only</td>
+                        <td>None</td>
+                        <td><span class="check">✓</span> IO monad</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Deterministic Concurrency</strong></td>
+                        <td><span class="check">✓</span> Built-in</td>
+                        <td>Manual with channels</td>
+                        <td>Goroutines (non-det)</td>
+                        <td>STM/Par monad</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Learning Curve</strong></td>
+                        <td><span class="check">✓</span> Low (weekend)</td>
+                        <td>High (months)</td>
+                        <td>Low (week)</td>
+                        <td>High (months)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Compile Times</strong></td>
+                        <td><span class="check">✓</span> Fast</td>
+                        <td>Slow</td>
+                        <td><span class="check">✓</span> Very fast</td>
+                        <td>Moderate</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Pattern Matching</strong></td>
+                        <td><span class="check">✓</span> Exhaustive</td>
+                        <td><span class="check">✓</span> Exhaustive</td>
+                        <td>Basic switch</td>
+                        <td><span class="check">✓</span> Exhaustive</td>
+                    </tr>
+                    <tr>
+                        <td><strong>AOT Compilation</strong></td>
+                        <td><span class="check">✓</span> LLVM</td>
+                        <td><span class="check">✓</span> LLVM</td>
+                        <td><span class="check">✓</span> Native</td>
+                        <td><span class="check">✓</span> GHC</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Inspectable Pipeline</strong></td>
+                        <td><span class="check">✓</span> Every stage</td>
+                        <td>Limited</td>
+                        <td>Limited</td>
+                        <td>Core dumps</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">Design Philosophy</h2>
+            <p class="section-intro">The principles guiding Mica's development</p>
+            
+            <div class="feature-grid">
+                <div class="feature-detail">
+                    <h3>🎯 Explicit Over Implicit</h3>
+                    <p>Effects, capabilities, and control flow are always visible. No hidden behavior or surprising action at a distance.</p>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>🔒 Safety By Default</h3>
+                    <p>The type system and effect system prevent common errors at compile time. Deterministic execution prevents race conditions.</p>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>📖 Readable Implementations</h3>
+                    <p>The compiler itself is designed to be a learning resource. Every module is documented and intentionally compact.</p>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>🧪 Verifiable Correctness</h3>
+                    <p>Exhaustive pattern matching, effect tracking, and testing infrastructure help ensure programs work as intended.</p>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>⚡ Predictable Performance</h3>
+                    <p>AOT compilation with LLVM, zero-cost abstractions, and explicit control over allocations and effects.</p>
+                </div>
+
+                <div class="feature-detail">
+                    <h3>🚀 Industrial-Strength Design</h3>
+                    <p>While learning-sized, Mica follows industrial compiler patterns: proper IR, staged compilation, and runtime systems.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>
+                <a href="index.html">Home</a> • 
+                <a href="getting-started.html">Getting Started</a> • 
+                <a href="tour.html">Tour</a> • 
+                <a href="https://github.com/Sir-Teo/mica">GitHub</a>
+            </p>
+        </div>
+    </footer>
+</body>
+</html>

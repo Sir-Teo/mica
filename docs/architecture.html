@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Mica Compiler Architecture - Understanding the compiler pipeline">
+    <title>Architecture - Mica Language</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary: #64748b;
+            --bg: #ffffff;
+            --bg-alt: #f8fafc;
+            --text: #0f172a;
+            --text-muted: #475569;
+            --border: #e2e8f0;
+            --code-bg: #1e293b;
+            --accent: #8b5cf6;
+            --success: #10b981;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            padding: 3rem 0;
+        }
+        
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .breadcrumb {
+            padding: 1rem 0;
+            background: var(--bg-alt);
+        }
+        
+        .breadcrumb a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        .content {
+            padding: 3rem 0;
+        }
+        
+        .section {
+            margin-bottom: 3rem;
+        }
+        
+        .section h2 {
+            color: var(--primary);
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .section p {
+            color: var(--text-muted);
+            line-height: 1.8;
+            margin-bottom: 1rem;
+        }
+        
+        .pipeline {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        
+        .pipeline-stage {
+            background: white;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-left: 4px solid var(--primary);
+            position: relative;
+        }
+        
+        .pipeline-stage:after {
+            content: "↓";
+            position: absolute;
+            bottom: -2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 2rem;
+            color: var(--primary);
+        }
+        
+        .pipeline-stage:last-child:after {
+            display: none;
+        }
+        
+        .pipeline-stage h3 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            font-size: 1.3rem;
+        }
+        
+        .pipeline-stage .cli-flag {
+            display: inline-block;
+            background: var(--code-bg);
+            color: #e2e8f0;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-family: 'Monaco', monospace;
+            font-size: 0.85rem;
+            margin-right: 0.5rem;
+        }
+        
+        .modules-layout {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .module-box {
+            background: white;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-top: 3px solid var(--primary);
+        }
+        
+        .module-box h3 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
+        }
+        
+        .module-box p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        
+        .module-box .path {
+            font-family: 'Monaco', monospace;
+            font-size: 0.85rem;
+            color: var(--accent);
+            margin-top: 0.5rem;
+            display: block;
+        }
+        
+        .phase-timeline {
+            position: relative;
+            padding-left: 3rem;
+            margin: 2rem 0;
+        }
+        
+        .phase {
+            position: relative;
+            padding-bottom: 2rem;
+        }
+        
+        .phase:before {
+            content: "";
+            position: absolute;
+            left: -2.75rem;
+            top: 0.5rem;
+            width: 1.5rem;
+            height: 1.5rem;
+            background: var(--primary);
+            border-radius: 50%;
+            border: 4px solid white;
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+        
+        .phase:after {
+            content: "";
+            position: absolute;
+            left: -2.125rem;
+            top: 2rem;
+            width: 2px;
+            height: calc(100% - 1rem);
+            background: var(--border);
+        }
+        
+        .phase:last-child:after {
+            display: none;
+        }
+        
+        .phase-complete:before {
+            background: var(--success);
+            box-shadow: 0 0 0 2px var(--success);
+        }
+        
+        .phase h3 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .phase-status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+        
+        .status-complete {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-active {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .status-planned {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        
+        footer {
+            background: var(--text);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+        }
+        
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .modules-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>🏗️ Compiler Architecture</h1>
+            <p>Understanding the Mica compiler pipeline</p>
+        </div>
+    </header>
+
+    <div class="breadcrumb">
+        <div class="container">
+            <a href="index.html">← Back to Home</a>
+        </div>
+    </div>
+
+    <div class="content container">
+        <div class="section">
+            <h2>Overview</h2>
+            <p>
+                Mica is designed to be a learning-sized compiler that you can read and understand in a weekend.
+                The entire pipeline—from lexing to native code generation—is intentionally compact and well-documented,
+                making it perfect for studying compiler implementation techniques.
+            </p>
+            <p>
+                Every stage of the compiler is exposed through CLI flags, allowing you to inspect intermediate
+                representations and understand how your code transforms at each step.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>Compiler Pipeline</h2>
+            <p>The Mica compiler processes code through the following stages:</p>
+            
+            <div class="pipeline">
+                <div class="pipeline-stage">
+                    <h3>1. Lexing</h3>
+                    <span class="cli-flag">--tokens</span>
+                    <p>Converts source text into a stream of tokens with precise span information. Handles keywords, operators, literals, and comments.</p>
+                    <p><strong>Output:</strong> Token stream with spans</p>
+                </div>
+
+                <div class="pipeline-stage">
+                    <h3>2. Parsing</h3>
+                    <span class="cli-flag">--ast</span>
+                    <span class="cli-flag">--pretty</span>
+                    <p>Builds an Abstract Syntax Tree (AST) using recursive descent parsing with Pratt expression handling. Includes error recovery.</p>
+                    <p><strong>Output:</strong> AST with full source structure</p>
+                </div>
+
+                <div class="pipeline-stage">
+                    <h3>3. Resolution</h3>
+                    <span class="cli-flag">--resolve</span>
+                    <p>Resolves names, builds symbol tables, and tracks capability usage. Handles imports and module graphs.</p>
+                    <p><strong>Output:</strong> Resolved symbols and capability metadata</p>
+                </div>
+
+                <div class="pipeline-stage">
+                    <h3>4. Type & Effect Checking</h3>
+                    <span class="cli-flag">--check</span>
+                    <p>Performs type inference, exhaustiveness checking, and effect verification. Ensures capability contracts are satisfied.</p>
+                    <p><strong>Output:</strong> Fully typed and checked program</p>
+                </div>
+
+                <div class="pipeline-stage">
+                    <h3>5. Lowering to HIR</h3>
+                    <span class="cli-flag">--lower</span>
+                    <p>Transforms AST to High-level Intermediate Representation. Desugars method calls, effects, and control flow.</p>
+                    <p><strong>Output:</strong> Simplified HIR</p>
+                </div>
+
+                <div class="pipeline-stage">
+                    <h3>6. SSA IR Generation</h3>
+                    <span class="cli-flag">--ir</span>
+                    <p>Converts HIR to typed SSA (Static Single Assignment) form with basic blocks and instructions.</p>
+                    <p><strong>Output:</strong> Typed SSA IR</p>
+                </div>
+
+                <div class="pipeline-stage">
+                    <h3>7. Backend Code Generation</h3>
+                    <span class="cli-flag">--llvm</span>
+                    <span class="cli-flag">--build</span>
+                    <p>Generates native code via LLVM or portable C backend. Links with runtime capability providers.</p>
+                    <p><strong>Output:</strong> Native binary</p>
+                </div>
+
+                <div class="pipeline-stage">
+                    <h3>8. Runtime Execution</h3>
+                    <span class="cli-flag">--run</span>
+                    <p>Executes the program with capability-aware runtime shims. Captures telemetry and enforces deterministic concurrency.</p>
+                    <p><strong>Output:</strong> Program results and telemetry</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Source Code Organization</h2>
+            <p>The repository is structured for easy navigation:</p>
+            
+            <div class="modules-layout">
+                <div class="module-box">
+                    <h3>Syntax</h3>
+                    <p>Lexer, parser, and pretty-printer for the front-end</p>
+                    <span class="path">src/syntax/</span>
+                </div>
+
+                <div class="module-box">
+                    <h3>Semantics</h3>
+                    <p>Name resolution, type checking, and effect analysis</p>
+                    <span class="path">src/semantics/</span>
+                </div>
+
+                <div class="module-box">
+                    <h3>Lowering</h3>
+                    <p>AST to HIR transformation and desugaring</p>
+                    <span class="path">src/lower/</span>
+                </div>
+
+                <div class="module-box">
+                    <h3>IR</h3>
+                    <p>Typed SSA intermediate representation</p>
+                    <span class="path">src/ir/</span>
+                </div>
+
+                <div class="module-box">
+                    <h3>Backend</h3>
+                    <p>Code generation targets (LLVM, native C)</p>
+                    <span class="path">src/backend/</span>
+                </div>
+
+                <div class="module-box">
+                    <h3>Runtime</h3>
+                    <p>Capability providers and task scheduler</p>
+                    <span class="path">src/runtime/</span>
+                </div>
+
+                <div class="module-box">
+                    <h3>Diagnostics</h3>
+                    <p>Error reporting and structured warnings</p>
+                    <span class="path">src/diagnostics/</span>
+                </div>
+
+                <div class="module-box">
+                    <h3>CLI</h3>
+                    <p>Command-line interface and tooling</p>
+                    <span class="path">src/main.rs</span>
+                </div>
+
+                <div class="module-box">
+                    <h3>Pretty</h3>
+                    <p>Code formatting and CST handling</p>
+                    <span class="path">src/pretty/</span>
+                </div>
+
+                <div class="module-box">
+                    <h3>Tests</h3>
+                    <p>Integration and unit test suites</p>
+                    <span class="path">src/tests/</span>
+                </div>
+
+                <div class="module-box">
+                    <h3>Examples</h3>
+                    <p>Runnable sample programs</p>
+                    <span class="path">examples/</span>
+                </div>
+
+                <div class="module-box">
+                    <h3>Documentation</h3>
+                    <p>Guides, roadmap, and module docs</p>
+                    <span class="path">docs/</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Development Phases</h2>
+            <p>Mica development follows a phased approach:</p>
+            
+            <div class="phase-timeline">
+                <div class="phase phase-complete">
+                    <h3>Phase 0 — Foundations <span class="phase-status status-complete">Complete</span></h3>
+                    <p>Lexer, parser, and basic tooling infrastructure</p>
+                </div>
+
+                <div class="phase phase-complete">
+                    <h3>Phase 1 — Semantic Core <span class="phase-status status-complete">Complete</span></h3>
+                    <p>Name resolution, type checking, and effect system</p>
+                </div>
+
+                <div class="phase phase-complete">
+                    <h3>Phase 2 — IR & Lowering <span class="phase-status status-complete">Complete</span></h3>
+                    <p>HIR lowering, typed SSA IR, and purity analysis</p>
+                </div>
+
+                <div class="phase">
+                    <h3>Phase 3 — Backend & Runtime <span class="phase-status status-active">Active</span></h3>
+                    <p>Code generation, runtime shims, and deterministic scheduler</p>
+                </div>
+
+                <div class="phase">
+                    <h3>Phase 4 — Tooling & IDE <span class="phase-status status-planned">Planned</span></h3>
+                    <p>Formatter, LSP server, and developer experience tools</p>
+                </div>
+
+                <div class="phase">
+                    <h3>Phase 5 — Ecosystem <span class="phase-status status-planned">Planned</span></h3>
+                    <p>Standard library, package manager, and interop adapters</p>
+                </div>
+
+                <div class="phase">
+                    <h3>Phase 6 — Growth <span class="phase-status status-planned">Planned</span></h3>
+                    <p>Community building, RFC process, and ecosystem expansion</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Design Principles</h2>
+            <p>The Mica compiler follows these core principles:</p>
+            
+            <div style="display: grid; gap: 1rem; margin-top: 1.5rem;">
+                <div class="module-box">
+                    <h3>📖 Learning-Sized</h3>
+                    <p>The entire codebase is designed to be readable in a weekend. Every module is intentionally compact and well-documented.</p>
+                </div>
+
+                <div class="module-box">
+                    <h3>🔍 Inspectable</h3>
+                    <p>Every compiler stage is exposed through CLI flags, making it easy to understand transformations and debug issues.</p>
+                </div>
+
+                <div class="module-box">
+                    <h3>🎯 Effect-Aware</h3>
+                    <p>Capabilities and effects are first-class, tracked through the entire pipeline from parsing to runtime.</p>
+                </div>
+
+                <div class="module-box">
+                    <h3>🔒 Deterministic</h3>
+                    <p>Concurrency is structured and deterministic by default, with explicit capability requirements.</p>
+                </div>
+
+                <div class="module-box">
+                    <h3>🧪 Well-Tested</h3>
+                    <p>Comprehensive test suites cover every stage with golden snapshots and negative test cases.</p>
+                </div>
+
+                <div class="module-box">
+                    <h3>🚀 Extensible</h3>
+                    <p>Clean interfaces and modular design make it easy to add new features or experiment with alternatives.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Learn More</h2>
+            <p>For detailed information about each compiler module:</p>
+            <ul style="margin-left: 2rem; color: var(--text-muted); margin-top: 1rem;">
+                <li><a href="module_reference.html" style="color: var(--primary);">Module Reference</a> — Deep dives into each subsystem</li>
+                <li><a href="modules/pipeline.html" style="color: var(--primary);">Pipeline Entry Points</a> — CLI integration guide</li>
+                <li><a href="roadmap/compiler.html" style="color: var(--primary);">Compiler Roadmap</a> — Future development plans</li>
+                <li><a href="https://github.com/Sir-Teo/mica/tree/main/src" style="color: var(--primary);">Source Code</a> — Browse the implementation</li>
+            </ul>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>
+                <a href="index.html">Home</a> • 
+                <a href="tour.html">Tour</a> • 
+                <a href="https://github.com/Sir-Teo/mica">GitHub</a>
+            </p>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,78 @@
+# Mica Language Documentation - GitHub Pages Configuration
+
+title: Mica Language Documentation
+description: An experimental systems language with explicit effects, deterministic concurrency, and predictable performance
+author: Mica Project
+url: https://sir-teo.github.io
+baseurl: /mica
+
+# Theme settings
+theme: jekyll-theme-cayman
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+# Build settings
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+# Exclude from build
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - vendor/
+
+# Collections
+collections:
+  modules:
+    output: true
+    permalink: /modules/:name/
+  roadmap:
+    output: true
+    permalink: /roadmap/:name/
+
+# Defaults
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: "default"
+  - scope:
+      path: "modules"
+    values:
+      layout: "default"
+  - scope:
+      path: "roadmap"
+    values:
+      layout: "default"
+
+# Navigation
+navigation:
+  - title: Home
+    url: /
+  - title: Getting Started
+    url: /getting-started
+  - title: Tour
+    url: /tour
+  - title: Examples
+    url: /examples
+  - title: Features
+    url: /features
+  - title: Architecture
+    url: /architecture
+  - title: FAQ
+    url: /faq
+  - title: Contributing
+    url: /contributing
+  - title: Modules
+    url: /module_reference
+  - title: Roadmap
+    url: /roadmap/
+  - title: Status
+    url: /status
+  - title: GitHub
+    url: https://github.com/Sir-Teo/mica

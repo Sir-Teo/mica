@@ -1,5 +1,7 @@
 # Syntax Front-End
 
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)
+
 > Lexing, parsing, and pretty-printing form the foundation for every other
 > compiler stage.
 
@@ -60,3 +62,13 @@ all later stages.
 - Investigate incremental lexing and error recovery once watch-mode work begins.
 - Expand tokens and AST nodes as new language constructs are approved.
 - Add formatting toggles to the pretty-printer to satisfy tooling integrations.
+
+---
+
+## Related Modules
+
+- **[Semantic Analysis](semantics.html)** — Consumes the AST for type checking
+- **[Lowering Pipeline](lowering.html)** — Transforms AST to HIR
+- **[Diagnostics](diagnostics.html)** — Shared error reporting
+
+[← Back to Module Reference](../module_reference.html) | [← Documentation Home](../index.html)
