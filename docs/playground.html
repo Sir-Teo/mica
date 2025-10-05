@@ -456,10 +456,9 @@
         } from `./wasm/mica.js?v=${wasmVersion}`;
 
         // Initialize WASM and expose functions globally
-        let wasmReady = false;
+        window.micaWasm = { ready: false }; // Initialize immediately
         
         init().then(() => {
-            wasmReady = true;
             console.log('✅ WASM module loaded successfully');
             console.log('Available functions:', { tokenize, parse_ast, resolve_code, check_code, lower_code, generate_ir, run_code });
             
@@ -482,9 +481,19 @@
             };
             
             console.log('✅ All WASM functions exposed to window.micaWasm');
+            
+            // Trigger a custom event to notify that WASM is ready
+            window.dispatchEvent(new CustomEvent('wasmReady'));
         }).catch(err => {
             console.error('❌ Failed to load WASM module:', err);
-            window.micaWasm = { ready: false };
+            console.error('Error details:', err.stack);
+            window.micaWasm = { ready: false, error: err.message };
+            
+            // Update status to show error
+            const statusIndicator = document.querySelector('.subtitle');
+            if (statusIndicator) {
+                statusIndicator.innerHTML = '<span class="status-indicator status-error"></span>WASM failed to load';
+            }
         });
     </script>
     
@@ -579,7 +588,42 @@
             try {
                 // Check if WASM is ready
                 if (!window.micaWasm || !window.micaWasm.ready) {
-                    throw new Error('WASM module not loaded yet. Please wait a moment and try again.');
+                    // Show a more helpful message
+                    output.innerHTML = `
+                        <div class="info-box">
+                            <strong>⏳ Loading WebAssembly module...</strong><br><br>
+                            The compiler is still loading. This usually takes 1-2 seconds.<br>
+                            Please wait a moment and try again.<br><br>
+                            ${window.micaWasm && window.micaWasm.error ? 
+                                `<span style="color: var(--danger);">Error: ${window.micaWasm.error}</span>` : 
+                                'If this persists, try refreshing the page.'}
+                        </div>
+                    `;
+                    statusIndicator.className = 'status-indicator status-running';
+                    
+                    // Try to wait for WASM to load
+                    return new Promise((resolve) => {
+                        const checkReady = setInterval(() => {
+                            if (window.micaWasm && window.micaWasm.ready) {
+                                clearInterval(checkReady);
+                                compileCode(stage); // Retry
+                                resolve();
+                            }
+                        }, 100);
+                        
+                        // Timeout after 5 seconds
+                        setTimeout(() => {
+                            clearInterval(checkReady);
+                            if (!window.micaWasm || !window.micaWasm.ready) {
+                                output.innerHTML = `<div class="output-error">
+                                    <strong>❌ WASM module failed to load</strong><br><br>
+                                    Please refresh the page and try again.<br>
+                                    Check the browser console for error details.
+                                </div>`;
+                                statusIndicator.className = 'status-indicator status-error';
+                            }
+                        }, 5000);
+                    });
                 }
 
                 const stageNames = {
