@@ -1,6 +1,7 @@
 use crate::runtime::{
-    CapabilityEvent, NetworkFixture, Runtime, RuntimeErrorKind, RuntimeEvent, RuntimeValue,
-    TaskPlan, TaskSpec, register_network_fixture, reset_network_fixtures,
+    CapabilityEvent, CompletedProcess, NetworkFixture, Runtime, RuntimeErrorKind, RuntimeEvent,
+    RuntimeValue, ScriptedProcess, TaskPlan, TaskSpec, register_network_fixture,
+    reset_network_fixtures,
 };
 
 #[test]
@@ -13,7 +14,6 @@ fn runtime_executes_default_shims() {
 
     runtime.spawn(spec, plan);
     let events = runtime.run().expect("runtime events");
-
     assert!(matches!(events[0], RuntimeEvent::TaskStarted { ref task } if task == "main"));
     assert!(matches!(
         events[1],
@@ -127,7 +127,7 @@ fn runtime_schedules_child_tasks_fifo() {
 #[test]
 fn runtime_validates_registered_capabilities() {
     let runtime = Runtime::with_default_shims().expect("runtime setup");
-    let valid = TaskSpec::new("main").with_capabilities(["io"]);
+    let valid = TaskSpec::new("main").with_capabilities(["io", "process"]);
     runtime
         .ensure_capabilities(&valid)
         .expect("io capability available");
@@ -140,6 +140,83 @@ fn runtime_validates_registered_capabilities() {
         err.kind(),
         RuntimeErrorKind::UnknownCapability { name } if name == "db"
     ));
+}
+
+#[test]
+fn deterministic_process_provider_replays_scripted_commands() {
+    let bundle = Runtime::with_deterministic_shims().expect("runtime setup");
+    bundle
+        .process
+        .script(ScriptedProcess::new("scripted-task").with_stdout_line("ok"));
+
+    let spec = TaskSpec::new("main").with_capabilities(["process"]);
+    let plan = TaskPlan::new().invoke(
+        "process",
+        "spawn",
+        Some(RuntimeValue::from("scripted-task")),
+    );
+
+    bundle.runtime().spawn(spec, plan);
+    let events = bundle.run().expect("runtime events");
+
+    assert!(events.iter().any(|event| match event {
+        RuntimeEvent::CapabilityEvent {
+            capability,
+            event: CapabilityEvent::Message(message),
+            ..
+        } => capability == "process" && message.contains("stdout: ok"),
+        _ => false,
+    }));
+
+    let completed: Vec<CompletedProcess> = bundle.process.completed();
+    assert_eq!(completed.len(), 1);
+    assert_eq!(completed[0].command, "scripted-task");
+    assert_eq!(completed[0].exit_code, 0);
+    assert_eq!(completed[0].stdout, vec!["ok".to_string()]);
+}
+
+#[cfg(unix)]
+#[test]
+fn process_provider_executes_host_commands() {
+    let runtime = Runtime::with_default_shims().expect("runtime setup");
+    let spec = TaskSpec::new("main").with_capabilities(["process"]);
+    let plan = TaskPlan::new().invoke(
+        "process",
+        "spawn",
+        Some(RuntimeValue::from("/bin/echo process-runtime")),
+    );
+
+    runtime.spawn(spec, plan);
+    let events = runtime.run().expect("runtime events");
+
+    assert!(events.iter().any(|event| match event {
+        RuntimeEvent::CapabilityEvent {
+            capability,
+            event: CapabilityEvent::Message(message),
+            ..
+        } => capability == "process" && message.contains("stdout: process-runtime"),
+        _ => false,
+    }));
+}
+
+#[cfg(unix)]
+#[test]
+fn process_provider_captures_blank_stdout_lines() {
+    let runtime = Runtime::with_default_shims().expect("runtime setup");
+    let spec = TaskSpec::new("main").with_capabilities(["process"]);
+    let plan = TaskPlan::new().invoke("process", "spawn", Some(RuntimeValue::from("/bin/echo")));
+
+    runtime.spawn(spec, plan);
+    let events = runtime.run().expect("runtime events");
+
+    assert!(events.iter().any(|event| match event {
+        RuntimeEvent::CapabilityEvent {
+            capability,
+            event: CapabilityEvent::Message(message),
+            ..
+        } => capability == "process" && message == "stdout: ",
+        _ => false,
+    }));
 }
 
 #[test]

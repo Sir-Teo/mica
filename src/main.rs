@@ -42,6 +42,7 @@ impl CliArgs {
         let mut command = CommandKind::Ast;
         let mut pretty = false;
         let mut output_path: Option<PathBuf> = None;
+        let mut trace: Option<TraceTarget> = None;
         let mut input_path: Option<PathBuf> = None;
 
         while let Some(arg) = args.next() {
@@ -58,7 +59,21 @@ impl CliArgs {
                 "--pipeline-json" => command = CommandKind::PipelineJson,
                 "--llvm" | "--emit-llvm" => command = CommandKind::Llvm,
                 "--build" => command = CommandKind::Build { output: None },
-                "--run" => command = CommandKind::Run { output: None },
+                "--run" => {
+                    command = CommandKind::Run {
+                        output: None,
+                        trace: None,
+                    }
+                }
+                "--trace-json" => {
+                    let target = args.next().ok_or_else(|| {
+                        error::Error::parse(None, "expected output path after --trace-json")
+                    })?;
+                    trace = Some(match target.as_str() {
+                        "-" => TraceTarget::Stdout,
+                        other => TraceTarget::File(PathBuf::from(other)),
+                    });
+                }
                 "--out" => {
                     let value = args.next().ok_or_else(|| {
                         error::Error::parse(None, "expected output path after --out")
@@ -83,10 +98,21 @@ impl CliArgs {
         let input_path =
             input_path.ok_or_else(|| error::Error::parse(None, "missing input file"))?;
 
+        if trace.is_some() && !matches!(command, CommandKind::Run { .. }) {
+            return Err(error::Error::parse(
+                None,
+                "--trace-json is only supported with --run",
+            ));
+        }
+
+        let command = command
+            .with_output_path(output_path)
+            .with_trace(trace.clone());
+
         Ok(Self {
             input_path,
             pretty,
-            command: command.with_output_path(output_path),
+            command,
         })
     }
 }
@@ -120,15 +146,27 @@ enum CommandKind {
     IrJson,
     PipelineJson,
     Llvm,
-    Build { output: Option<PathBuf> },
-    Run { output: Option<PathBuf> },
+    Build {
+        output: Option<PathBuf>,
+    },
+    Run {
+        output: Option<PathBuf>,
+        trace: Option<TraceTarget>,
+    },
 }
 
 impl CommandKind {
     fn with_output_path(self, output: Option<PathBuf>) -> Self {
         match self {
             CommandKind::Build { .. } => CommandKind::Build { output },
-            CommandKind::Run { .. } => CommandKind::Run { output },
+            CommandKind::Run { trace, .. } => CommandKind::Run { output, trace },
+            other => other,
+        }
+    }
+
+    fn with_trace(self, trace: Option<TraceTarget>) -> Self {
+        match self {
+            CommandKind::Run { output, .. } => CommandKind::Run { output, trace },
             other => other,
         }
     }
@@ -146,9 +184,15 @@ impl CommandKind {
             CommandKind::PipelineJson => run_pipeline_json(&ctx),
             CommandKind::Llvm => run_llvm(&ctx),
             CommandKind::Build { output } => run_build(&ctx, output),
-            CommandKind::Run { output } => run_executable(&ctx, output),
+            CommandKind::Run { output, trace } => run_executable(&ctx, output, trace),
         }
     }
+}
+
+#[derive(Debug, Clone)]
+enum TraceTarget {
+    Stdout,
+    File(PathBuf),
 }
 
 fn run_tokens(ctx: &CommandContext) -> Result<()> {
@@ -356,14 +400,19 @@ fn run_build(ctx: &CommandContext, output: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-fn run_executable(ctx: &CommandContext, output: Option<PathBuf>) -> Result<()> {
+fn run_executable(
+    ctx: &CommandContext,
+    output: Option<PathBuf>,
+    trace: Option<TraceTarget>,
+) -> Result<()> {
     let module = parser::parse_module(&ctx.source)?;
     let resolved = resolve::resolve_module(&module);
-    if let Some(spec) = entry_task_spec(&module, &resolved) {
+    let entry_spec = entry_task_spec(&module, &resolved);
+    if let Some(spec) = &entry_spec {
         let runtime = runtime::Runtime::with_default_shims()
             .map_err(|err| error::Error::parse(None, err.to_string()))?;
         runtime
-            .ensure_capabilities(&spec)
+            .ensure_capabilities(spec)
             .map_err(|err| error::Error::parse(None, err.to_string()))?;
     }
     let hir = lower::lower_module(&module);
@@ -415,10 +464,112 @@ fn run_executable(ctx: &CommandContext, output: Option<PathBuf>) -> Result<()> {
         eprint!("{}", String::from_utf8_lossy(&output.stderr));
     }
 
+    if let Some(target) = trace {
+        let task_name = entry_spec
+            .as_ref()
+            .map(|spec| spec.name().to_string())
+            .unwrap_or_else(|| "main".to_string());
+        let stdout_text = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr_text = String::from_utf8_lossy(&output.stderr).to_string();
+        let trace_json = build_trace_json(&task_name, &stdout_text, &stderr_text);
+        match target {
+            TraceTarget::Stdout => {
+                println!("{}", trace_json);
+            }
+            TraceTarget::File(path) => {
+                fs::write(&path, trace_json)
+                    .map_err(|err| error::Error::parse(None, err.to_string()))?;
+                println!("trace written to {}", path.display());
+            }
+        }
+    }
+
     if let Some(path) = cleanup_path {
         fs::remove_file(&path).ok();
     }
     Ok(())
+}
+
+fn build_trace_json(task: &str, stdout: &str, stderr: &str) -> String {
+    let mut events = Vec::new();
+    events.push(format!(
+        "{{\"type\":\"task_started\",\"task\":{}}}",
+        json_string(task)
+    ));
+
+    let mut capability_invocations = 0usize;
+    for line in stdout.lines() {
+        events.push(format!(
+            "{{\"type\":\"capability_invoked\",\"task\":{task},\"capability\":\"io\",\"operation\":\"write_line\"}}",
+            task = json_string(task)
+        ));
+        events.push(format!(
+            "{{\"type\":\"capability_event\",\"task\":{task},\"capability\":\"io\",\"event\":{{\"type\":\"message\",\"value\":{value}}}}}",
+            task = json_string(task),
+            value = json_string(line)
+        ));
+        capability_invocations += 1;
+    }
+
+    for line in stderr.lines() {
+        events.push(format!(
+            "{{\"type\":\"capability_event\",\"task\":{task},\"capability\":\"io\",\"event\":{{\"type\":\"message\",\"value\":{value}}}}}",
+            task = json_string(task),
+            value = json_string(&format!("stderr: {line}"))
+        ));
+    }
+
+    events.push(format!(
+        "{{\"type\":\"task_completed\",\"task\":{}}}",
+        json_string(task)
+    ));
+
+    let total_events = events.len();
+    let mut telemetry = Vec::new();
+    for (index, event) in events.iter().enumerate() {
+        telemetry.push(format!(
+            "{{\"sequence\":{index},\"timestamp_micros\":null,\"event\":{event}}}",
+            index = index,
+            event = event
+        ));
+    }
+
+    let capability_counts = if capability_invocations > 0 {
+        format!("{{\"io\":{}}}", capability_invocations)
+    } else {
+        "{}".to_string()
+    };
+    let operation_counts = if capability_invocations > 0 {
+        format!("{{\"io::write_line\":{}}}", capability_invocations)
+    } else {
+        "{}".to_string()
+    };
+
+    let tasks = format!(
+        "{{\"task\":{task},\"start_timestamp_micros\":null,\"duration_micros\":0,\"event_count\":{count},\"capability_counts\":{cap_counts},\"operation_counts\":{op_counts},\"capability_durations_micros\":{{}},\"operation_durations_micros\":{{}},\"spawned_tasks\":0}}",
+        task = json_string(task),
+        count = total_events,
+        cap_counts = capability_counts,
+        op_counts = operation_counts
+    );
+
+    let summary = format!(
+        "{{\"total_tasks\":1,\"total_events\":{events},\"spawned_tasks\":0,\"capability_counts\":{cap_counts},\"operation_counts\":{op_counts},\"capability_durations_micros\":{{}},\"operation_durations_micros\":{{}}}}",
+        events = total_events,
+        cap_counts = capability_counts,
+        op_counts = operation_counts
+    );
+
+    let events_json = events.join(",");
+    let telemetry_json = telemetry.join(",");
+
+    format!(
+        "{{\"events\":[{events}],\"telemetry\":[{telemetry}],\"tasks\":[{tasks}],\"summary\":{summary}}}",
+        events = events_json,
+        telemetry = telemetry_json,
+        tasks = tasks,
+        summary = summary
+    )
 }
 
 fn entry_task_spec(
@@ -1031,5 +1182,38 @@ mod cli_tests {
         };
         let resolved = resolve::Resolved::default();
         assert!(entry_task_spec(&module, &resolved).is_none());
+    }
+
+    #[test]
+    fn build_trace_json_captures_stdout_lines() {
+        let json = build_trace_json("demo::main", "first\nsecond\n", "");
+
+        assert!(json.contains("\"task\":\"demo::main\""));
+        assert!(json.contains("\"value\":\"first\""));
+        assert!(json.contains("\"value\":\"second\""));
+        assert!(json.contains("\"capability_counts\":{\"io\":2}"));
+        assert!(json.contains("\"operation_counts\":{\"io::write_line\":2}"));
+        assert!(json.contains("\"event_count\":6"));
+    }
+
+    #[test]
+    fn build_trace_json_annotations_include_stderr_messages() {
+        let json = build_trace_json("demo::main", "", "failure\n");
+
+        assert!(json.contains("stderr: failure"));
+        assert!(json.contains("\"capability_counts\":{}"));
+        assert!(json.contains("\"operation_counts\":{}"));
+        assert!(json.contains("\"event_count\":3"));
+    }
+
+    #[test]
+    fn build_trace_json_preserves_blank_lines() {
+        let json = build_trace_json("demo::main", "first\n\nthird\n", "\n");
+
+        assert!(json.contains("\"capability_counts\":{\"io\":3}"));
+        assert!(json.contains("\"operation_counts\":{\"io::write_line\":3}"));
+        assert!(json.contains("\"value\":\"\""));
+        assert!(json.contains("\"value\":\"stderr: \""));
+        assert!(json.contains("\"event_count\":9"));
     }
 }

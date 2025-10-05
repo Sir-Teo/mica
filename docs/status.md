@@ -1,8 +1,6 @@
 # Project Status — Phase 3 Kickoff
 
-_Last reviewed: 2025-10-04_
-
-[← Back to Documentation Home](index.html)
+_Last reviewed: 2024-07-08_
 
 The current milestone focuses on stabilising the Phase 3 runtime and backend
 work. The sections below summarise what is healthy today, the verification that
@@ -25,8 +23,9 @@ backs it up, and the immediate priorities for the next iteration.
   accidental regressions.
 - **Runtime** – Generated binaries thread capability providers through the
   runtime shim, enforcing declared effects before IO or time operations run.
-  Deterministic, in-memory shims unblock regression tests without touching the
-  host environment, and telemetry captures per-capability timings.
+  Deterministic, in-memory shims now include scripted process orchestration, and
+  the CLI can export runtime traces for downstream tooling without bespoke
+  harnesses.
 
 ## Verification Snapshot
 
@@ -39,15 +38,14 @@ backs it up, and the immediate priorities for the next iteration.
 
 ## Near-Term Priorities
 
-1. Introduce process and task-orchestration providers so sandboxed binaries can
-   spawn scripted subprocesses without leaving the deterministic surface.
-2. Feed the richer runtime telemetry into CLI exporters (e.g. `mica run`
-   `--trace-json <path>`) and document downstream ingestion patterns.
-3. Use the new parallel compile metrics to tune worker heuristics against
+1. Harden the process/task orchestration shims with failure-path fixtures and
+   documentation so contributors know how to script multi-stage workflows.
+2. Leverage the new runtime trace snippet to drive walkthrough updates that
+   connect pipeline data with execution telemetry.
+3. Use the parallel compile metrics to tune worker heuristics against
    workspace-sized module sets and surface the results in the docs.
-4. Extend the freshly documented pipeline entry points with end-to-end
-   walkthroughs that show how resolver and IR snapshots integrate with editor
-   tooling.
+4. Extend the new pipeline walkthrough with editor-facing recipes (e.g.
+   “highlight capability usage”) to inform the Phase 4 IDE work.
 
 ## Risks & Watch Items
 
@@ -62,13 +60,3 @@ backs it up, and the immediate priorities for the next iteration.
 
 Revisit this status report after runtime wiring and structured CLI outputs
 advance, or once the parallel backend experiments complete.
-
----
-
-## Related Documentation
-
-- **[Status Summary](status_summary.html)** — Condensed Phase 3 health report
-- **[Roadmap](roadmap/index.html)** — Full milestone breakdown
-- **[Language Tour](tour.html)** — Explore the language features
-
-[← Back to Documentation Home](index.html)

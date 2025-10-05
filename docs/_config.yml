@@ -1,13 +1,14 @@
 # Mica Language Documentation - GitHub Pages Configuration
 
-title: Mica Language Documentation
-description: An experimental systems language with explicit effects, deterministic concurrency, and predictable performance
+title: Mica Language
+description: A tiny, expressive systems language with explicit effects, deterministic concurrency, and predictable performance
 author: Mica Project
 url: https://sir-teo.github.io
 baseurl: /mica
 
 # Theme settings
 theme: jekyll-theme-cayman
+show_downloads: false
 markdown: kramdown
 kramdown:
   input: GFM
@@ -19,11 +20,16 @@ plugins:
   - jekyll-seo-tag
   - jekyll-sitemap
 
+# Enable GitHub metadata for repository links
+github:
+  is_project_page: true
+
 # Exclude from build
 exclude:
   - Gemfile
   - Gemfile.lock
   - README.md
+  - README_DESIGN.md
   - vendor/
 
 # Collections

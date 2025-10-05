@@ -7,16 +7,16 @@ runtimes, native code generation, and contributor tooling.
 
 With that context, the next actions should reinforce Phase 3 outcomes:
 
-1. **Add process orchestration shims.** Layer scripted subprocess/task providers
-   on top of the deterministic runtime bundle so multi-process programs stay
-   reproducible.
-2. **Export telemetry from the CLI.** Extend `mica run` with opt-in trace output
-   flags and document how downstream tooling can ingest the JSON metrics.
-3. **Tune the parallel backend.** Use the new worker/schedule metrics to profile
+1. **Broaden process orchestration.** Extend the scripted subprocess provider
+   with error fixtures, argument validation, and tutorial coverage so complex
+   workflows remain deterministic.
+2. **Correlate trace walkthroughs.** Use the new CLI trace snippet to expand
+   the walkthrough so readers can follow telemetry from compilation to
+   execution without manual capture steps.
+3. **Tune the parallel backend.** Use the worker/schedule metrics to profile
    workspace-sized builds and adjust heuristics before scaling out.
-4. **Publish pipeline walkthroughs.** Turn the documented pipeline entry points
-   into step-by-step guides that show resolver/IR snapshots flowing into editor
-   integrations and automation.
+4. **Publish richer walkthroughs.** Expand the pipeline guide with editor-facing
+   recipes that connect resolver/IR snapshots to runtime traces.
 
 Staying disciplined on these items keeps Phase 3 deliverables aligned: richer
 runtime coverage, observable compiler behaviour, and ergonomic tooling that can

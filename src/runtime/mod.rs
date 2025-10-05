@@ -1,6 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::env;
 use std::fs;
+use std::process::Command;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -23,6 +24,7 @@ pub struct DeterministicRuntime {
     pub filesystem: InMemoryFilesystemProvider,
     pub env: DeterministicEnvProvider,
     pub time: DeterministicTimeProvider,
+    pub process: DeterministicProcessProvider,
 }
 
 impl std::ops::Deref for DeterministicRuntime {
@@ -94,6 +96,7 @@ impl Runtime {
         runtime.register_provider(FilesystemProvider)?;
         runtime.register_provider(NetworkProvider)?;
         runtime.register_provider(EnvProvider)?;
+        runtime.register_provider(ProcessProvider)?;
         Ok(runtime)
     }
 
@@ -106,12 +109,14 @@ impl Runtime {
         let filesystem = InMemoryFilesystemProvider::default();
         let env = DeterministicEnvProvider::default();
         let time = DeterministicTimeProvider::monotonic(0, 1);
+        let process = DeterministicProcessProvider::default();
 
         runtime.register_provider(console.clone())?;
         runtime.register_provider(time.clone())?;
         runtime.register_provider(filesystem.clone())?;
         runtime.register_provider(NetworkProvider)?;
         runtime.register_provider(env.clone())?;
+        runtime.register_provider(process.clone())?;
 
         Ok(DeterministicRuntime {
             runtime,
@@ -119,6 +124,7 @@ impl Runtime {
             filesystem,
             env,
             time,
+            process,
         })
     }
 
@@ -1095,6 +1101,166 @@ impl TaskSpec {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct CompletedProcess {
+    pub command: String,
+    pub exit_code: i32,
+    pub stdout: Vec<String>,
+    pub stderr: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ScriptedProcess {
+    command: String,
+    stdout: Vec<String>,
+    stderr: Vec<String>,
+    exit_code: i32,
+}
+
+impl ScriptedProcess {
+    pub fn new(command: impl Into<String>) -> Self {
+        ScriptedProcess {
+            command: command.into(),
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+            exit_code: 0,
+        }
+    }
+
+    pub fn with_exit_code(mut self, code: i32) -> Self {
+        self.exit_code = code;
+        self
+    }
+
+    pub fn with_stdout_line(mut self, line: impl Into<String>) -> Self {
+        self.stdout.push(line.into());
+        self
+    }
+
+    pub fn with_stderr_line(mut self, line: impl Into<String>) -> Self {
+        self.stderr.push(line.into());
+        self
+    }
+}
+
+#[derive(Debug, Default)]
+struct DeterministicProcessInner {
+    scripted: Mutex<VecDeque<ScriptedProcess>>,
+    completed: Mutex<Vec<CompletedProcess>>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DeterministicProcessProvider {
+    inner: Arc<DeterministicProcessInner>,
+}
+
+impl DeterministicProcessProvider {
+    pub fn script(&self, process: ScriptedProcess) {
+        self.inner
+            .scripted
+            .lock()
+            .expect("deterministic process queue poisoned")
+            .push_back(process);
+    }
+
+    pub fn completed(&self) -> Vec<CompletedProcess> {
+        self.inner
+            .completed
+            .lock()
+            .expect("deterministic process results poisoned")
+            .clone()
+    }
+
+    fn dequeue(&self) -> Option<ScriptedProcess> {
+        self.inner
+            .scripted
+            .lock()
+            .expect("deterministic process queue poisoned")
+            .pop_front()
+    }
+
+    fn push_completed(&self, process: &ScriptedProcess) {
+        self.inner
+            .completed
+            .lock()
+            .expect("deterministic process results poisoned")
+            .push(CompletedProcess {
+                command: process.command.clone(),
+                exit_code: process.exit_code,
+                stdout: process.stdout.clone(),
+                stderr: process.stderr.clone(),
+            });
+    }
+}
+
+impl CapabilityProvider for DeterministicProcessProvider {
+    fn name(&self) -> &str {
+        "process"
+    }
+
+    fn handle(&self, invocation: &CapabilityInvocation) -> Result<ProviderResponse, RuntimeError> {
+        match invocation.operation.as_str() {
+            "spawn" => {
+                let requested = invocation
+                    .payload
+                    .as_ref()
+                    .and_then(|value| match value {
+                        RuntimeValue::String(value) => Some(value.clone()),
+                        _ => None,
+                    })
+                    .ok_or_else(|| {
+                        RuntimeError::provider_failure(
+                            self.name(),
+                            "spawn expects a string payload",
+                        )
+                    })?;
+
+                let scripted = self.dequeue().ok_or_else(|| {
+                    RuntimeError::provider_failure(
+                        self.name(),
+                        "spawn invoked without scripted process",
+                    )
+                })?;
+
+                if scripted.command != requested {
+                    return Err(RuntimeError::provider_failure(
+                        self.name(),
+                        format!(
+                            "expected scripted command '{}' but received '{}'",
+                            scripted.command, requested
+                        ),
+                    ));
+                }
+
+                self.push_completed(&scripted);
+
+                let mut response =
+                    ProviderResponse::new(RuntimeValue::from(i64::from(scripted.exit_code)));
+                response = response.with_event(CapabilityEvent::Message(format!(
+                    "spawned {}",
+                    scripted.command
+                )));
+                for line in &scripted.stdout {
+                    response =
+                        response.with_event(CapabilityEvent::Message(format!("stdout: {}", line)));
+                }
+                for line in &scripted.stderr {
+                    response =
+                        response.with_event(CapabilityEvent::Message(format!("stderr: {}", line)));
+                }
+                response = response.with_event(CapabilityEvent::Data(RuntimeValue::from(
+                    i64::from(scripted.exit_code),
+                )));
+                Ok(response)
+            }
+            other => Err(RuntimeError::provider_failure(
+                self.name(),
+                format!("unsupported operation '{other}'"),
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct DeterministicConsoleProvider {
     inner: Arc<DeterministicConsoleInner>,
@@ -1775,6 +1941,147 @@ pub fn reset_network_fixtures() {
 fn network_fixtures() -> &'static RwLock<HashMap<String, NetworkFixture>> {
     static FIXTURES: OnceLock<RwLock<HashMap<String, NetworkFixture>>> = OnceLock::new();
     FIXTURES.get_or_init(|| RwLock::new(HashMap::new()))
+}
+
+#[derive(Debug, Default)]
+struct ProcessProvider;
+
+impl ProcessProvider {
+    fn parse_command(
+        &self,
+        invocation: &CapabilityInvocation,
+    ) -> Result<Vec<String>, RuntimeError> {
+        let payload = invocation
+            .payload
+            .as_ref()
+            .and_then(|value| match value {
+                RuntimeValue::String(value) => Some(value.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                RuntimeError::provider_failure(self.name(), "spawn expects a string payload")
+            })?;
+
+        let mut parts = Vec::new();
+        let mut current = String::new();
+        let mut chars = payload.chars().peekable();
+        let mut in_quotes = false;
+        let mut quote = '\0';
+        while let Some(ch) = chars.next() {
+            match ch {
+                '\'' | '"' => {
+                    if in_quotes {
+                        if ch == quote {
+                            in_quotes = false;
+                        } else {
+                            current.push(ch);
+                        }
+                    } else {
+                        in_quotes = true;
+                        quote = ch;
+                    }
+                }
+                '\\' => {
+                    if let Some(next) = chars.next() {
+                        current.push(next);
+                    }
+                }
+                ch if ch.is_whitespace() && !in_quotes => {
+                    if !current.is_empty() {
+                        parts.push(current.clone());
+                        current.clear();
+                    }
+                }
+                _ => current.push(ch),
+            }
+        }
+
+        if in_quotes {
+            return Err(RuntimeError::provider_failure(
+                self.name(),
+                "unterminated quote in process payload",
+            ));
+        }
+
+        if !current.is_empty() {
+            parts.push(current);
+        }
+
+        if parts.is_empty() {
+            return Err(RuntimeError::provider_failure(
+                self.name(),
+                "spawn requires a command to execute",
+            ));
+        }
+
+        Ok(parts)
+    }
+
+    fn spawn(&self, args: &[String]) -> Result<std::process::Output, RuntimeError> {
+        let mut command = Command::new(&args[0]);
+        if args.len() > 1 {
+            command.args(&args[1..]);
+        }
+        command.output().map_err(|err| {
+            RuntimeError::provider_failure(
+                self.name(),
+                format!("failed to spawn '{}': {err}", args[0]),
+            )
+        })
+    }
+
+    fn append_stream_events(
+        &self,
+        response: ProviderResponse,
+        stdout: &[u8],
+        stderr: &[u8],
+    ) -> ProviderResponse {
+        let mut response = response;
+        let stdout_text = String::from_utf8_lossy(stdout);
+        for line in stdout_text.lines() {
+            response = response.with_event(CapabilityEvent::Message(format!("stdout: {line}",)));
+        }
+        let stderr_text = String::from_utf8_lossy(stderr);
+        for line in stderr_text.lines() {
+            response = response.with_event(CapabilityEvent::Message(format!("stderr: {line}",)));
+        }
+        response
+    }
+}
+
+impl CapabilityProvider for ProcessProvider {
+    fn name(&self) -> &str {
+        "process"
+    }
+
+    fn handle(&self, invocation: &CapabilityInvocation) -> Result<ProviderResponse, RuntimeError> {
+        match invocation.operation.as_str() {
+            "spawn" => {
+                let args = self.parse_command(invocation)?;
+                let output = self.spawn(&args)?;
+                let exit_code = output.status.code().ok_or_else(|| {
+                    RuntimeError::provider_failure(
+                        self.name(),
+                        "process exited without status code",
+                    )
+                })?;
+                let mut response =
+                    ProviderResponse::new(RuntimeValue::from(i64::from(exit_code))).with_event(
+                        CapabilityEvent::Message(format!("spawned {}", args.join(" "))),
+                    );
+                response = self.append_stream_events(response, &output.stdout, &output.stderr);
+                Ok(
+                    response.with_event(CapabilityEvent::Data(RuntimeValue::from(i64::from(
+                        exit_code,
+                    )))),
+                )
+            }
+            other => Err(RuntimeError::provider_failure(
+                self.name(),
+                format!("unsupported operation '{other}'"),
+            )),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
