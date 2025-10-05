@@ -160,7 +160,14 @@ fn function_signature(
     record_names: &RecordNameMap,
 ) -> BackendResult<String> {
     let mut signature = String::new();
-    let ret_type = c_type_return(module, function.ret_type, record_names);
+    
+    // Special case: main function in C must return int
+    let ret_type = if function.name == "main" {
+        "int".to_string()
+    } else {
+        c_type_return(module, function.ret_type, record_names)
+    };
+    
     write!(signature, "{} {}(", ret_type, mangle_name(&function.name)).unwrap();
 
     for (index, param) in function.params.iter().enumerate() {
