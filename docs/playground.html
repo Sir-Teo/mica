@@ -443,7 +443,8 @@
     <script src="assets/futuristic.js"></script>
     
     <script type="module">
-        // Import WASM module
+        // Import WASM module with cache busting
+        const wasmVersion = '1.0.1'; // Update this when WASM changes
         import init, { 
             tokenize, 
             parse_ast, 
@@ -452,7 +453,7 @@
             lower_code, 
             generate_ir,
             run_code
-        } from './wasm/mica.js';
+        } from `./wasm/mica.js?v=${wasmVersion}`;
 
         // Initialize WASM and expose functions globally
         let wasmReady = false;
@@ -460,11 +461,12 @@
         init().then(() => {
             wasmReady = true;
             console.log('✅ WASM module loaded successfully');
+            console.log('Available functions:', { tokenize, parse_ast, resolve_code, check_code, lower_code, generate_ir, run_code });
             
             // Update status indicator
             const statusIndicator = document.querySelector('.subtitle');
             if (statusIndicator) {
-                statusIndicator.innerHTML = '<span class="status-indicator status-ready"></span>WebAssembly compiler ready';
+                statusIndicator.innerHTML = '<span class="status-indicator status-ready"></span>WebAssembly compiler + runtime ready';
             }
             
             // Expose to global scope for use in inline scripts
@@ -478,6 +480,8 @@
                 run_code,
                 ready: true
             };
+            
+            console.log('✅ All WASM functions exposed to window.micaWasm');
         }).catch(err => {
             console.error('❌ Failed to load WASM module:', err);
             window.micaWasm = { ready: false };
@@ -611,7 +615,12 @@
                         result = window.micaWasm.generate_ir(code);
                         break;
                     case 'run':
+                        console.log('🚀 Executing run_code...');
+                        if (!window.micaWasm.run_code) {
+                            throw new Error('run_code function not available in WASM module');
+                        }
                         result = window.micaWasm.run_code(code);
+                        console.log('✅ run_code result:', result);
                         break;
                     default:
                         throw new Error(`Unknown stage: ${stage}`);
