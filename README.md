@@ -131,7 +131,7 @@ Get a working environment and your first compiler run in minutes.
 ### 2. Clone, build, and smoke-test
 
 ```bash
-git clone https://github.com/<you>/mica.git
+git clone https://github.com/Sir-Teo/mica.git
 cd mica
 cargo build
 cargo test
