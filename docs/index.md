@@ -702,9 +702,9 @@ nav_order: 1
       <h1>Build industrial-grade language tooling without the million-line overhead.</h1>
       <p>
         Mica is a compact systems language prototype that exposes the full compiler pipeline—
-        lexer to native backend—through one approachable repository. Every doc, snippet, and
-        example is generated from real commands so you can trust what you read and extend what
-        you build.
+        lexer to native backend—through one approachable repository. The README, GitHub Pages
+        tour, and runnable examples all regenerate from real CLI output, so what you read is what
+        the binary actually does.
       </p>
       <div class="hero-marquee">
         <div class="hero-marquee-track">
@@ -720,8 +720,9 @@ nav_order: 1
       </div>
       <div class="cta-buttons">
         <a class="button" href="https://github.com/mica-lang/mica">View the repository ↗</a>
+        <a class="button" href="https://mica-lang.github.io/mica/">Open the published docs site ↗</a>
+        <a class="button" href="https://github.com/mica-lang/mica/blob/main/README.md#quickstart">Read the README quickstart ↗</a>
         <a class="button" href="https://github.com/search?q=repo%3Amica-lang%2Fmica+path%3Aexamples&type=code">Browse runnable examples</a>
-        <a class="button" href="https://github.com/mica-lang/mica/issues">Join the discussion</a>
       </div>
       <div class="hero-demo" data-animated="true">
         <pre><code><span class="typing-line" data-command="# Explore every compiler stage with one binary"></span>
@@ -747,17 +748,39 @@ cd mica
 cargo build</code></pre>
       </div>
       <div class="command-card">
-        <h3>2. Run the language tour</h3>
-        <p>Pair the guided docs with runnable snippets.</p>
-        <pre><code>code docs/tour.md examples/
-# or open directly on GitHub</code></pre>
-        <a href="https://github.com/mica-lang/mica/blob/main/docs/tour.md">Read the tour ↗</a>
+        <h3>2. Smoke-test the toolchain</h3>
+        <p>Run the full suite once so snapshots and examples stay trustworthy.</p>
+        <pre><code>cargo test
+cargo run --bin gen_snippets -- --check</code></pre>
       </div>
       <div class="command-card">
         <h3>3. Inspect the pipeline</h3>
         <p>Use CLI flags to peek behind each compiler stage.</p>
         <pre><code>cargo run --bin mica -- --tokens examples/adt.mica
 cargo run --bin mica -- --ir examples/methods.mica</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="audience">
+    <div class="section-eyebrow">Who it’s for</div>
+    <h2>Tailored for curious language builders</h2>
+    <p class="lead">
+      Whether you’re prototyping a research idea or guiding a study group, Mica keeps the entire compiler
+      pipeline visible without overwhelming you with infrastructure.
+    </p>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3>Language tinkerers</h3>
+        <p>Inspect lexing, parsing, semantic analysis, lowering, and codegen in one place—no runtime scaffolding required.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Educators & study groups</h3>
+        <p>Teach from audited examples and snapshot-backed docs that ensure every command stays up to date.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Systems programmers</h3>
+        <p>Experiment with deterministic concurrency, capability tracking, and SSA-based passes in a familiar Rust codebase.</p>
       </div>
     </div>
   </section>
