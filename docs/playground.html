@@ -450,7 +450,8 @@
             resolve_code, 
             check_code, 
             lower_code, 
-            generate_ir 
+            generate_ir,
+            run_code
         } from './wasm/mica.js';
 
         // Initialize WASM and expose functions globally
@@ -474,6 +475,7 @@
                 check_code,
                 lower_code,
                 generate_ir,
+                run_code,
                 ready: true
             };
         }).catch(err => {
@@ -609,21 +611,8 @@
                         result = window.micaWasm.generate_ir(code);
                         break;
                     case 'run':
-                        output.innerHTML = `
-                            <div class="output-section">
-                                <div class="output-section-title">▶️ Execute Program</div>
-                                <div class="info-box">
-                                    <strong>🚀 Execution:</strong> To run this program, use:<br><br>
-                                    <code style="display: block; background: var(--bg-tertiary); padding: 1rem; border-radius: 4px; margin-top: 0.5rem; color: var(--neon-cyan);">
-                                    cargo run --bin mica -- --run your_file.mica
-                                    </code>
-                                    <br>
-                                    <strong>Note:</strong> In-browser execution coming soon!
-                                </div>
-                            </div>
-                        `;
-                        statusIndicator.className = 'status-indicator status-ready';
-                        return;
+                        result = window.micaWasm.run_code(code);
+                        break;
                     default:
                         throw new Error(`Unknown stage: ${stage}`);
                 }

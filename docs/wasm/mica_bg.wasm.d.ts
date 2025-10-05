@@ -8,6 +8,7 @@ export const resolve_code: (a: number, b: number) => [number, number];
 export const check_code: (a: number, b: number) => [number, number];
 export const lower_code: (a: number, b: number) => [number, number];
 export const generate_ir: (a: number, b: number) => [number, number];
+export const run_code: (a: number, b: number) => [number, number];
 export const __wbindgen_free: (a: number, b: number, c: number) => void;
 export const __wbindgen_malloc: (a: number, b: number) => number;
 export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

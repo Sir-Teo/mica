@@ -1,5 +1,6 @@
 pub mod backend;
 pub mod diagnostics;
+pub mod interpreter;
 pub mod ir;
 pub mod lower;
 pub mod pretty;

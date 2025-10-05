@@ -88,7 +88,7 @@ pub enum FuncRef {
 pub struct ValueId(u32);
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct BlockId(u32);
+pub struct BlockId(pub u32);
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct TypeId(u32);
