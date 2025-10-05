@@ -8,6 +8,9 @@ pub mod semantics;
 pub mod syntax;
 pub mod tooling;
 
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
+
 pub use diagnostics::error;
 pub use diagnostics::{Error, ErrorKind, Result};
 pub use semantics::{check, resolve};

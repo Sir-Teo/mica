@@ -105,6 +105,9 @@ focus.
 
 Pick the workflow that matches your goal today:
 
+- **🎮 Try the playground** — Visit the [interactive playground](https://sir-teo.github.io/mica/playground.html)
+  to write and compile Mica code directly in your browser. All 21+ examples are
+  available with one click.
 - **Skim the architecture** — Start with the [repository layout](#repository-layout)
   and open the corresponding modules in `src/` to see how each stage is wired.
 - **Observe the compiler in motion** — Run a program with `--tokens`, `--ast`,
@@ -120,15 +123,25 @@ Pick the workflow that matches your goal today:
 
 ## Quickstart
 
-Get a working environment and your first compiler run in minutes.
+Get started with Mica in minutes—no installation required!
 
-### 1. Install prerequisites
+### Try Online First
+
+Visit the **[🎮 Interactive Playground](https://sir-teo.github.io/mica/playground.html)** 
+to write and compile Mica code directly in your browser. Select from 21+ examples, 
+edit the code, and explore different compiler stages instantly.
+
+### Local Installation
+
+For local development and the full compiler experience:
+
+#### 1. Install prerequisites
 
 - Install a recent stable Rust toolchain via <https://rustup.rs/>.
 - LLVM ships with Rust, so no additional native dependencies are required for
   this prototype.
 
-### 2. Clone, build, and smoke-test
+#### 2. Clone, build, and smoke-test
 
 ```bash
 git clone https://github.com/Sir-Teo/mica.git
@@ -140,7 +153,7 @@ cargo test
 `cargo test` exercises lexing, parsing, lowering, the IR pipeline, and snapshot
 comparisons so you can trust subsequent experiments.
 
-### 3. Explore the CLI
+#### 3. Explore the CLI
 
 - Inspect the AST of a demo program:
 

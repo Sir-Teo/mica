@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="⚡ MICA Playground - Write and run Mica code in your browser">
+    <title>⚡ MICA Playground</title>
+    
+    <link rel="stylesheet" href="assets/futuristic.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css">
+    
+    <style>
+        .playground-container {
+            max-width: 1600px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .playground-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .playground-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px var(--shadow);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .panel-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .btn {
+            padding: 0.6rem 1.2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+            box-shadow: 0 4px 16px var(--glow-purple);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px var(--glow-purple);
+        }
+
+        .btn-secondary {
+            background: var(--bg-glass-strong);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-glass);
+            border-color: var(--border-strong);
+        }
+
+        .select-wrapper {
+            position: relative;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        select {
+            width: 100%;
+            padding: 0.6rem 2.5rem 0.6rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-glass-strong);
+            color: var(--text);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            appearance: none;
+            transition: all 0.3s;
+        }
+
+        select:hover {
+            border-color: var(--border-strong);
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--glow-purple);
+        }
+
+        .select-wrapper::after {
+            content: '▼';
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            pointer-events: none;
+            font-size: 0.8rem;
+        }
+
+        #editor {
+            height: 600px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .CodeMirror {
+            height: 100%;
+            background: var(--bg-secondary);
+            color: var(--text);
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
+        }
+
+        .CodeMirror-gutters {
+            background: var(--bg-tertiary);
+            border-right: 1px solid var(--border);
+        }
+
+        .CodeMirror-linenumber {
+            color: var(--text-dim);
+        }
+
+        .CodeMirror-cursor {
+            border-left-color: var(--neon-cyan);
+        }
+
+        .CodeMirror-selected {
+            background: rgba(139, 92, 246, 0.2);
+        }
+
+        .output-container {
+            min-height: 600px;
+            max-height: 600px;
+            overflow-y: auto;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .output-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .output-container::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        .output-container::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+
+        .output-container::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-light);
+        }
+
+        .output-empty {
+            color: var(--text-dim);
+            font-style: italic;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .output-error {
+            color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 3px solid var(--danger);
+            padding: 1rem;
+            margin: 0.5rem 0;
+            border-radius: 4px;
+        }
+
+        .output-success {
+            color: var(--success);
+        }
+
+        .output-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .output-section-title {
+            color: var(--primary-light);
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-ready {
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
+        }
+
+        .status-running {
+            background: var(--warning);
+            box-shadow: 0 0 8px var(--warning);
+            animation: pulse-status 1s infinite;
+        }
+
+        .status-error {
+            background: var(--danger);
+            box-shadow: 0 0 8px var(--danger);
+        }
+
+        @keyframes pulse-status {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .info-box {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: var(--text-secondary);
+        }
+
+        .info-box strong {
+            color: var(--neon-blue);
+        }
+
+        @media (max-width: 1200px) {
+            .playground-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .playground-container {
+                padding: 0 1rem;
+            }
+
+            .toolbar {
+                flex-direction: column;
+            }
+
+            .select-wrapper {
+                width: 100%;
+            }
+        }
+
+        /* Syntax highlighting for code output */
+        .cm-s-monokai .cm-keyword { color: #f92672; }
+        .cm-s-monokai .cm-atom { color: #ae81ff; }
+        .cm-s-monokai .cm-number { color: #ae81ff; }
+        .cm-s-monokai .cm-def { color: #a6e22e; }
+        .cm-s-monokai .cm-variable { color: #f8f8f2; }
+        .cm-s-monokai .cm-variable-2 { color: #66d9ef; }
+        .cm-s-monokai .cm-variable-3 { color: #66d9ef; }
+        .cm-s-monokai .cm-property { color: #66d9ef; }
+        .cm-s-monokai .cm-operator { color: #f92672; }
+        .cm-s-monokai .cm-comment { color: #75715e; }
+        .cm-s-monokai .cm-string { color: #e6db74; }
+        .cm-s-monokai .cm-meta { color: #75715e; }
+        .cm-s-monokai .cm-qualifier { color: #a6e22e; }
+        .cm-s-monokai .cm-builtin { color: #66d9ef; }
+        .cm-s-monokai .cm-tag { color: #f92672; }
+        .cm-s-monokai .cm-attribute { color: #a6e22e; }
+        .cm-s-monokai .cm-type { color: #66d9ef; }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">🌙</button>
+    <button class="scroll-top" id="scrollTop" aria-label="Scroll to top">↑</button>
+    
+    <header style="padding: 3rem 0;">
+        <div class="container" style="text-align: center;">
+            <h1 style="font-size: 3.5rem; margin-bottom: 1rem;">⚡ MICA Playground</h1>
+            <div class="tagline">Write, Compile, and Explore Mica Code</div>
+            <div class="subtitle" style="margin-top: 1rem;">
+                <span class="status-indicator status-ready"></span>
+                Interactive browser-based compiler
+            </div>
+        </div>
+    </header>
+
+    <div class="playground-container">
+        <div class="info-box">
+            <strong>🎮 How to use:</strong> Select an example from the dropdown, edit the code, and click buttons to see different compiler stages (tokens, AST, IR) or run the code. All examples from the repository are available!
+        </div>
+
+        <div class="playground-grid">
+            <!-- Left Panel: Code Editor -->
+            <div class="playground-panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        📝 Source Code
+                    </h2>
+                </div>
+                
+                <div class="toolbar">
+                    <div class="select-wrapper">
+                        <select id="exampleSelector">
+                            <option value="">Select an example...</option>
+                            <option value="demo">demo.mica - Basic demo</option>
+                            <option value="adt">adt.mica - Algebraic data types</option>
+                            <option value="adt_match_exhaustive">adt_match_exhaustive.mica</option>
+                            <option value="adt_match_nonexhaustive">adt_match_nonexhaustive.mica</option>
+                            <option value="cast_and_patterns">cast_and_patterns.mica</option>
+                            <option value="channels">channels.mica - Channels</option>
+                            <option value="comprehensive_deployment">comprehensive_deployment.mica</option>
+                            <option value="concurrency_pipeline">concurrency_pipeline.mica</option>
+                            <option value="effects_and_using">effects_and_using.mica</option>
+                            <option value="effects_resource_pool">effects_resource_pool.mica</option>
+                            <option value="generics_bounds">generics_bounds.mica</option>
+                            <option value="generics_tree_algorithms">generics_tree_algorithms.mica</option>
+                            <option value="impls">impls.mica - Implementations</option>
+                            <option value="lists_and_loops">lists_and_loops.mica</option>
+                            <option value="loop_control">loop_control.mica</option>
+                            <option value="match_guards">match_guards.mica</option>
+                            <option value="methods">methods.mica - Methods</option>
+                            <option value="native_entry">native_entry.mica</option>
+                            <option value="results_try">results_try.mica</option>
+                            <option value="spawn_await">spawn_await.mica</option>
+                            <option value="using">using.mica - Using blocks</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" onclick="clearEditor()">Clear</button>
+                </div>
+
+                <div id="editor"></div>
+            </div>
+
+            <!-- Right Panel: Output -->
+            <div class="playground-panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        💻 Output
+                    </h2>
+                </div>
+                
+                <div class="toolbar">
+                    <button class="btn btn-secondary" onclick="compileCode('tokens')">🔤 Tokens</button>
+                    <button class="btn btn-secondary" onclick="compileCode('ast')">🌳 AST</button>
+                    <button class="btn btn-secondary" onclick="compileCode('resolve')">🔍 Resolve</button>
+                    <button class="btn btn-secondary" onclick="compileCode('ir')">⚙️ IR</button>
+                    <button class="btn btn-primary" onclick="compileCode('run')">▶️ Run</button>
+                </div>
+
+                <div id="output" class="output-container">
+                    <div class="output-empty">
+                        Select an example and click a compiler stage button to see the output...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box" style="margin-top: 2rem;">
+            <strong>📚 Learn more:</strong> Check out the <a href="tour.html" style="color: var(--neon-cyan);">Language Tour</a> for a complete guide to Mica syntax and semantics. Visit the <a href="examples.html" style="color: var(--neon-cyan);">Examples Gallery</a> to explore more code samples.
+        </div>
+    </div>
+
+    <footer style="margin-top: 4rem;">
+        <div class="container" style="text-align: center;">
+            <p style="margin-bottom: 1rem;">
+                <a href="index.html">Home</a> • 
+                <a href="getting-started.html">Getting Started</a> • 
+                <a href="tour.html">Tour</a> • 
+                <a href="examples.html">Examples</a> • 
+                <a href="https://github.com/Sir-Teo/mica">GitHub</a>
+            </p>
+            <p style="opacity: 0.7; font-size: 0.9rem;">
+                © 2025 Mica Project • Built for learning and experimentation
+            </p>
+        </div>
+    </footer>
+
+    <!-- CodeMirror -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/rust/rust.min.js"></script>
+    
+    <script src="assets/futuristic.js"></script>
+    
+    <script>
+        // Initialize CodeMirror editor
+        const editor = CodeMirror(document.getElementById('editor'), {
+            lineNumbers: true,
+            mode: 'rust',
+            theme: 'monokai',
+            indentUnit: 2,
+            tabSize: 2,
+            lineWrapping: true,
+            autofocus: true,
+        });
+
+        // Example code repository
+        let examplesManifest = [];
+
+        // Load examples manifest
+        async function loadExamplesManifest() {
+            try {
+                const response = await fetch('examples-manifest.json');
+                if (response.ok) {
+                    examplesManifest = await response.json();
+                    populateExampleSelector();
+                } else {
+                    console.error('Failed to load examples manifest');
+                }
+            } catch (error) {
+                console.error('Error loading examples manifest:', error);
+            }
+        }
+
+        // Populate example selector from manifest
+        function populateExampleSelector() {
+            const selector = document.getElementById('exampleSelector');
+            selector.innerHTML = '<option value="">Select an example...</option>';
+            
+            examplesManifest.forEach(example => {
+                const option = document.createElement('option');
+                option.value = example.id;
+                option.textContent = `${example.name} - ${example.description}`;
+                selector.appendChild(option);
+            });
+        }
+
+        // Load example when selected
+        document.getElementById('exampleSelector').addEventListener('change', function() {
+            const exampleId = this.value;
+            if (!exampleId) return;
+
+            const output = document.getElementById('output');
+            
+            const example = examplesManifest.find(ex => ex.id === exampleId);
+            if (example) {
+                editor.setValue(example.code);
+                output.innerHTML = `
+                    <div class="output-empty">
+                        <strong>${example.name}</strong> loaded!<br>
+                        <em>${example.description}</em><br><br>
+                        ${example.lines} lines of code<br>
+                        Click a compiler stage button to see the output.
+                    </div>
+                `;
+            } else {
+                output.innerHTML = '<div class="output-error">Example not found</div>';
+            }
+        });
+
+        // Clear editor
+        function clearEditor() {
+            editor.setValue('');
+            document.getElementById('exampleSelector').value = '';
+            document.getElementById('output').innerHTML = '<div class="output-empty">Editor cleared. Start writing or select an example.</div>';
+        }
+
+        // Compile code with different stages
+        async function compileCode(stage) {
+            const code = editor.getValue();
+            const output = document.getElementById('output');
+
+            if (!code.trim()) {
+                output.innerHTML = '<div class="output-empty">Please write or select some code first!</div>';
+                return;
+            }
+
+            // Show loading with status
+            const statusIndicator = document.querySelector('.subtitle .status-indicator');
+            statusIndicator.className = 'status-indicator status-running';
+            output.innerHTML = '<div class="output-empty"><div class="loading"></div> Compiling...</div>';
+
+            try {
+                // For now, we'll display a message about running locally
+                // In the future, this can be connected to a WebAssembly build or API
+                const stageNames = {
+                    tokens: 'Tokenization',
+                    ast: 'Abstract Syntax Tree',
+                    resolve: 'Name Resolution & Effect Checking',
+                    ir: 'Intermediate Representation',
+                    run: 'Execute Program'
+                };
+
+                output.innerHTML = `
+                    <div class="output-section">
+                        <div class="output-section-title">📦 ${stageNames[stage]}</div>
+                        <div class="info-box">
+                            <strong>🚀 Running locally:</strong> To see actual compiler output, run the following command:<br><br>
+                            <code style="display: block; background: var(--bg-tertiary); padding: 1rem; border-radius: 4px; margin-top: 0.5rem; color: var(--neon-cyan);">
+                            cargo run --bin mica -- --${stage} your_file.mica
+                            </code>
+                            <br>
+                            <strong>🔮 Coming soon:</strong> WebAssembly-based in-browser compilation!<br>
+                            For now, clone the repository and try the examples locally:<br><br>
+                            <code style="display: block; background: var(--bg-tertiary); padding: 1rem; border-radius: 4px; margin-top: 0.5rem; color: var(--neon-green);">
+                            git clone https://github.com/Sir-Teo/mica.git<br>
+                            cd mica<br>
+                            cargo build<br>
+                            cargo run --bin mica -- --${stage} examples/${document.getElementById('exampleSelector').value || 'demo'}.mica
+                            </code>
+                        </div>
+                        <div style="margin-top: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 4px;">
+                            <strong style="color: var(--text);">Your code:</strong><br><br>
+                            <pre style="color: var(--text-secondary); line-height: 1.6; white-space: pre-wrap;">${escapeHtml(code)}</pre>
+                        </div>
+                    </div>
+                `;
+
+                statusIndicator.className = 'status-indicator status-ready';
+            } catch (error) {
+                output.innerHTML = `<div class="output-error"><strong>Error:</strong> ${error.message}</div>`;
+                statusIndicator.className = 'status-indicator status-error';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', async () => {
+            await loadExamplesManifest();
+            
+            // Load default example
+            if (examplesManifest.length > 0) {
+                document.getElementById('exampleSelector').value = 'demo';
+                document.getElementById('exampleSelector').dispatchEvent(new Event('change'));
+            }
+        });
+    </script>
+</body>
+</html>

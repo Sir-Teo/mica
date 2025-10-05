@@ -1,0 +1,170 @@
+[
+  {
+    "id": "adt",
+    "name": "adt.mica",
+    "description": "enum-like ADT",
+    "code": "module demo.adt\n\n// enum-like ADT\npub type Option[T] = Some(T) | None\npub type Result[T,E] = Ok(T) | Err(E)\n\npub fn map_option[T,U](x: Option[T], f: fn(T) -> U) -> Option[U] {\n  match x {\n    Some(v) => Some(f(v)),\n    None => None,\n  }\n}\n\n",
+    "lines": 14,
+    "size": 240
+  },
+  {
+    "id": "adt_match_exhaustive",
+    "name": "adt_match_exhaustive.mica",
+    "description": "Exhaustive match returns a string label for each variant",
+    "code": "module demo.matching\n\ntype Color = Red | Green | Blue\n\n// Exhaustive match returns a string label for each variant\nfn to_text(c: Color) -> String {\n  match c {\n    Red => \"red\",\n    Green => \"green\",\n    Blue => \"blue\",\n  }\n}\n",
+    "lines": 13,
+    "size": 226
+  },
+  {
+    "id": "adt_match_nonexhaustive",
+    "name": "adt_match_nonexhaustive.mica",
+    "description": "Module: demo.matching_nx",
+    "code": "module demo.matching_nx\n\ntype Color = Red | Green | Blue\n\nfn to_text(c: Color) -> String {\n  match c {\n    Red => \"red\",\n  }\n}\n\n",
+    "lines": 11,
+    "size": 128
+  },
+  {
+    "id": "cast_and_patterns",
+    "name": "cast_and_patterns.mica",
+    "description": "Module: demo.casts_and_patterns",
+    "code": "module demo.casts_and_patterns\n\ntype Pair = { a: Int, b: Int }\n\nfn work(p: Pair, x: Int) -> Int {\n  match p {\n    { a, b: bb } => (a + bb) as Int,\n  }\n}\n\nfn unit_match(u: ()) {\n  match u { () => () }\n}\n\n",
+    "lines": 15,
+    "size": 203
+  },
+  {
+    "id": "channels",
+    "name": "channels.mica",
+    "description": "Module: demo.channels",
+    "code": "module demo.channels\n\nfn make() {\n  let q = chan[Int](10)\n  q\n}\n\n",
+    "lines": 8,
+    "size": 65
+  },
+  {
+    "id": "comprehensive_deployment",
+    "name": "comprehensive_deployment.mica",
+    "description": "Module: demo.comprehensive.deployment",
+    "code": "module demo.comprehensive.deployment\n\ntype Result[T, E] = Ok(T) | Err(E)\n\ntype Component = { name: String, endpoint: String, retries: Int }\ntype Stage = Provision(Component) | Check(Component) | Warm(Component)\ntype StageStatus = StageOk(Component, Int) | StageWarn(Component, String) | StageErr(Component, String)\ntype StageError = { component: Component, reason: String }\ntype Plan = { run_id: Int, stages: [Stage] }\ntype Audit = { run_id: Int, ok: Int, warn: Int, err: Int }\n\nfn component(stage: Stage) -> Component {\n  match stage {\n    Provision(component) => component,\n    Check(component) => component,\n    Warm(component) => component,\n  }\n}\n\nfn describe(stage: Stage) -> String {\n  match stage {\n    Provision(_) => \"provision\",\n    Check(_) => \"check\",\n    Warm(_) => \"warm\",\n  }\n}\n\nfn compute_backoff(attempt: Int) -> Int {\n  let mut delay = 1\n  let mut i = 0\n  while i < attempt {\n    delay = delay * 2\n    i = i + 1\n  }\n  delay\n}\n\nfn log_attempt(stage: Stage, attempt: Int, io: IO) -> Result[(), String] !{io} {\n  using File::open(\"/tmp/plan.log\", io)? {\n    io.println(describe(stage))\n    if attempt == 0 {\n      io.println(\"initial attempt\")\n    } else {\n      io.println(\"retrying stage\")\n    }\n  }\n  Ok(())\n}\n\nfn log_backoff(stage: Stage, delay: Int, io: IO) -> Result[(), String] !{io} {\n  using File::open(\"/tmp/plan.backoff\", io)? {\n    io.println(describe(stage))\n    if delay > 1 {\n      io.println(\"extended delay applied\")\n    } else {\n      io.println(\"minimal delay applied\")\n    }\n  }\n  Ok(())\n}\n\nfn escalate(stage: Stage, component: Component, reason: String, io: IO) -> Result[(), String] !{io} {\n  using File::open(\"/tmp/plan.escalations\", io)? {\n    io.println(component.name)\n    io.println(reason)\n    using File::open(\"/tmp/plan.context\", io)? {\n      io.println(describe(stage))\n      io.println(component.endpoint)\n    }\n  }\n  Ok(())\n}\n\nfn log_failure(error: StageError, io: IO) -> Result[(), String] !{io} {\n  using File::open(\"/tmp/plan.failures\", io)? {\n    io.println(error.component.name)\n    io.println(error.reason)\n  }\n  Ok(())\n}\n\nfn log_warning(reason: String, io: IO) -> Result[(), String] !{io} {\n  using File::open(\"/tmp/plan.warnings\", io)? {\n    io.println(reason)\n  }\n  Ok(())\n}\n\nfn execute_stage(stage: Stage, net: Net, io: IO) -> Result[StageStatus, StageError] !{net, io} {\n  let comp = component(stage)\n  let mut attempt = 0\n\n  while attempt < comp.retries {\n    log_attempt(stage, attempt, io)?\n    let _ = await spawn http::get(comp.endpoint, net)\n\n    if attempt == comp.retries - 1 && comp.retries > 1 {\n      using File::open(\"/tmp/plan.threshold\", io)? {\n        io.println(comp.name)\n        io.println(\"exceeded retry budget\")\n      }\n      return Ok(StageErr(comp, \"exceeded retry budget\"))\n    }\n\n    if attempt >= 1 {\n      using File::open(\"/tmp/plan.success\", io)? {\n        io.println(comp.name)\n        using File::open(\"/tmp/plan.traces\", io)? {\n          io.println(describe(stage))\n        }\n      }\n      return Ok(StageOk(comp, attempt + 1))\n    }\n\n    attempt = attempt + 1\n    if attempt < comp.retries {\n      let delay = compute_backoff(attempt)\n      log_backoff(stage, delay, io)?\n    }\n  }\n\n  if comp.retries == 1 {\n    Ok(StageWarn(comp, \"executed with single attempt\"))\n  } else {\n    Err(StageError { component: comp, reason: \"no healthy response\" })\n  }\n}\n\nfn summarize(audit: Audit, status: StageStatus) -> Audit {\n  match status {\n    StageOk(_, _) => Audit { run_id: audit.run_id, ok: audit.ok + 1, warn: audit.warn, err: audit.err },\n    StageWarn(_, _) => Audit { run_id: audit.run_id, ok: audit.ok, warn: audit.warn + 1, err: audit.err },\n    StageErr(_, _) => Audit { run_id: audit.run_id, ok: audit.ok, warn: audit.warn, err: audit.err + 1 },\n  }\n}\n\nfn execute_plan(plan: Plan, net: Net, io: IO) -> Result[Audit, String] !{net, io} {\n  let mut audit = Audit { run_id: plan.run_id, ok: 0, warn: 0, err: 0 }\n\n  for stage in plan.stages {\n    match execute_stage(stage, net, io) {\n      Ok(status) => {\n        match status {\n          StageWarn(_, reason) => {\n            log_warning(reason, io)?\n            audit = summarize(audit, status)\n          },\n          StageErr(component, reason) => {\n            escalate(stage, component, reason, io)?\n            audit = summarize(audit, status)\n          },\n          _ => {\n            audit = summarize(audit, status)\n          },\n        }\n      },\n      Err(error) => {\n        log_failure(error, io)?\n        return Err(error.reason)\n      },\n    }\n  }\n\n  Ok(audit)\n}\n",
+    "lines": 166,
+    "size": 4518
+  },
+  {
+    "id": "concurrency_pipeline",
+    "name": "concurrency_pipeline.mica",
+    "description": "Spawn network work for each job and record how many attempts were required.",
+    "code": "module demo.concurrent.pipeline\n\ntype Job = { id: Int, endpoint: String, retries: Int }\ntype Stats = { id: Int, attempts: Int }\ntype JobResult = Success(Job, Stats) | Exhausted(Job)\n\n// Spawn network work for each job and record how many attempts were required.\nfn analyze(job: Job, net: Net) -> JobResult !{net} {\n  let mut attempt = 0\n  while attempt < job.retries {\n    let _ = await spawn http::get(job.endpoint, net)\n    attempt = attempt + 1\n    if attempt >= 1 {\n      return Success(job, Stats { id: job.id, attempts: attempt })\n    }\n  }\n  Exhausted(job)\n}\n\nfn classify_attempts(attempts: Int) -> String {\n  if attempts == 1 { \"fast\" } else { \"retried\" }\n}\n\nfn persist_success(job: Job, stats: Stats, io: IO) !{io} {\n  using File::open(\"/tmp/pipeline.log\", io)? {\n    io.println(\"completed:\")\n    io.println(job.endpoint)\n    if stats.attempts > 1 {\n      io.println(\"required retries\")\n    }\n  }\n}\n\nfn persist_failure(job: Job, io: IO) !{io} {\n  using File::open(\"/tmp/pipeline.log\", io)? {\n    io.println(\"gave up:\")\n    io.println(job.endpoint)\n  }\n}\n\nfn run_pipeline(jobs: [Job], net: Net, io: IO) !{net, io} {\n  for job in jobs {\n    match await spawn analyze(job, net) {\n      Success(job, stats) => {\n        let label = classify_attempts(stats.attempts)\n        io.println(label)\n        persist_success(job, stats, io)\n      },\n      Exhausted(job) => {\n        io.println(\"failed\")\n        persist_failure(job, io)\n      },\n    }\n  }\n}\n",
+    "lines": 56,
+    "size": 1455
+  },
+  {
+    "id": "demo",
+    "name": "demo.mica",
+    "description": "Module: demo.core",
+    "code": "module demo.core\n\ntype Row = { id: Int, qty: Int, price: F64 }\n\npub fn total(rows: List[Row]) -> F64 {\n  let mut sum = 0.0\n  for r in rows {\n    sum = sum + r.price\n  }\n  sum\n}\n",
+    "lines": 12,
+    "size": 177
+  },
+  {
+    "id": "effects_and_using",
+    "name": "effects_and_using.mica",
+    "description": "function type with effect row as parameter",
+    "code": "module demo.effects\n\nfn open_and_print(io: IO) !{io} {\n  using File::open(\"/tmp/example.txt\", io)? {\n    io.println(\"opened ok\")\n  }\n}\n\n// function type with effect row as parameter\nfn run_with(callback: fn(Int) -> Int !{io}, io: IO) !{io} {\n  let _ = callback(42)\n}\n\n",
+    "lines": 14,
+    "size": 268
+  },
+  {
+    "id": "effects_resource_pool",
+    "name": "effects_resource_pool.mica",
+    "description": "Module: demo.effects.resource",
+    "code": "module demo.effects.resource\n\ntype Result[T, E] = Ok(T) | Err(E)\n\nfn with_file[T, A](path: String, arg: A, io: IO, callback: fn(File, A) -> Result[T, String] !{io}) -> Result[T, String] !{io} {\n  using file = File::open(path, io)? {\n    let value = callback(file, arg)?\n    Ok(value)\n  }\n}\n\nfn write_lines_into(file: File, lines: [String], io: IO) -> Result[Int, String] !{io} {\n  let mut count = 0\n  for line in lines {\n    io.println(line)\n    count = count + 1\n  }\n  Ok(count)\n}\n\nfn write_lines(path: String, lines: [String], io: IO) -> Result[Int, String] !{io} {\n  with_file(path, lines, io, write_lines_into)\n}\n\nfn read_config(path: String, io: IO) -> Result[String, String] !{io} {\n  using File::open(path, io)? {\n    Ok(\"config loaded\")\n  }\n}\n\nfn sync_logs(path: String, lines: [String], io: IO, net: Net) -> Result[Int, String] !{io, net} {\n  let count = write_lines(path, lines, io)?\n  let _ = await spawn telemetry::publish(count, net)?\n  Ok(count)\n}\n",
+    "lines": 36,
+    "size": 962
+  },
+  {
+    "id": "generics_bounds",
+    "name": "generics_bounds.mica",
+    "description": "Generic max with a single trait bound",
+    "code": "module demo.generics\n\ntype Pair[T] = { a: T, b: T }\n\n// Generic max with a single trait bound\nfn max[T: Ord](a: T, b: T) -> T {\n  if a < b { b } else { a }\n}\n\n// Call with concrete type\nfn use_max() { max(1, 2) }\n",
+    "lines": 12,
+    "size": 213
+  },
+  {
+    "id": "generics_tree_algorithms",
+    "name": "generics_tree_algorithms.mica",
+    "description": "Module: demo.generics.trees",
+    "code": "module demo.generics.trees\n\ntype Tree[T] = Leaf(T) | Branch(Tree[T], Tree[T])\n\nfn size[T](tree: Tree[T]) -> Int {\n  match tree {\n    Leaf(_) => 1,\n    Branch(left, right) => size(left) + size(right),\n  }\n}\n\nfn map_tree[T, U](tree: Tree[T], f: fn(T) -> U) -> Tree[U] {\n  match tree {\n    Leaf(value) => Leaf(f(value)),\n    Branch(left, right) => Branch(map_tree(left, f), map_tree(right, f)),\n  }\n}\n\nfn fold_tree[T, U](tree: Tree[T], seed: U, combine: fn(U, T) -> U) -> U {\n  match tree {\n    Leaf(value) => combine(seed, value),\n    Branch(left, right) => {\n      let left_acc = fold_tree(left, seed, combine)\n      fold_tree(right, left_acc, combine)\n    }\n  }\n}\n\nfn double(value: Int) -> Int { value * 2 }\nfn add(acc: Int, value: Int) -> Int { acc + value }\n\nfn double_all(tree: Tree[Int]) -> Tree[Int] { map_tree(tree, double) }\nfn sum(tree: Tree[Int]) -> Int { fold_tree(tree, 0, add) }\n\nfn depth[T](tree: Tree[T]) -> Int {\n  match tree {\n    Leaf(_) => 1,\n    Branch(left, right) => {\n      let left_depth = depth(left)\n      let right_depth = depth(right)\n      if left_depth < right_depth { right_depth + 1 } else { left_depth + 1 }\n    }\n  }\n}\n",
+    "lines": 45,
+    "size": 1152
+  },
+  {
+    "id": "impls",
+    "name": "impls.mica",
+    "description": "Module: demo.impls",
+    "code": "module demo.impls\n\ntype Point = { x: Int, y: Int }\n\nimpl Ord for Point {\n  fn cmp(a: Point, b: Point) -> Int {\n    if a.x == b.x { 0 } else { if a.x < b.x { -1 } else { 1 } }\n  }\n}\n\nfn max[T: Ord](a: T, b: T) -> T {\n  if a < b { b } else { a }\n}\n\n",
+    "lines": 15,
+    "size": 247
+  },
+  {
+    "id": "lists_and_loops",
+    "name": "lists_and_loops.mica",
+    "description": "Sum a list of integers with a for-loop over an iterator",
+    "code": "module demo.collections\n\n// Sum a list of integers with a for-loop over an iterator\nfn sum(xs: [Int]) -> Int {\n  let mut s = 0\n  for x in xs {\n    s = s + x\n  }\n  s\n}\n",
+    "lines": 11,
+    "size": 167
+  },
+  {
+    "id": "loop_control",
+    "name": "loop_control.mica",
+    "description": "Demonstrate `loop`, `break`, and `continue` working together.",
+    "code": "module demo.loop_control\n\n// Demonstrate `loop`, `break`, and `continue` working together.\nfn factorial(n: Int) -> Int {\n  let mut acc = 1\n  let mut i = 0\n  loop {\n    if i == 0 {\n      i = i + 1\n      continue\n    }\n    if i > n {\n      break\n    }\n    acc = acc * i\n    i = i + 1\n  }\n  acc\n}\n\n// Basic `while` countdown showing mutation inside the loop body.\nfn countdown(start: Int) -> Int {\n  let mut value = start\n  while value > 0 {\n    value = value - 1\n  }\n  value\n}\n",
+    "lines": 29,
+    "size": 475
+  },
+  {
+    "id": "match_guards",
+    "name": "match_guards.mica",
+    "description": "Classify tokens using pattern guards to refine matches.",
+    "code": "module demo.match_guards\n\ntype Token = Number(Int) | Word(String) | Symbol(String)\n\n// Classify tokens using pattern guards to refine matches.\nfn classify(token: Token) -> String {\n  match token {\n    Number(n) if n < 0 => \"negative\",\n    Number(_) => \"number\",\n    Word(w) if w == \"mica\" => \"keyword\",\n    Word(_) => \"word\",\n    Symbol(_) => \"symbol\",\n  }\n}\n",
+    "lines": 15,
+    "size": 359
+  },
+  {
+    "id": "methods",
+    "name": "methods.mica",
+    "description": "toy body; return other for now",
+    "code": "module demo.methods\n\ntype Vec2 = { x: Int, y: Int }\n\nimpl Addable for Vec2 {\n  fn add(self, other: Vec2) -> Vec2 {\n    // toy body; return other for now\n    other\n  }\n}\n\nfn use_method(a: Vec2, b: Vec2) -> Vec2 {\n  a.add(b)\n}\n\n",
+    "lines": 16,
+    "size": 226
+  },
+  {
+    "id": "native_entry",
+    "name": "native_entry.mica",
+    "description": "Module: examples.native_entry",
+    "code": "module examples.native_entry\n\nfn add(a: Int, b: Int) -> Int {\n  a + b\n}\n\nfn main() -> Int {\n  let base = 39\n  let total = add(base, 3)\n  total - 42\n}\n",
+    "lines": 12,
+    "size": 150
+  },
+  {
+    "id": "results_try",
+    "name": "results_try.mica",
+    "description": "Ensure an integer is strictly positive.",
+    "code": "module demo.results_try\n\ntype Result[T, E] = Ok(T) | Err(E)\n\n// Ensure an integer is strictly positive.\nfn ensure_positive(n: Int) -> Result[Int, String] {\n  if n > 0 { Ok(n) } else { Err(\"non-positive\") }\n}\n\n// Use the `?` operator to propagate failures when doubling values.\nfn double_positive(n: Int) -> Result[Int, String] {\n  let value = ensure_positive(n)?\n  Ok(value * 2)\n}\n\n// Combine two checked values, propagating any error early.\nfn sum_checked(a: Int, b: Int) -> Result[Int, String] {\n  let left = ensure_positive(a)?\n  let right = ensure_positive(b)?\n  Ok(left + right)\n}\n",
+    "lines": 22,
+    "size": 586
+  },
+  {
+    "id": "spawn_await",
+    "name": "spawn_await.mica",
+    "description": "Demonstrate structured concurrency primitives",
+    "code": "module demo.concurrent\n\n// Demonstrate structured concurrency primitives\nfn fetch(u: String, net: Net) -> Bytes !{net} {\n  await spawn http::get(u, net)\n}\n",
+    "lines": 7,
+    "size": 155
+  },
+  {
+    "id": "using",
+    "name": "using.mica",
+    "description": "using with inline expression",
+    "code": "module demo.using_demo\n\n// using with inline expression\nfn demo1(io: IO) !{io} {\n  using File::open(\"/tmp/x.txt\", io)? {\n    io.println(\"opened\")\n  }\n}\n\n// using with binding\nfn demo2(io: IO) !{io} {\n  using f = File::open(\"/tmp/y.txt\", io)? {\n    io.println(\"opened2\")\n  }\n}\n",
+    "lines": 16,
+    "size": 276
+  }
+]
