@@ -1,0 +1,15 @@
+{
+  "name": "mica",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "mica_bg.wasm",
+    "mica.js",
+    "mica.d.ts"
+  ],
+  "main": "mica.js",
+  "types": "mica.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

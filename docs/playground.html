@@ -345,7 +345,7 @@
 
     <div class="playground-container">
         <div class="info-box">
-            <strong>🎮 How to use:</strong> Select an example from the dropdown, edit the code, and click buttons to see different compiler stages (tokens, AST, IR) or run the code. All examples from the repository are available!
+            <strong>🎮 How to use:</strong> Select an example from the dropdown, edit the code, and click buttons to see different compiler stages. <strong>WebAssembly compilation runs entirely in your browser!</strong> All 21+ examples from the repository are available.
         </div>
 
         <div class="playground-grid">
@@ -402,6 +402,8 @@
                     <button class="btn btn-secondary" onclick="compileCode('tokens')">🔤 Tokens</button>
                     <button class="btn btn-secondary" onclick="compileCode('ast')">🌳 AST</button>
                     <button class="btn btn-secondary" onclick="compileCode('resolve')">🔍 Resolve</button>
+                    <button class="btn btn-secondary" onclick="compileCode('check')">✓ Check</button>
+                    <button class="btn btn-secondary" onclick="compileCode('lower')">📦 Lower</button>
                     <button class="btn btn-secondary" onclick="compileCode('ir')">⚙️ IR</button>
                     <button class="btn btn-primary" onclick="compileCode('run')">▶️ Run</button>
                 </div>
@@ -439,6 +441,46 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/rust/rust.min.js"></script>
     
     <script src="assets/futuristic.js"></script>
+    
+    <script type="module">
+        // Import WASM module
+        import init, { 
+            tokenize, 
+            parse_ast, 
+            resolve_code, 
+            check_code, 
+            lower_code, 
+            generate_ir 
+        } from './wasm/mica.js';
+
+        // Initialize WASM and expose functions globally
+        let wasmReady = false;
+        
+        init().then(() => {
+            wasmReady = true;
+            console.log('✅ WASM module loaded successfully');
+            
+            // Update status indicator
+            const statusIndicator = document.querySelector('.subtitle');
+            if (statusIndicator) {
+                statusIndicator.innerHTML = '<span class="status-indicator status-ready"></span>WebAssembly compiler ready';
+            }
+            
+            // Expose to global scope for use in inline scripts
+            window.micaWasm = {
+                tokenize,
+                parse_ast,
+                resolve_code,
+                check_code,
+                lower_code,
+                generate_ir,
+                ready: true
+            };
+        }).catch(err => {
+            console.error('❌ Failed to load WASM module:', err);
+            window.micaWasm = { ready: false };
+        });
+    </script>
     
     <script>
         // Initialize CodeMirror editor
@@ -529,44 +571,87 @@
             output.innerHTML = '<div class="output-empty"><div class="loading"></div> Compiling...</div>';
 
             try {
-                // For now, we'll display a message about running locally
-                // In the future, this can be connected to a WebAssembly build or API
+                // Check if WASM is ready
+                if (!window.micaWasm || !window.micaWasm.ready) {
+                    throw new Error('WASM module not loaded yet. Please wait a moment and try again.');
+                }
+
                 const stageNames = {
                     tokens: 'Tokenization',
                     ast: 'Abstract Syntax Tree',
-                    resolve: 'Name Resolution & Effect Checking',
+                    resolve: 'Name Resolution',
+                    check: 'Exhaustiveness & Effect Checking',
+                    lower: 'HIR Lowering',
                     ir: 'Intermediate Representation',
                     run: 'Execute Program'
                 };
 
-                output.innerHTML = `
-                    <div class="output-section">
-                        <div class="output-section-title">📦 ${stageNames[stage]}</div>
-                        <div class="info-box">
-                            <strong>🚀 Running locally:</strong> To see actual compiler output, run the following command:<br><br>
-                            <code style="display: block; background: var(--bg-tertiary); padding: 1rem; border-radius: 4px; margin-top: 0.5rem; color: var(--neon-cyan);">
-                            cargo run --bin mica -- --${stage} your_file.mica
-                            </code>
-                            <br>
-                            <strong>🔮 Coming soon:</strong> WebAssembly-based in-browser compilation!<br>
-                            For now, clone the repository and try the examples locally:<br><br>
-                            <code style="display: block; background: var(--bg-tertiary); padding: 1rem; border-radius: 4px; margin-top: 0.5rem; color: var(--neon-green);">
-                            git clone https://github.com/Sir-Teo/mica.git<br>
-                            cd mica<br>
-                            cargo build<br>
-                            cargo run --bin mica -- --${stage} examples/${document.getElementById('exampleSelector').value || 'demo'}.mica
-                            </code>
-                        </div>
-                        <div style="margin-top: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 4px;">
-                            <strong style="color: var(--text);">Your code:</strong><br><br>
-                            <pre style="color: var(--text-secondary); line-height: 1.6; white-space: pre-wrap;">${escapeHtml(code)}</pre>
-                        </div>
-                    </div>
-                `;
+                let result;
+                
+                // Call appropriate WASM function based on stage
+                switch(stage) {
+                    case 'tokens':
+                        result = window.micaWasm.tokenize(code);
+                        break;
+                    case 'ast':
+                        result = window.micaWasm.parse_ast(code, false);
+                        break;
+                    case 'resolve':
+                        result = window.micaWasm.resolve_code(code);
+                        break;
+                    case 'check':
+                        result = window.micaWasm.check_code(code);
+                        break;
+                    case 'lower':
+                        result = window.micaWasm.lower_code(code);
+                        break;
+                    case 'ir':
+                        result = window.micaWasm.generate_ir(code);
+                        break;
+                    case 'run':
+                        output.innerHTML = `
+                            <div class="output-section">
+                                <div class="output-section-title">▶️ Execute Program</div>
+                                <div class="info-box">
+                                    <strong>🚀 Execution:</strong> To run this program, use:<br><br>
+                                    <code style="display: block; background: var(--bg-tertiary); padding: 1rem; border-radius: 4px; margin-top: 0.5rem; color: var(--neon-cyan);">
+                                    cargo run --bin mica -- --run your_file.mica
+                                    </code>
+                                    <br>
+                                    <strong>Note:</strong> In-browser execution coming soon!
+                                </div>
+                            </div>
+                        `;
+                        statusIndicator.className = 'status-indicator status-ready';
+                        return;
+                    default:
+                        throw new Error(`Unknown stage: ${stage}`);
+                }
 
-                statusIndicator.className = 'status-indicator status-ready';
+                // Parse the JSON result
+                const parsed = JSON.parse(result);
+                
+                if (parsed.success) {
+                    output.innerHTML = `
+                        <div class="output-section">
+                            <div class="output-section-title">✅ ${stageNames[stage]}</div>
+                            <div style="padding: 1rem; background: var(--bg-tertiary); border-radius: 4px; margin-top: 1rem;">
+                                <pre style="color: var(--text-secondary); line-height: 1.6; white-space: pre-wrap; margin: 0;">${escapeHtml(parsed.output)}</pre>
+                            </div>
+                        </div>
+                    `;
+                    statusIndicator.className = 'status-indicator status-ready';
+                } else {
+                    output.innerHTML = `
+                        <div class="output-error">
+                            <strong>❌ Compilation Error:</strong><br><br>
+                            ${escapeHtml(parsed.error || 'Unknown error')}
+                        </div>
+                    `;
+                    statusIndicator.className = 'status-indicator status-error';
+                }
             } catch (error) {
-                output.innerHTML = `<div class="output-error"><strong>Error:</strong> ${error.message}</div>`;
+                output.innerHTML = `<div class="output-error"><strong>Error:</strong> ${escapeHtml(error.message)}</div>`;
                 statusIndicator.className = 'status-indicator status-error';
             }
         }

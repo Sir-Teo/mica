@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{lexer, parser, resolve, check, lower, ir, backend, error, pretty};
+use crate::{lexer, parser, resolve, check, lower, ir, pretty};
 use std::fmt::Write;
 
 #[wasm_bindgen]
@@ -68,11 +68,10 @@ pub fn parse_ast(source: &str, pretty: bool) -> String {
 }
 
 fn parse_ast_internal(source: &str, pretty_print: bool) -> Result<String, String> {
-    let tokens = lexer::lex(source).map_err(|e| format!("Lexer error: {}", e))?;
-    let ast = parser::parse(&tokens).map_err(|e| format!("Parser error: {}", e))?;
+    let ast = parser::parse_module(source).map_err(|e| format!("Parser error: {}", e))?;
     
     if pretty_print {
-        Ok(pretty::format_module(&ast))
+        Ok(pretty::module_to_string(&ast))
     } else {
         Ok(format!("{:#?}", ast))
     }
@@ -96,9 +95,8 @@ pub fn resolve_code(source: &str) -> String {
 }
 
 fn resolve_internal(source: &str) -> Result<String, String> {
-    let tokens = lexer::lex(source).map_err(|e| format!("Lexer error: {}", e))?;
-    let ast = parser::parse(&tokens).map_err(|e| format!("Parser error: {}", e))?;
-    let resolution = resolve::resolve(&ast).map_err(|e| format!("Resolution error: {}", e))?;
+    let ast = parser::parse_module(source).map_err(|e| format!("Parser error: {}", e))?;
+    let resolution = resolve::resolve_module(&ast);
     
     Ok(format!("{:#?}", resolution))
 }
@@ -121,12 +119,18 @@ pub fn check_code(source: &str) -> String {
 }
 
 fn check_internal(source: &str) -> Result<String, String> {
-    let tokens = lexer::lex(source).map_err(|e| format!("Lexer error: {}", e))?;
-    let ast = parser::parse(&tokens).map_err(|e| format!("Parser error: {}", e))?;
-    let resolution = resolve::resolve(&ast).map_err(|e| format!("Resolution error: {}", e))?;
-    check::check(&ast, &resolution).map_err(|e| format!("Check error: {}", e))?;
+    let ast = parser::parse_module(source).map_err(|e| format!("Parser error: {}", e))?;
+    let check_result = check::check_module(&ast);
     
-    Ok("✓ All checks passed!".to_string())
+    if check_result.diagnostics.is_empty() {
+        Ok("✓ All checks passed!".to_string())
+    } else {
+        let mut output = String::from("Diagnostics:\n");
+        for diag in &check_result.diagnostics {
+            writeln!(output, "  - {}", diag.message).unwrap();
+        }
+        Ok(output)
+    }
 }
 
 /// Lower to HIR
@@ -147,13 +151,10 @@ pub fn lower_code(source: &str) -> String {
 }
 
 fn lower_internal(source: &str) -> Result<String, String> {
-    let tokens = lexer::lex(source).map_err(|e| format!("Lexer error: {}", e))?;
-    let ast = parser::parse(&tokens).map_err(|e| format!("Parser error: {}", e))?;
-    let resolution = resolve::resolve(&ast).map_err(|e| format!("Resolution error: {}", e))?;
-    check::check(&ast, &resolution).map_err(|e| format!("Check error: {}", e))?;
-    let hir = lower::lower(&ast, &resolution).map_err(|e| format!("Lowering error: {}", e))?;
+    let ast = parser::parse_module(source).map_err(|e| format!("Parser error: {}", e))?;
+    let hir = lower::lower_module(&ast);
     
-    Ok(format!("{:#?}", hir))
+    Ok(lower::hir_to_string(&hir))
 }
 
 /// Generate IR
@@ -174,12 +175,9 @@ pub fn generate_ir(source: &str) -> String {
 }
 
 fn generate_ir_internal(source: &str) -> Result<String, String> {
-    let tokens = lexer::lex(source).map_err(|e| format!("Lexer error: {}", e))?;
-    let ast = parser::parse(&tokens).map_err(|e| format!("Parser error: {}", e))?;
-    let resolution = resolve::resolve(&ast).map_err(|e| format!("Resolution error: {}", e))?;
-    check::check(&ast, &resolution).map_err(|e| format!("Check error: {}", e))?;
-    let hir = lower::lower(&ast, &resolution).map_err(|e| format!("Lowering error: {}", e))?;
-    let ir_module = ir::build_ir(&hir).map_err(|e| format!("IR generation error: {}", e))?;
+    let ast = parser::parse_module(source).map_err(|e| format!("Parser error: {}", e))?;
+    let hir = lower::lower_module(&ast);
+    let ir_module = ir::lower_module(&hir);
     
     Ok(format!("{:#?}", ir_module))
 }
