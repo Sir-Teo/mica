@@ -1,181 +1,42 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Mica - A futuristic systems language with explicit effects, deterministic concurrency, and predictable performance">
+    <meta name="description" content="⚡ MICA - Ultra-modern systems language with explicit effects, deterministic concurrency, and zero-trust security. Master the compiler in a weekend.">
+    <meta name="keywords" content="programming language, systems programming, compiler, LLVM, effect system, concurrency, type safety, Rust alternative">
+    <meta name="author" content="Mica Language Team">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://sir-teo.github.io/mica/">
-    <meta property="og:title" content="Mica Programming Language - Next Generation Systems Language">
-    <meta property="og:description" content="Learn the entire compiler in a weekend, extend it on Monday. Explore the future of systems programming.">
-    <meta property="og:image" content="https://sir-teo.github.io/mica/assets/og-image.png">
+    <meta property="og:title" content="⚡ MICA - Next-Gen Systems Language">
+    <meta property="og:description" content="Ultra-modern systems language with neon-cyberpunk design. Learn the entire compiler in a weekend, ship production code on Monday.">
+    <meta property="og:image" content="https://sir-teo.github.io/mica/assets/og-mica.png">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://sir-teo.github.io/mica/">
-    <meta property="twitter:title" content="Mica Programming Language">
-    <meta property="twitter:description" content="Learn the entire compiler in a weekend, extend it on Monday">
+    <meta property="twitter:title" content="⚡ MICA Programming Language">
+    <meta property="twitter:description" content="Next-generation systems language with deterministic concurrency and zero-trust effects">
+    <meta property="twitter:image" content="https://sir-teo.github.io/mica/assets/og-mica.png">
     
-    <title>Mica - Next Generation Systems Language</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    
+    <title>⚡ MICA - Next-Generation Systems Language</title>
+    
+    <!-- Link to external futuristic CSS -->
+    <link rel="stylesheet" href="assets/futuristic.css">
+    
     <style>
-        :root {
-            /* Futuristic Color Palette */
-            --primary: #6366f1;
-            --primary-dark: #4338ca;
-            --primary-light: #818cf8;
-            --secondary: #ec4899;
-            --accent: #06b6d4;
-            --success: #10b981;
-            --warning: #f59e0b;
-            
-            /* Backgrounds */
-            --bg: #0a0a0f;
-            --bg-card: rgba(15, 15, 25, 0.8);
-            --bg-glass: rgba(255, 255, 255, 0.05);
-            --bg-alt: #0f0f19;
-            
-            /* Text */
-            --text: #f8fafc;
-            --text-muted: #94a3b8;
-            --text-highlight: #fff;
-            
-            /* Borders & Effects */
-            --border: rgba(255, 255, 255, 0.1);
-            --glow: rgba(99, 102, 241, 0.3);
-            --shadow: rgba(0, 0, 0, 0.5);
-            
-            /* Gradients */
-            --gradient-primary: linear-gradient(135deg, #6366f1 0%, #ec4899 50%, #06b6d4 100%);
-            --gradient-glow: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.2), transparent 70%);
-        }
-        
-        [data-theme="light"] {
-            --bg: #ffffff;
-            --bg-card: rgba(255, 255, 255, 0.95);
-            --bg-glass: rgba(15, 15, 25, 0.05);
-            --bg-alt: #f8fafc;
-            --text: #0a0a0f;
-            --text-muted: #64748b;
-            --border: rgba(0, 0, 0, 0.1);
-            --glow: rgba(99, 102, 241, 0.15);
-            --shadow: rgba(0, 0, 0, 0.1);
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        html {
-            scroll-behavior: smooth;
-            overflow-x: hidden;
-        }
-        
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.7;
-            color: var(--text);
-            background: var(--bg);
-            position: relative;
-            overflow-x: hidden;
-        }
-        
-        /* Animated Background */
-        body::before {
-            content: '';
-            position: fixed;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: 
-                radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 80% 70%, rgba(236, 72, 153, 0.15) 0%, transparent 50%),
-                radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.1) 0%, transparent 70%);
-            animation: rotateBackground 30s linear infinite;
-            z-index: -1;
-        }
-        
-        @keyframes rotateBackground {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 2rem;
-            position: relative;
-            z-index: 1;
-        }
-        
-        /* Futuristic Header */
-        header {
-            position: relative;
-            background: transparent;
-            color: var(--text-highlight);
-            padding: 6rem 0 8rem;
-            text-align: center;
-            overflow: hidden;
-        }
-        
-        header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: var(--gradient-primary);
-            opacity: 0.1;
-            z-index: -1;
-        }
-        
-        header h1 {
-            font-size: 5rem;
-            font-weight: 900;
-            margin-bottom: 1.5rem;
-            letter-spacing: -0.03em;
-            background: var(--gradient-primary);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            animation: titleGlow 3s ease-in-out infinite alternate;
-            text-shadow: 0 0 80px var(--glow);
-        }
-        
-        @keyframes titleGlow {
-            0% { filter: brightness(1); }
-            100% { filter: brightness(1.3); }
-        }
-        
-        header .tagline {
-            font-size: 1.8rem;
-            margin-bottom: 0.75rem;
-            font-weight: 600;
-            color: var(--text);
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
-            opacity: 0.9;
-        }
-        
-        header .subtitle {
-            font-size: 1.2rem;
-            color: var(--text-muted);
-            font-style: italic;
-            margin-bottom: 3rem;
-            letter-spacing: 0.05em;
-        }
-        
+        /* Minimal page-specific overrides - most styles are in futuristic.css */
         .hero-description {
             max-width: 900px;
             margin: 0 auto 3rem;
-            font-size: 1.25rem;
-            line-height: 1.9;
-            color: var(--text-muted);
+            font-size: 1.3rem;
+            line-height: 2;
+            color: var(--text-secondary);
             font-weight: 300;
         }
         
@@ -184,85 +45,7 @@
             gap: 1.5rem;
             justify-content: center;
             flex-wrap: wrap;
-            margin-top: 3rem;
-        }
-        
-        .btn {
-            position: relative;
-            display: inline-block;
-            padding: 1.1rem 2.5rem;
-            border-radius: 12px;
-            text-decoration: none;
-            font-weight: 700;
-            font-size: 1.1rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            overflow: hidden;
-            letter-spacing: 0.02em;
-        }
-        
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-            transition: left 0.5s;
-        }
-        
-        .btn:hover::before {
-            left: 100%;
-        }
-        
-        .btn-primary {
-            background: var(--gradient-primary);
-            color: white;
-            box-shadow: 0 10px 40px var(--glow);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-3px) scale(1.02);
-            box-shadow: 0 20px 60px var(--glow);
-        }
-        
-        .btn-secondary {
-            background: var(--bg-glass);
-            color: var(--text);
-            border: 2px solid var(--border);
-            backdrop-filter: blur(10px);
-        }
-        
-        .btn-secondary:hover {
-            background: var(--bg-card);
-            border-color: var(--primary);
-            transform: translateY(-3px);
-            box-shadow: 0 15px 40px var(--shadow);
-        }
-        
-        .section {
-            padding: 4rem 0;
-        }
-        
-        .section:nth-child(even) {
-            background: var(--bg-alt);
-        }
-        
-        .section-title {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            text-align: center;
-            color: var(--text);
-        }
-        
-        .section-intro {
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 1.1rem;
-            max-width: 700px;
-            margin: 0 auto 3rem;
+            margin-top: 3.5rem;
         }
         
         .features {
@@ -270,180 +53,41 @@
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 2.5rem;
             margin-top: 4rem;
-            perspective: 1000px;
-        }
-        
-        .feature-card {
-            position: relative;
-            background: var(--bg-card);
-            backdrop-filter: blur(20px);
-            padding: 2.5rem;
-            border-radius: 20px;
-            box-shadow: 0 8px 32px var(--shadow);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 1px solid var(--border);
-            transform-style: preserve-3d;
-        }
-        
-        .feature-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            border-radius: 20px;
-            padding: 2px;
-            background: var(--gradient-primary);
-            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            mask-composite: exclude;
-            opacity: 0;
-            transition: opacity 0.4s;
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-10px) rotateX(5deg);
-            box-shadow: 0 20px 60px var(--glow);
-        }
-        
-        .feature-card:hover::before {
-            opacity: 1;
         }
         
         .feature-icon {
-            font-size: 3.5rem;
+            font-size: 4rem;
             margin-bottom: 1.5rem;
             display: inline-block;
-            filter: drop-shadow(0 0 20px var(--glow));
+            filter: drop-shadow(0 0 25px var(--glow-purple));
             animation: floatIcon 3s ease-in-out infinite;
         }
         
         @keyframes floatIcon {
             0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-        }
-        
-        .feature-card h3 {
-            font-size: 1.6rem;
-            margin-bottom: 1rem;
-            font-weight: 700;
-            background: var(--gradient-primary);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .feature-card p {
-            color: var(--text-muted);
-            line-height: 1.8;
-            font-size: 1.05rem;
+            50% { transform: translateY(-15px); }
         }
         
         .quick-links {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
             gap: 1.5rem;
-            margin-top: 2rem;
+            margin-top: 2.5rem;
         }
         
-        .quick-link {
-            position: relative;
-            background: var(--bg-card);
-            backdrop-filter: blur(10px);
-            padding: 2rem;
-            border-radius: 16px;
-            border: 1px solid var(--border);
-            text-decoration: none;
-            color: var(--text);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            display: block;
-            overflow: hidden;
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2.5rem;
         }
-        
-        .quick-link::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 100px;
-            height: 100px;
-            background: var(--gradient-glow);
-            border-radius: 50%;
-            transform: translate(50%, -50%);
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        
-        .quick-link:hover::after {
-            opacity: 1;
-        }
-        
-        .quick-link:hover {
-            border-color: var(--primary);
-            transform: translateY(-5px);
-            box-shadow: 0 10px 40px var(--glow);
-        }
-        
-        .quick-link h4 {
-            position: relative;
-            z-index: 1;
-            background: var(--gradient-primary);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.75rem;
-            font-size: 1.3rem;
-            font-weight: 700;
-        }
-        
-        .quick-link p {
-            position: relative;
-            z-index: 1;
-            color: var(--text-muted);
-            font-size: 1rem;
-            line-height: 1.6;
-        }
-        
-        .code-example {
-            position: relative;
-            background: #0d1117;
-            color: #e6edf3;
-            padding: 2.5rem;
-            border-radius: 16px;
-            overflow-x: auto;
-            margin: 3rem 0;
-            font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Courier New', monospace;
-            font-size: 1rem;
-            line-height: 1.8;
-            box-shadow: 0 20px 60px var(--shadow);
-            border: 1px solid var(--border);
-        }
-        
-        .code-example::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 40px;
-            background: linear-gradient(to bottom, rgba(99, 102, 241, 0.1), transparent);
-            border-radius: 16px 16px 0 0;
-        }
-        
-        .code-example .keyword { color: #c792ea; }
-        .code-example .function { color: #82aaff; }
-        .code-example .string { color: #c3e88d; }
-        .code-example .comment { color: #546e7a; font-style: italic; }
-        .code-example .type { color: #ffcb6b; }
         
         .stats {
             display: flex;
             justify-content: space-around;
             flex-wrap: wrap;
-            gap: 3rem;
-            margin: 4rem 0;
+            gap: 3.5rem;
+            margin: 4.5rem 0;
         }
         
         .stat {
@@ -457,248 +101,43 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 120px;
-            height: 120px;
+            width: 140px;
+            height: 140px;
             background: var(--gradient-glow);
             border-radius: 50%;
             z-index: -1;
-            animation: pulse 3s ease-in-out infinite;
+            animation: pulse 4s ease-in-out infinite;
         }
         
         @keyframes pulse {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
-            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.6; }
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.4; }
+            50% { transform: translate(-50%, -50%) scale(1.15); opacity: 0.7; }
         }
         
         .stat-number {
-            font-size: 4rem;
+            font-size: 4.5rem;
             font-weight: 900;
-            background: var(--gradient-primary);
+            background: var(--gradient-neon);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
             display: block;
             line-height: 1.2;
+            text-shadow: 0 0 30px var(--glow-purple);
         }
         
         .stat-label {
             color: var(--text-muted);
             font-size: 1.1rem;
             margin-top: 0.75rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-        }
-        
-        .theme-toggle {
-            position: fixed;
-            top: 2rem;
-            right: 2rem;
-            z-index: 1000;
-            background: var(--bg-card);
-            backdrop-filter: blur(10px);
-            border: 2px solid var(--border);
-            border-radius: 50%;
-            width: 4rem;
-            height: 4rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 1.8rem;
-            box-shadow: 0 8px 32px var(--shadow);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .theme-toggle:hover {
-            transform: scale(1.15) rotate(180deg);
-            box-shadow: 0 12px 48px var(--glow);
-            border-color: var(--primary);
-        }
-        
-        .scroll-top {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            z-index: 999;
-            background: var(--gradient-primary);
-            color: white;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            width: 4rem;
-            height: 4rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 1.8rem;
-            font-weight: bold;
-            box-shadow: 0 8px 32px var(--glow);
-            opacity: 0;
-            transform: translateY(100px);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            backdrop-filter: blur(10px);
-        }
-        
-        .scroll-top.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        
-        .scroll-top:hover {
-            transform: translateY(-5px) scale(1.1);
-            box-shadow: 0 15px 50px var(--glow);
-        }
-        
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .animate-on-scroll {
-            opacity: 0;
-            animation: fadeInUp 0.6s ease forwards;
-        }
-        
-        .animate-on-scroll.visible {
-            animation: fadeInUp 0.6s ease forwards;
-        }
-        
-        footer {
-            position: relative;
-            background: var(--bg-alt);
-            color: var(--text);
-            padding: 4rem 0 2rem;
-            text-align: center;
-            border-top: 1px solid var(--border);
-        }
-        
-        footer::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: var(--gradient-primary);
-            opacity: 0.5;
-        }
-        
-        footer a {
-            color: var(--primary);
-            text-decoration: none;
-            transition: all 0.3s;
-            position: relative;
-        }
-        
-        footer a::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 0;
-            width: 0;
-            height: 2px;
-            background: var(--gradient-primary);
-            transition: width 0.3s;
-        }
-        
-        footer a:hover::after {
-            width: 100%;
-        }
-        
-        .modules-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-            margin-top: 2rem;
-        }
-        
-        .module-card {
-            position: relative;
-            background: var(--bg-card);
-            backdrop-filter: blur(10px);
-            padding: 2rem;
-            border-radius: 16px;
-            border: 1px solid var(--border);
-            border-left: 4px solid transparent;
-            border-image: var(--gradient-primary) 1;
-            border-image-slice: 1;
-            box-shadow: 0 4px 16px var(--shadow);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            overflow: hidden;
-        }
-        
-        .module-card::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: var(--gradient-primary);
-        }
-        
-        .module-card:hover {
-            box-shadow: 0 12px 40px var(--glow);
-            transform: translateX(8px);
-            border-color: var(--primary);
-        }
-        
-        .module-card h4 {
-            background: var(--gradient-primary);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.75rem;
-            font-size: 1.2rem;
-            font-weight: 700;
-        }
-        
-        .module-card a {
-            color: var(--text);
-            text-decoration: none;
             font-weight: 600;
-        }
-        
-        .module-card p {
-            color: var(--text-muted);
-            font-size: 0.95rem;
-            line-height: 1.6;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
         }
         
         @media (max-width: 768px) {
-            header h1 {
-                font-size: 3rem;
-            }
-            
-            header .tagline {
-                font-size: 1.3rem;
-            }
-            
-            header .subtitle {
-                font-size: 1rem;
-            }
-            
             .hero-description {
-                font-size: 1.1rem;
-            }
-            
-            .section-title {
-                font-size: 2.2rem;
-            }
-            
-            .container {
-                padding: 0 1.5rem;
-            }
-            
-            .feature-card, .quick-link {
-                padding: 1.5rem;
+                font-size: 1.15rem;
             }
             
             .features, .quick-links, .modules-grid {
@@ -706,24 +145,14 @@
             }
             
             .stat-number {
-                font-size: 3rem;
-            }
-            
-            .theme-toggle, .scroll-top {
-                width: 3.5rem;
-                height: 3.5rem;
-                font-size: 1.5rem;
-            }
-            
-            header {
-                padding: 4rem 0 5rem;
+                font-size: 3.5rem;
             }
         }
     </style>
 </head>
 <body>
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
-        ☀️
+        🌙
     </button>
     
     <button class="scroll-top" id="scrollTop" aria-label="Scroll to top">
@@ -733,70 +162,70 @@
     <header>
         <div class="container">
             <h1>⚡ MICA</h1>
-            <div class="tagline">Next-Gen Systems Language</div>
+            <div class="tagline">NEXT-GEN SYSTEMS LANGUAGE</div>
             <div class="subtitle">Minimal • Industrial • Composable • Auditable</div>
             <div class="hero-description">
-                Experience the future of systems programming. Mica delivers explicit effects, deterministic concurrency, 
-                and predictable performance in a learning-sized compiler. Master the entire pipeline in a weekend, 
-                ship production code on Monday.
+                Experience the future of systems programming with ultra-modern design. Mica delivers explicit effects, 
+                deterministic concurrency, and predictable performance in a learning-sized compiler. Master the entire 
+                pipeline in a weekend, ship production code on Monday. Welcome to the neon-cyberpunk era of programming languages.
             </div>
             <div class="cta-buttons">
                 <a href="getting-started.html" class="btn btn-primary">🚀 Get Started</a>
                 <a href="tour.html" class="btn btn-primary">📖 Language Tour</a>
-                <a href="https://github.com/Sir-Teo/mica" class="btn btn-secondary">⭐ GitHub Repository</a>
+                <a href="https://github.com/Sir-Teo/mica" class="btn btn-secondary">⭐ Star on GitHub</a>
             </div>
         </div>
     </header>
 
     <section class="section">
         <div class="container">
-            <h2 class="section-title">🌟 Why Mica?</h2>
+            <h2 class="section-title">🌟 Why Choose Mica?</h2>
             <p class="section-intro">
                 A revolutionary language playground that combines industrial-grade design patterns with educational clarity.
-                Inspect every stage of a production-quality compiler without drowning in complexity.
+                Inspect every stage of a production-quality compiler without drowning in complexity. Built for the next generation.
             </p>
             
             <div class="features">
-                <div class="feature-card">
+                <div class="feature-card animate-on-scroll">
                     <div class="feature-icon">⚡</div>
                     <h3>Hyper-Minimal Core</h3>
                     <p>Master the complete syntax in hours, not months. Zero bloat, pure expressiveness. 
-                    Extend functionality through composable libraries, not language keywords.</p>
+                    Extend functionality through composable libraries, not language keywords. Beautiful simplicity.</p>
                 </div>
                 
-                <div class="feature-card">
+                <div class="feature-card animate-on-scroll">
                     <div class="feature-icon">🔒</div>
                     <h3>Deterministic Concurrency</h3>
                     <p>Structured spawn/await with compile-time effect tracking. Write concurrent code that behaves 
-                    identically across runs. No race conditions, no debugging nightmares.</p>
+                    identically across runs. No race conditions, no debugging nightmares. Pure determinism.</p>
                 </div>
                 
-                <div class="feature-card">
+                <div class="feature-card animate-on-scroll">
                     <div class="feature-icon">🎯</div>
                     <h3>Zero-Trust Effects</h3>
                     <p>Capability-based security at the type level. Every side effect is explicit and auditable. 
-                    Know exactly what your code can do just by reading its signature.</p>
+                    Know exactly what your code can do just by reading its signature. Total transparency.</p>
                 </div>
                 
-                <div class="feature-card">
+                <div class="feature-card animate-on-scroll">
                     <div class="feature-icon">🛠️</div>
                     <h3>Full-Spectrum Tooling</h3>
                     <p>Inspect every compiler stage: tokens → AST → IR → LLVM → native code. 
                     Golden-file testing ensures correctness. Real-time introspection for learning and debugging.</p>
                 </div>
                 
-                <div class="feature-card">
+                <div class="feature-card animate-on-scroll">
                     <div class="feature-icon">🔌</div>
                     <h3>Universal Interop</h3>
                     <p>C-compatible ABI for seamless FFI. Python and JavaScript task hooks out of the box. 
-                    Integrate with any ecosystem without friction.</p>
+                    Integrate with any ecosystem without friction. Maximum compatibility.</p>
                 </div>
                 
-                <div class="feature-card">
+                <div class="feature-card animate-on-scroll">
                     <div class="feature-icon">🎓</div>
                     <h3>Built to Learn</h3>
                     <p>Complete compiler pipeline in one repository. Real implementations of lexing, parsing, 
-                    type checking, optimization, and codegen. Learn by reading production code.</p>
+                    type checking, optimization, and codegen. Learn by reading production code. Educational excellence.</p>
                 </div>
             </div>
         </div>
@@ -806,7 +235,7 @@
         <div class="container">
             <h2 class="section-title">⚙️ See It In Action</h2>
             <p class="section-intro">
-                Pattern matching meets capability-aware design. Type-safe, auditable, elegant.
+                Pattern matching meets capability-aware design. Type-safe, auditable, elegant. This is modern systems programming.
             </p>
             
             <div class="code-example">
@@ -831,62 +260,62 @@
 
     <section class="section">
         <div class="container">
-            <h2 class="section-title">🚀 Explore Mica</h2>
+            <h2 class="section-title">🚀 Explore the Ecosystem</h2>
             
             <div class="quick-links">
-                <a href="getting-started.html" class="quick-link">
+                <a href="getting-started.html" class="quick-link animate-on-scroll">
                     <h4>🚀 Getting Started</h4>
-                    <p>Installation guide and your first Mica program</p>
+                    <p>Installation guide and your first Mica program in minutes</p>
                 </a>
                 
-                <a href="tour.html" class="quick-link">
+                <a href="tour.html" class="quick-link animate-on-scroll">
                     <h4>📖 Language Tour</h4>
                     <p>Guided walkthrough of syntax, semantics, and runtime behavior</p>
                 </a>
                 
-                <a href="examples.html" class="quick-link">
+                <a href="examples.html" class="quick-link animate-on-scroll">
                     <h4>💡 Examples Gallery</h4>
-                    <p>20+ runnable programs showcasing all features</p>
+                    <p>20+ runnable programs showcasing all features in action</p>
                 </a>
                 
-                <a href="features.html" class="quick-link">
+                <a href="features.html" class="quick-link animate-on-scroll">
                     <h4>⚡ Features</h4>
-                    <p>Complete overview of language capabilities</p>
+                    <p>Complete overview of language capabilities and design</p>
                 </a>
                 
-                <a href="architecture.html" class="quick-link">
+                <a href="architecture.html" class="quick-link animate-on-scroll">
                     <h4>🏗️ Architecture</h4>
-                    <p>Understanding the compiler pipeline and design</p>
+                    <p>Understanding the compiler pipeline and internal design</p>
                 </a>
                 
-                <a href="snippets.html" class="quick-link">
+                <a href="snippets.html" class="quick-link animate-on-scroll">
                     <h4>💻 CLI Reference</h4>
                     <p>Real compiler output examples for every stage</p>
                 </a>
                 
-                <a href="module_reference.html" class="quick-link">
+                <a href="module_reference.html" class="quick-link animate-on-scroll">
                     <h4>🔧 Module Docs</h4>
                     <p>Deep dives for each subsystem in the compiler</p>
                 </a>
                 
-                <a href="roadmap/index.html" class="quick-link">
+                <a href="roadmap/index.html" class="quick-link animate-on-scroll">
                     <h4>🗺️ Roadmap</h4>
                     <p>Milestones, design notes, and implementation plans</p>
                 </a>
                 
-                <a href="status.html" class="quick-link">
+                <a href="status.html" class="quick-link animate-on-scroll">
                     <h4>📊 Status Report</h4>
-                    <p>Current health, verification, and priorities</p>
+                    <p>Current health, verification coverage, and priorities</p>
                 </a>
                 
-                <a href="faq.html" class="quick-link">
+                <a href="faq.html" class="quick-link animate-on-scroll">
                     <h4>❓ FAQ</h4>
-                    <p>Frequently asked questions and answers</p>
+                    <p>Frequently asked questions and detailed answers</p>
                 </a>
                 
-                <a href="contributing.html" class="quick-link">
+                <a href="contributing.html" class="quick-link animate-on-scroll">
                     <h4>🤝 Contributing</h4>
-                    <p>Join the development and help build Mica</p>
+                    <p>Join the development and help build the future</p>
                 </a>
             </div>
         </div>
@@ -898,42 +327,42 @@
             <p class="section-intro">Deep dive into the modular compiler pipeline. Every component is documented, tested, and ready to explore.</p>
             
             <div class="modules-grid">
-                <div class="module-card">
+                <div class="module-card animate-on-scroll">
                     <h4><a href="modules/syntax.html">Syntax Front-End</a></h4>
-                    <p>Lexer, parser, and AST construction</p>
+                    <p>Lexer, parser, and AST construction with error recovery</p>
                 </div>
                 
-                <div class="module-card">
+                <div class="module-card animate-on-scroll">
                     <h4><a href="modules/semantics.html">Semantic Analysis</a></h4>
-                    <p>Resolver, type checker, and effect system</p>
+                    <p>Resolver, type checker, and comprehensive effect system</p>
                 </div>
                 
-                <div class="module-card">
+                <div class="module-card animate-on-scroll">
                     <h4><a href="modules/lowering.html">Lowering Pipeline</a></h4>
-                    <p>AST to HIR transformation</p>
+                    <p>AST to HIR transformation and desugaring</p>
                 </div>
                 
-                <div class="module-card">
+                <div class="module-card animate-on-scroll">
                     <h4><a href="modules/ir.html">SSA Intermediate Representation</a></h4>
                     <p>Typed SSA IR and optimization passes</p>
                 </div>
                 
-                <div class="module-card">
+                <div class="module-card animate-on-scroll">
                     <h4><a href="modules/runtime.html">Runtime</a></h4>
-                    <p>Capability providers and task scheduler</p>
+                    <p>Capability providers and deterministic task scheduler</p>
                 </div>
                 
-                <div class="module-card">
+                <div class="module-card animate-on-scroll">
                     <h4><a href="modules/diagnostics.html">Diagnostics</a></h4>
-                    <p>Error reporting and structured warnings</p>
+                    <p>Error reporting and structured warnings with source context</p>
                 </div>
                 
-                <div class="module-card">
+                <div class="module-card animate-on-scroll">
                     <h4><a href="modules/cli.html">CLI Tooling</a></h4>
-                    <p>Command-line interface and utilities</p>
+                    <p>Command-line interface and development utilities</p>
                 </div>
                 
-                <div class="module-card">
+                <div class="module-card animate-on-scroll">
                     <h4><a href="modules/pipeline.html">Pipeline Entry Points</a></h4>
                     <p>Compiler stage inspection and JSON exports</p>
                 </div>
@@ -950,7 +379,7 @@
                     <div class="stat-label">Integration Tests</div>
                 </div>
                 <div class="stat">
-                    <span class="stat-number">15+</span>
+                    <span class="stat-number">20+</span>
                     <div class="stat-label">Example Programs</div>
                 </div>
                 <div class="stat">
@@ -967,8 +396,8 @@
 
     <footer>
         <div class="container">
-            <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1.5rem;">
-                Mica: The Future of Systems Programming is Open Source
+            <p style="font-size: 1.2rem; font-weight: 700; margin-bottom: 1.5rem;">
+                ⚡ Mica: The Future of Systems Programming is Open Source ⚡
             </p>
             <p style="margin-top: 1rem;">
                 <a href="getting-started.html">Getting Started</a> • 
@@ -984,81 +413,13 @@
                 <a href="faq.html">FAQ</a> • 
                 <a href="contributing.html">Contributing</a>
             </p>
-            <p style="margin-top: 2rem; opacity: 0.7; font-size: 0.95rem;">
+            <p style="margin-top: 2rem; opacity: 0.8; font-size: 0.95rem;">
                 © 2025 Mica Project • Built with passion for the next generation of developers
             </p>
         </div>
     </footer>
     
-    <script>
-        // Theme toggle (defaults to dark)
-        const themeToggle = document.getElementById('themeToggle');
-        const htmlElement = document.documentElement;
-        
-        // Load saved theme or default to dark
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        htmlElement.setAttribute('data-theme', savedTheme);
-        themeToggle.textContent = savedTheme === 'light' ? '🌙' : '☀️';
-        
-        themeToggle.addEventListener('click', () => {
-            const currentTheme = htmlElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            
-            htmlElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            themeToggle.textContent = newTheme === 'light' ? '🌙' : '☀️';
-        });
-        
-        // Scroll to top button
-        const scrollTop = document.getElementById('scrollTop');
-        
-        window.addEventListener('scroll', () => {
-            if (window.pageYOffset > 300) {
-                scrollTop.classList.add('visible');
-            } else {
-                scrollTop.classList.remove('visible');
-            }
-        });
-        
-        scrollTop.addEventListener('click', () => {
-            window.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
-        });
-        
-        // Smooth scroll for anchor links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }
-            });
-        });
-        
-        // Animate elements on scroll
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
-        
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('visible');
-                }
-            });
-        }, observerOptions);
-        
-        document.querySelectorAll('.feature-card, .quick-link, .module-card').forEach(el => {
-            el.classList.add('animate-on-scroll');
-            observer.observe(el);
-        });
-    </script>
+    <!-- Link to external JavaScript -->
+    <script src="assets/futuristic.js"></script>
 </body>
 </html>
