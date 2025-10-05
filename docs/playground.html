@@ -443,9 +443,13 @@
     <script src="assets/futuristic.js"></script>
     
     <script type="module">
-        // Import WASM module with cache busting
+        // Import WASM module - use dynamic import for cache busting
         const wasmVersion = '1.0.1'; // Update this when WASM changes
-        import init, { 
+        
+        // Dynamic import to support cache busting
+        const wasmModule = await import(`./wasm/mica.js?v=${wasmVersion}`);
+        const { 
+            default: init,
             tokenize, 
             parse_ast, 
             resolve_code, 
@@ -453,7 +457,7 @@
             lower_code, 
             generate_ir,
             run_code
-        } from `./wasm/mica.js?v=${wasmVersion}`;
+        } = wasmModule;
 
         // Initialize WASM and expose functions globally
         window.micaWasm = { ready: false }; // Initialize immediately
