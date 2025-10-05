@@ -1,0 +1,10 @@
+title: "Mica Language"
+description: "A tiny, expressive systems language prototype"
+theme: jekyll-theme-cayman
+show_downloads: false
+plugins:
+  - jekyll-seo-tag
+
+# Enable GitHub metadata for repository links
+github:
+  is_project_page: true
