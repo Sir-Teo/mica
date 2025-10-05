@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Mica - An experimental systems language with explicit effects, deterministic concurrency, and predictable performance">
+    <meta name="description" content="Mica - A futuristic systems language with explicit effects, deterministic concurrency, and predictable performance">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://sir-teo.github.io/mica/">
-    <meta property="og:title" content="Mica Programming Language">
-    <meta property="og:description" content="Learn the entire compiler in a weekend, extend it on Monday">
+    <meta property="og:title" content="Mica Programming Language - Next Generation Systems Language">
+    <meta property="og:description" content="Learn the entire compiler in a weekend, extend it on Monday. Explore the future of systems programming.">
     <meta property="og:image" content="https://sir-teo.github.io/mica/assets/og-image.png">
 
     <!-- Twitter -->
@@ -18,36 +18,49 @@
     <meta property="twitter:title" content="Mica Programming Language">
     <meta property="twitter:description" content="Learn the entire compiler in a weekend, extend it on Monday">
     
-    <title>Mica Language Documentation</title>
+    <title>Mica - Next Generation Systems Language</title>
     <style>
         :root {
-            --primary: #2563eb;
-            --primary-dark: #1e40af;
-            --secondary: #64748b;
+            /* Futuristic Color Palette */
+            --primary: #6366f1;
+            --primary-dark: #4338ca;
+            --primary-light: #818cf8;
+            --secondary: #ec4899;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            
+            /* Backgrounds */
+            --bg: #0a0a0f;
+            --bg-card: rgba(15, 15, 25, 0.8);
+            --bg-glass: rgba(255, 255, 255, 0.05);
+            --bg-alt: #0f0f19;
+            
+            /* Text */
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-highlight: #fff;
+            
+            /* Borders & Effects */
+            --border: rgba(255, 255, 255, 0.1);
+            --glow: rgba(99, 102, 241, 0.3);
+            --shadow: rgba(0, 0, 0, 0.5);
+            
+            /* Gradients */
+            --gradient-primary: linear-gradient(135deg, #6366f1 0%, #ec4899 50%, #06b6d4 100%);
+            --gradient-glow: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.2), transparent 70%);
+        }
+        
+        [data-theme="light"] {
             --bg: #ffffff;
+            --bg-card: rgba(255, 255, 255, 0.95);
+            --bg-glass: rgba(15, 15, 25, 0.05);
             --bg-alt: #f8fafc;
-            --text: #0f172a;
-            --text-muted: #475569;
-            --border: #e2e8f0;
-            --code-bg: #1e293b;
-            --accent: #8b5cf6;
-        }
-        
-        [data-theme="dark"] {
-            --bg: #0f172a;
-            --bg-alt: #1e293b;
-            --text: #f1f5f9;
-            --text-muted: #cbd5e1;
-            --border: #334155;
-            --code-bg: #0f172a;
-        }
-        
-        * {
-            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-        }
-        
-        html {
-            scroll-behavior: smooth;
+            --text: #0a0a0f;
+            --text-muted: #64748b;
+            --border: rgba(0, 0, 0, 0.1);
+            --glow: rgba(99, 102, 241, 0.15);
+            --shadow: rgba(0, 0, 0, 0.1);
         }
         
         * {
@@ -56,92 +69,176 @@
             box-sizing: border-box;
         }
         
+        html {
+            scroll-behavior: smooth;
+            overflow-x: hidden;
+        }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.7;
             color: var(--text);
             background: var(--bg);
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        /* Animated Background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(236, 72, 153, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.1) 0%, transparent 70%);
+            animation: rotateBackground 30s linear infinite;
+            z-index: -1;
+        }
+        
+        @keyframes rotateBackground {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 0 2rem;
+            position: relative;
+            z-index: 1;
         }
         
+        /* Futuristic Header */
         header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
-            color: white;
-            padding: 4rem 0 5rem;
+            position: relative;
+            background: transparent;
+            color: var(--text-highlight);
+            padding: 6rem 0 8rem;
             text-align: center;
+            overflow: hidden;
+        }
+        
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--gradient-primary);
+            opacity: 0.1;
+            z-index: -1;
         }
         
         header h1 {
-            font-size: 3.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            letter-spacing: -0.02em;
+            font-size: 5rem;
+            font-weight: 900;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.03em;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: titleGlow 3s ease-in-out infinite alternate;
+            text-shadow: 0 0 80px var(--glow);
+        }
+        
+        @keyframes titleGlow {
+            0% { filter: brightness(1); }
+            100% { filter: brightness(1.3); }
         }
         
         header .tagline {
-            font-size: 1.5rem;
-            opacity: 0.95;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
+            font-size: 1.8rem;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+            color: var(--text);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            opacity: 0.9;
         }
         
         header .subtitle {
-            font-size: 1.1rem;
-            opacity: 0.85;
+            font-size: 1.2rem;
+            color: var(--text-muted);
             font-style: italic;
-            margin-bottom: 2.5rem;
+            margin-bottom: 3rem;
+            letter-spacing: 0.05em;
         }
         
         .hero-description {
-            max-width: 800px;
-            margin: 0 auto 2rem;
-            font-size: 1.1rem;
-            line-height: 1.8;
-            opacity: 0.9;
+            max-width: 900px;
+            margin: 0 auto 3rem;
+            font-size: 1.25rem;
+            line-height: 1.9;
+            color: var(--text-muted);
+            font-weight: 300;
         }
         
         .cta-buttons {
             display: flex;
-            gap: 1rem;
+            gap: 1.5rem;
             justify-content: center;
             flex-wrap: wrap;
-            margin-top: 2rem;
+            margin-top: 3rem;
         }
         
         .btn {
+            position: relative;
             display: inline-block;
-            padding: 0.875rem 2rem;
-            border-radius: 0.5rem;
+            padding: 1.1rem 2.5rem;
+            border-radius: 12px;
             text-decoration: none;
-            font-weight: 600;
-            transition: all 0.2s;
-            font-size: 1rem;
+            font-weight: 700;
+            font-size: 1.1rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+            letter-spacing: 0.02em;
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn:hover::before {
+            left: 100%;
         }
         
         .btn-primary {
-            background: white;
-            color: var(--primary);
+            background: var(--gradient-primary);
+            color: white;
+            box-shadow: 0 10px 40px var(--glow);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
         
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 20px 60px var(--glow);
         }
         
         .btn-secondary {
-            background: rgba(255,255,255,0.1);
-            color: white;
-            border: 2px solid white;
+            background: var(--bg-glass);
+            color: var(--text);
+            border: 2px solid var(--border);
+            backdrop-filter: blur(10px);
         }
         
         .btn-secondary:hover {
-            background: rgba(255,255,255,0.2);
-            transform: translateY(-2px);
+            background: var(--bg-card);
+            border-color: var(--primary);
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px var(--shadow);
         }
         
         .section {
@@ -170,40 +267,78 @@
         
         .features {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-top: 3rem;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2.5rem;
+            margin-top: 4rem;
+            perspective: 1000px;
         }
         
         .feature-card {
-            background: var(--bg);
-            padding: 2rem;
-            border-radius: 1rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            transition: all 0.3s;
+            position: relative;
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px var(--shadow);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             border: 1px solid var(--border);
+            transform-style: preserve-3d;
+        }
+        
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 20px;
+            padding: 2px;
+            background: var(--gradient-primary);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+            opacity: 0;
+            transition: opacity 0.4s;
         }
         
         .feature-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 12px 24px rgba(0,0,0,0.1);
-            border-color: var(--primary);
+            transform: translateY(-10px) rotateX(5deg);
+            box-shadow: 0 20px 60px var(--glow);
+        }
+        
+        .feature-card:hover::before {
+            opacity: 1;
         }
         
         .feature-icon {
-            font-size: 2.5rem;
-            margin-bottom: 1rem;
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
+            display: inline-block;
+            filter: drop-shadow(0 0 20px var(--glow));
+            animation: floatIcon 3s ease-in-out infinite;
+        }
+        
+        @keyframes floatIcon {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
         }
         
         .feature-card h3 {
-            font-size: 1.5rem;
-            margin-bottom: 0.75rem;
-            color: var(--primary);
+            font-size: 1.6rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         
         .feature-card p {
             color: var(--text-muted);
-            line-height: 1.7;
+            line-height: 1.8;
+            font-size: 1.05rem;
         }
         
         .quick-links {
@@ -214,44 +349,87 @@
         }
         
         .quick-link {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 0.75rem;
-            border: 2px solid var(--border);
+            position: relative;
+            background: var(--bg-card);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: 16px;
+            border: 1px solid var(--border);
             text-decoration: none;
             color: var(--text);
-            transition: all 0.2s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: block;
+            overflow: hidden;
+        }
+        
+        .quick-link::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100px;
+            height: 100px;
+            background: var(--gradient-glow);
+            border-radius: 50%;
+            transform: translate(50%, -50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .quick-link:hover::after {
+            opacity: 1;
         }
         
         .quick-link:hover {
             border-color: var(--primary);
-            transform: translateX(5px);
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px var(--glow);
         }
         
         .quick-link h4 {
-            color: var(--primary);
-            margin-bottom: 0.5rem;
-            font-size: 1.2rem;
+            position: relative;
+            z-index: 1;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.75rem;
+            font-size: 1.3rem;
+            font-weight: 700;
         }
         
         .quick-link p {
+            position: relative;
+            z-index: 1;
             color: var(--text-muted);
-            font-size: 0.95rem;
+            font-size: 1rem;
+            line-height: 1.6;
         }
         
         .code-example {
-            background: var(--code-bg);
-            color: #e2e8f0;
-            padding: 2rem;
-            border-radius: 0.75rem;
+            position: relative;
+            background: #0d1117;
+            color: #e6edf3;
+            padding: 2.5rem;
+            border-radius: 16px;
             overflow-x: auto;
-            margin: 2rem 0;
-            font-family: 'Monaco', 'Courier New', monospace;
-            font-size: 0.95rem;
-            line-height: 1.6;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            margin: 3rem 0;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Courier New', monospace;
+            font-size: 1rem;
+            line-height: 1.8;
+            box-shadow: 0 20px 60px var(--shadow);
+            border: 1px solid var(--border);
+        }
+        
+        .code-example::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background: linear-gradient(to bottom, rgba(99, 102, 241, 0.1), transparent);
+            border-radius: 16px 16px 0 0;
         }
         
         .code-example .keyword { color: #c792ea; }
@@ -264,71 +442,102 @@
             display: flex;
             justify-content: space-around;
             flex-wrap: wrap;
-            gap: 2rem;
-            margin: 3rem 0;
+            gap: 3rem;
+            margin: 4rem 0;
         }
         
         .stat {
             text-align: center;
+            position: relative;
+        }
+        
+        .stat::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 120px;
+            height: 120px;
+            background: var(--gradient-glow);
+            border-radius: 50%;
+            z-index: -1;
+            animation: pulse 3s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.6; }
         }
         
         .stat-number {
-            font-size: 3rem;
-            font-weight: 700;
-            color: var(--primary);
+            font-size: 4rem;
+            font-weight: 900;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             display: block;
+            line-height: 1.2;
         }
         
         .stat-label {
             color: var(--text-muted);
-            font-size: 1rem;
-            margin-top: 0.5rem;
+            font-size: 1.1rem;
+            margin-top: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
         }
         
         .theme-toggle {
             position: fixed;
-            top: 1rem;
-            right: 1rem;
+            top: 2rem;
+            right: 2rem;
             z-index: 1000;
-            background: var(--bg);
+            background: var(--bg-card);
+            backdrop-filter: blur(10px);
             border: 2px solid var(--border);
             border-radius: 50%;
-            width: 3rem;
-            height: 3rem;
+            width: 4rem;
+            height: 4rem;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            font-size: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: all 0.3s;
+            font-size: 1.8rem;
+            box-shadow: 0 8px 32px var(--shadow);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
         .theme-toggle:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+            transform: scale(1.15) rotate(180deg);
+            box-shadow: 0 12px 48px var(--glow);
+            border-color: var(--primary);
         }
         
         .scroll-top {
             position: fixed;
             bottom: 2rem;
             right: 2rem;
-            z-index: 1000;
-            background: var(--primary);
+            z-index: 999;
+            background: var(--gradient-primary);
             color: white;
-            border: none;
+            border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
-            width: 3rem;
-            height: 3rem;
+            width: 4rem;
+            height: 4rem;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            font-size: 1.5rem;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+            font-size: 1.8rem;
+            font-weight: bold;
+            box-shadow: 0 8px 32px var(--glow);
             opacity: 0;
             transform: translateY(100px);
-            transition: all 0.3s;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
         }
         
         .scroll-top.visible {
@@ -337,8 +546,8 @@
         }
         
         .scroll-top:hover {
-            background: var(--primary-dark);
-            transform: translateY(-3px);
+            transform: translateY(-5px) scale(1.1);
+            box-shadow: 0 15px 50px var(--glow);
         }
         
         @keyframes fadeInUp {
@@ -362,19 +571,45 @@
         }
         
         footer {
-            background: var(--text);
-            color: white;
-            padding: 3rem 0;
+            position: relative;
+            background: var(--bg-alt);
+            color: var(--text);
+            padding: 4rem 0 2rem;
             text-align: center;
+            border-top: 1px solid var(--border);
+        }
+        
+        footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--gradient-primary);
+            opacity: 0.5;
         }
         
         footer a {
             color: var(--primary);
             text-decoration: none;
+            transition: all 0.3s;
+            position: relative;
         }
         
-        footer a:hover {
-            text-decoration: underline;
+        footer a::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--gradient-primary);
+            transition: width 0.3s;
+        }
+        
+        footer a:hover::after {
+            width: 100%;
         }
         
         .modules-grid {
@@ -385,53 +620,110 @@
         }
         
         .module-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 0.75rem;
-            border-left: 4px solid var(--primary);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            transition: all 0.2s;
+            position: relative;
+            background: var(--bg-card);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            border-left: 4px solid transparent;
+            border-image: var(--gradient-primary) 1;
+            border-image-slice: 1;
+            box-shadow: 0 4px 16px var(--shadow);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+        
+        .module-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--gradient-primary);
         }
         
         .module-card:hover {
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-            transform: translateX(5px);
+            box-shadow: 0 12px 40px var(--glow);
+            transform: translateX(8px);
+            border-color: var(--primary);
         }
         
         .module-card h4 {
-            color: var(--primary);
-            margin-bottom: 0.5rem;
-            font-size: 1.1rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.75rem;
+            font-size: 1.2rem;
+            font-weight: 700;
         }
         
         .module-card a {
             color: var(--text);
             text-decoration: none;
-            font-weight: 500;
+            font-weight: 600;
+        }
+        
+        .module-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.6;
         }
         
         @media (max-width: 768px) {
             header h1 {
-                font-size: 2.5rem;
+                font-size: 3rem;
             }
             
             header .tagline {
-                font-size: 1.2rem;
+                font-size: 1.3rem;
+            }
+            
+            header .subtitle {
+                font-size: 1rem;
+            }
+            
+            .hero-description {
+                font-size: 1.1rem;
             }
             
             .section-title {
-                font-size: 2rem;
+                font-size: 2.2rem;
             }
             
             .container {
-                padding: 0 1rem;
+                padding: 0 1.5rem;
+            }
+            
+            .feature-card, .quick-link {
+                padding: 1.5rem;
+            }
+            
+            .features, .quick-links, .modules-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-number {
+                font-size: 3rem;
+            }
+            
+            .theme-toggle, .scroll-top {
+                width: 3.5rem;
+                height: 3.5rem;
+                font-size: 1.5rem;
+            }
+            
+            header {
+                padding: 4rem 0 5rem;
             }
         }
     </style>
 </head>
 <body>
-    <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode">
-        🌙
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        ☀️
     </button>
     
     <button class="scroll-top" id="scrollTop" aria-label="Scroll to top">
@@ -440,64 +732,71 @@
     
     <header>
         <div class="container">
-            <h1>🎵 Mica</h1>
-            <div class="tagline">An Experimental Systems Language</div>
+            <h1>⚡ MICA</h1>
+            <div class="tagline">Next-Gen Systems Language</div>
             <div class="subtitle">Minimal • Industrial • Composable • Auditable</div>
             <div class="hero-description">
-                Mica explores a tiny, expressive core with explicit effects, deterministic concurrency, 
-                and predictable performance. Learn the entire compiler in a weekend, extend it on Monday.
+                Experience the future of systems programming. Mica delivers explicit effects, deterministic concurrency, 
+                and predictable performance in a learning-sized compiler. Master the entire pipeline in a weekend, 
+                ship production code on Monday.
             </div>
             <div class="cta-buttons">
                 <a href="getting-started.html" class="btn btn-primary">🚀 Get Started</a>
                 <a href="tour.html" class="btn btn-primary">📖 Language Tour</a>
-                <a href="https://github.com/Sir-Teo/mica" class="btn btn-secondary">⭐ View on GitHub</a>
+                <a href="https://github.com/Sir-Teo/mica" class="btn btn-secondary">⭐ GitHub Repository</a>
             </div>
         </div>
     </header>
 
     <section class="section">
         <div class="container">
-            <h2 class="section-title">Why Mica?</h2>
+            <h2 class="section-title">🌟 Why Mica?</h2>
             <p class="section-intro">
-                A learning-sized, industrially-inspired language playground designed for readers 
-                who want to inspect a full compiler without wading through millions of lines of code.
+                A revolutionary language playground that combines industrial-grade design patterns with educational clarity.
+                Inspect every stage of a production-quality compiler without drowning in complexity.
             </p>
             
             <div class="features">
                 <div class="feature-card">
                     <div class="feature-icon">⚡</div>
-                    <h3>Tiny but Expressive</h3>
-                    <p>Learn the entire syntax in an afternoon. Extend behavior via standard libraries instead of bespoke keywords.</p>
+                    <h3>Hyper-Minimal Core</h3>
+                    <p>Master the complete syntax in hours, not months. Zero bloat, pure expressiveness. 
+                    Extend functionality through composable libraries, not language keywords.</p>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon">🔒</div>
                     <h3>Deterministic Concurrency</h3>
-                    <p>Structured spawn/await with effect tracking ensures reproducible outcomes every time.</p>
+                    <p>Structured spawn/await with compile-time effect tracking. Write concurrent code that behaves 
+                    identically across runs. No race conditions, no debugging nightmares.</p>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon">🎯</div>
-                    <h3>Capability-Based Effects</h3>
-                    <p>Explicit using clauses make side effects and resource access fully auditable.</p>
+                    <h3>Zero-Trust Effects</h3>
+                    <p>Capability-based security at the type level. Every side effect is explicit and auditable. 
+                    Know exactly what your code can do just by reading its signature.</p>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon">🛠️</div>
-                    <h3>Ahead-of-Time Tooling</h3>
-                    <p>CLI exposes every compiler stage from tokens to native code, backed by golden-file snapshots.</p>
+                    <h3>Full-Spectrum Tooling</h3>
+                    <p>Inspect every compiler stage: tokens → AST → IR → LLVM → native code. 
+                    Golden-file testing ensures correctness. Real-time introspection for learning and debugging.</p>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon">🔌</div>
-                    <h3>Interop-Friendly</h3>
-                    <p>C-compatible calling conventions and hooks for Python/JavaScript keep the ecosystem friendly.</p>
+                    <h3>Universal Interop</h3>
+                    <p>C-compatible ABI for seamless FFI. Python and JavaScript task hooks out of the box. 
+                    Integrate with any ecosystem without friction.</p>
                 </div>
                 
                 <div class="feature-card">
-                    <div class="feature-icon">📚</div>
-                    <h3>Learning-Focused</h3>
-                    <p>Study real implementations of lexing, parsing, semantic analysis, lowering, and code generation.</p>
+                    <div class="feature-icon">🎓</div>
+                    <h3>Built to Learn</h3>
+                    <p>Complete compiler pipeline in one repository. Real implementations of lexing, parsing, 
+                    type checking, optimization, and codegen. Learn by reading production code.</p>
                 </div>
             </div>
         </div>
@@ -505,9 +804,9 @@
 
     <section class="section">
         <div class="container">
-            <h2 class="section-title">Quick Example</h2>
+            <h2 class="section-title">⚙️ See It In Action</h2>
             <p class="section-intro">
-                Pattern matching and capability-aware logging in action
+                Pattern matching meets capability-aware design. Type-safe, auditable, elegant.
             </p>
             
             <div class="code-example">
@@ -532,7 +831,7 @@
 
     <section class="section">
         <div class="container">
-            <h2 class="section-title">Getting Started</h2>
+            <h2 class="section-title">🚀 Explore Mica</h2>
             
             <div class="quick-links">
                 <a href="getting-started.html" class="quick-link">
@@ -595,8 +894,8 @@
 
     <section class="section">
         <div class="container">
-            <h2 class="section-title">Compiler Modules</h2>
-            <p class="section-intro">Explore the internals of the Mica compiler</p>
+            <h2 class="section-title">🔬 Compiler Architecture</h2>
+            <p class="section-intro">Deep dive into the modular compiler pipeline. Every component is documented, tested, and ready to explore.</p>
             
             <div class="modules-grid">
                 <div class="module-card">
@@ -644,7 +943,7 @@
 
     <section class="section">
         <div class="container">
-            <h2 class="section-title">Project Stats</h2>
+            <h2 class="section-title">📊 By The Numbers</h2>
             <div class="stats">
                 <div class="stat">
                     <span class="stat-number">50+</span>
@@ -668,34 +967,38 @@
 
     <footer>
         <div class="container">
-            <p>Mica is a prototype under active development.</p>
+            <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1.5rem;">
+                Mica: The Future of Systems Programming is Open Source
+            </p>
             <p style="margin-top: 1rem;">
                 <a href="getting-started.html">Getting Started</a> • 
-                <a href="tour.html">Tour</a> • 
+                <a href="tour.html">Language Tour</a> • 
                 <a href="examples.html">Examples</a> • 
                 <a href="architecture.html">Architecture</a>
             </p>
-            <p style="margin-top: 0.5rem;">
+            <p style="margin-top: 0.75rem;">
                 <a href="https://github.com/Sir-Teo/mica">GitHub</a> • 
                 <a href="https://github.com/Sir-Teo/mica/issues">Issues</a> • 
                 <a href="roadmap/index.html">Roadmap</a> • 
-                <a href="status.html">Status</a>
+                <a href="status.html">Status</a> • 
+                <a href="faq.html">FAQ</a> • 
+                <a href="contributing.html">Contributing</a>
             </p>
-            <p style="margin-top: 1.5rem; opacity: 0.7; font-size: 0.9rem;">
-                © 2025 Mica Project • Built with ❤️ for language learners
+            <p style="margin-top: 2rem; opacity: 0.7; font-size: 0.95rem;">
+                © 2025 Mica Project • Built with passion for the next generation of developers
             </p>
         </div>
     </footer>
     
     <script>
-        // Theme toggle
+        // Theme toggle (defaults to dark)
         const themeToggle = document.getElementById('themeToggle');
         const htmlElement = document.documentElement;
         
-        // Load saved theme
-        const savedTheme = localStorage.getItem('theme') || 'light';
+        // Load saved theme or default to dark
+        const savedTheme = localStorage.getItem('theme') || 'dark';
         htmlElement.setAttribute('data-theme', savedTheme);
-        themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        themeToggle.textContent = savedTheme === 'light' ? '🌙' : '☀️';
         
         themeToggle.addEventListener('click', () => {
             const currentTheme = htmlElement.getAttribute('data-theme');
@@ -703,7 +1006,7 @@
             
             htmlElement.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
-            themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+            themeToggle.textContent = newTheme === 'light' ? '🌙' : '☀️';
         });
         
         // Scroll to top button
