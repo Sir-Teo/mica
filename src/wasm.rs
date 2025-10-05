@@ -1,7 +1,7 @@
-use wasm_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::*;
 
-use crate::{lexer, parser, resolve, check, lower, ir, pretty};
+use crate::{check, ir, lexer, lower, parser, pretty, resolve};
 use std::fmt::Write;
 
 #[wasm_bindgen]
@@ -32,12 +32,24 @@ pub fn tokenize(source: &str) -> String {
             success: true,
             output,
             error: None,
-        }).unwrap_or_else(|e| format!("{{\"success\":false,\"error\":\"Serialization error: {}\"}}",  e)),
+        })
+        .unwrap_or_else(|e| {
+            format!(
+                "{{\"success\":false,\"error\":\"Serialization error: {}\"}}",
+                e
+            )
+        }),
         Err(e) => serde_json::to_string(&CompileResult {
             success: false,
             output: String::new(),
             error: Some(e),
-        }).unwrap_or_else(|e| format!("{{\"success\":false,\"error\":\"Serialization error: {}\"}}", e)),
+        })
+        .unwrap_or_else(|e| {
+            format!(
+                "{{\"success\":false,\"error\":\"Serialization error: {}\"}}",
+                e
+            )
+        }),
     }
 }
 
@@ -58,18 +70,30 @@ pub fn parse_ast(source: &str, pretty: bool) -> String {
             success: true,
             output,
             error: None,
-        }).unwrap_or_else(|e| format!("{{\"success\":false,\"error\":\"Serialization error: {}\"}}", e)),
+        })
+        .unwrap_or_else(|e| {
+            format!(
+                "{{\"success\":false,\"error\":\"Serialization error: {}\"}}",
+                e
+            )
+        }),
         Err(e) => serde_json::to_string(&CompileResult {
             success: false,
             output: String::new(),
             error: Some(e),
-        }).unwrap_or_else(|e| format!("{{\"success\":false,\"error\":\"Serialization error: {}\"}}", e)),
+        })
+        .unwrap_or_else(|e| {
+            format!(
+                "{{\"success\":false,\"error\":\"Serialization error: {}\"}}",
+                e
+            )
+        }),
     }
 }
 
 fn parse_ast_internal(source: &str, pretty_print: bool) -> Result<String, String> {
     let ast = parser::parse_module(source).map_err(|e| format!("Parser error: {}", e))?;
-    
+
     if pretty_print {
         Ok(pretty::module_to_string(&ast))
     } else {
@@ -85,19 +109,31 @@ pub fn resolve_code(source: &str) -> String {
             success: true,
             output,
             error: None,
-        }).unwrap_or_else(|e| format!("{{\"success\":false,\"error\":\"Serialization error: {}\"}}", e)),
+        })
+        .unwrap_or_else(|e| {
+            format!(
+                "{{\"success\":false,\"error\":\"Serialization error: {}\"}}",
+                e
+            )
+        }),
         Err(e) => serde_json::to_string(&CompileResult {
             success: false,
             output: String::new(),
             error: Some(e),
-        }).unwrap_or_else(|e| format!("{{\"success\":false,\"error\":\"Serialization error: {}\"}}", e)),
+        })
+        .unwrap_or_else(|e| {
+            format!(
+                "{{\"success\":false,\"error\":\"Serialization error: {}\"}}",
+                e
+            )
+        }),
     }
 }
 
 fn resolve_internal(source: &str) -> Result<String, String> {
     let ast = parser::parse_module(source).map_err(|e| format!("Parser error: {}", e))?;
     let resolution = resolve::resolve_module(&ast);
-    
+
     Ok(format!("{:#?}", resolution))
 }
 
@@ -109,19 +145,31 @@ pub fn check_code(source: &str) -> String {
             success: true,
             output,
             error: None,
-        }).unwrap_or_else(|e| format!("{{\"success\":false,\"error\":\"Serialization error: {}\"}}", e)),
+        })
+        .unwrap_or_else(|e| {
+            format!(
+                "{{\"success\":false,\"error\":\"Serialization error: {}\"}}",
+                e
+            )
+        }),
         Err(e) => serde_json::to_string(&CompileResult {
             success: false,
             output: String::new(),
             error: Some(e),
-        }).unwrap_or_else(|e| format!("{{\"success\":false,\"error\":\"Serialization error: {}\"}}", e)),
+        })
+        .unwrap_or_else(|e| {
+            format!(
+                "{{\"success\":false,\"error\":\"Serialization error: {}\"}}",
+                e
+            )
+        }),
     }
 }
 
 fn check_internal(source: &str) -> Result<String, String> {
     let ast = parser::parse_module(source).map_err(|e| format!("Parser error: {}", e))?;
     let check_result = check::check_module(&ast);
-    
+
     if check_result.diagnostics.is_empty() {
         Ok("✓ All checks passed!".to_string())
     } else {
@@ -141,19 +189,31 @@ pub fn lower_code(source: &str) -> String {
             success: true,
             output,
             error: None,
-        }).unwrap_or_else(|e| format!("{{\"success\":false,\"error\":\"Serialization error: {}\"}}", e)),
+        })
+        .unwrap_or_else(|e| {
+            format!(
+                "{{\"success\":false,\"error\":\"Serialization error: {}\"}}",
+                e
+            )
+        }),
         Err(e) => serde_json::to_string(&CompileResult {
             success: false,
             output: String::new(),
             error: Some(e),
-        }).unwrap_or_else(|e| format!("{{\"success\":false,\"error\":\"Serialization error: {}\"}}", e)),
+        })
+        .unwrap_or_else(|e| {
+            format!(
+                "{{\"success\":false,\"error\":\"Serialization error: {}\"}}",
+                e
+            )
+        }),
     }
 }
 
 fn lower_internal(source: &str) -> Result<String, String> {
     let ast = parser::parse_module(source).map_err(|e| format!("Parser error: {}", e))?;
     let hir = lower::lower_module(&ast);
-    
+
     Ok(lower::hir_to_string(&hir))
 }
 
@@ -165,12 +225,24 @@ pub fn generate_ir(source: &str) -> String {
             success: true,
             output,
             error: None,
-        }).unwrap_or_else(|e| format!("{{\"success\":false,\"error\":\"Serialization error: {}\"}}", e)),
+        })
+        .unwrap_or_else(|e| {
+            format!(
+                "{{\"success\":false,\"error\":\"Serialization error: {}\"}}",
+                e
+            )
+        }),
         Err(e) => serde_json::to_string(&CompileResult {
             success: false,
             output: String::new(),
             error: Some(e),
-        }).unwrap_or_else(|e| format!("{{\"success\":false,\"error\":\"Serialization error: {}\"}}", e)),
+        })
+        .unwrap_or_else(|e| {
+            format!(
+                "{{\"success\":false,\"error\":\"Serialization error: {}\"}}",
+                e
+            )
+        }),
     }
 }
 
@@ -178,6 +250,6 @@ fn generate_ir_internal(source: &str) -> Result<String, String> {
     let ast = parser::parse_module(source).map_err(|e| format!("Parser error: {}", e))?;
     let hir = lower::lower_module(&ast);
     let ir_module = ir::lower_module(&hir);
-    
+
     Ok(format!("{:#?}", ir_module))
 }
