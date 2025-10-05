@@ -138,11 +138,7 @@ where
     let options = options.clone();
     let start = Instant::now();
 
-    let worker_count = std::thread::available_parallelism()
-        .map(|count| count.get())
-        .unwrap_or(1)
-        .min(modules.len())
-        .max(1);
+    let worker_count = recommended_worker_count(modules.len());
     let next_index = Arc::new(AtomicUsize::new(0));
     let worker_accumulators: Arc<Vec<Mutex<WorkerAccumulator>>> = Arc::new(
         (0..worker_count)
@@ -268,4 +264,33 @@ where
     };
 
     Ok(ParallelCompileReport { outputs, metrics })
+}
+
+fn recommended_worker_count(module_count: usize) -> usize {
+    if module_count <= 1 {
+        return module_count.max(1);
+    }
+    let available = std::thread::available_parallelism()
+        .map(|count| count.get())
+        .unwrap_or(1);
+    recommended_worker_count_with_available(module_count, available)
+}
+
+pub(crate) fn recommended_worker_count_with_available(
+    module_count: usize,
+    available_workers: usize,
+) -> usize {
+    if module_count <= 1 {
+        return module_count.max(1);
+    }
+    let available = available_workers.max(1);
+    if available <= 2 {
+        return module_count.min(available).max(1);
+    }
+    if module_count <= 2 {
+        return 1;
+    }
+    let target = available.saturating_sub(1).max(2);
+    let balanced = module_count.saturating_sub(1).max(2);
+    target.min(balanced)
 }

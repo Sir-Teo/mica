@@ -1,6 +1,6 @@
 # Phase 3 Kickoff Status
 
-_Last refreshed: 2024-07-01_
+_Last refreshed: 2024-07-08_
 
 This summary condenses the current Phase 3 health report for quick scanning. It
 highlights what is stable, how we validate it, and where contributors can have
@@ -27,9 +27,9 @@ the most impact next.
 - The native backend emits portable C for typed IR, including record aggregates,
   and drives the system toolchain to produce runnable binaries.
 - The runtime orchestrator binds IO/time providers, now including deterministic
-  in-memory shims, and validates capability coverage before native binaries
-  execute. Telemetry captures per-capability counts and durations for
-  downstream analysis.
+  in-memory shims and scripted process orchestration, and validates capability
+  coverage before native binaries execute. CLI-exported telemetry captures
+  per-capability counts and durations for downstream analysis.
 
 ### Tooling and Developer Experience
 - The `mica` CLI exposes lexing, resolving, lowering, IR dumps, LLVM previews,
@@ -61,14 +61,14 @@ the most impact next.
 
 ## Next Focus Areas
 
-1. **Process providers** – Introduce scripted process/task orchestration so the
-   deterministic runtime can model multi-process workloads safely.
-2. **Telemetry exporters** – Wire the richer runtime metrics into CLI flags and
-   document how downstream tooling consumes the JSON traces.
-3. **Parallel backend scaling** – Use the new worker metrics to tune scheduling
+1. **Process shims** – Expand scripted process orchestration with failure paths
+   and tutorials so contributors can model multi-process workloads safely.
+2. **Trace coverage** – Build on the new runtime trace snippet by weaving it
+   into walkthroughs that correlate compile-time and run-time data.
+3. **Parallel backend scaling** – Use the worker metrics to tune scheduling
    heuristics on workspace-sized module sets and publish guidance.
-4. **Pipeline documentation** – Expand the freshly documented pipeline entry
-   points with end-to-end walkthroughs for editor integrations and audits.
+4. **Pipeline documentation** – Build on the new walkthrough with editor-facing
+   recipes for capability exploration and automation audits.
 
 ## Watch Items
 
