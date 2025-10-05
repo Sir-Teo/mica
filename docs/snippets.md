@@ -72,3 +72,11 @@ fn fetch(u, net) !{net}
   await(spawn(http::get(u, net)))
 ```
 
+## Runtime Trace (`--run --trace-json`)
+
+Command: `cargo run --bin mica -- --run --trace-json - examples/native_entry.mica`
+
+```
+{"events":[{"type":"task_started","task":"examples::native_entry::main"},{"type":"task_completed","task":"examples::native_entry::main"}],"telemetry":[{"sequence":0,"timestamp_micros":null,"event":{"type":"task_started","task":"examples::native_entry::main"}},{"sequence":1,"timestamp_micros":null,"event":{"type":"task_completed","task":"examples::native_entry::main"}}],"tasks":[{"task":"examples::native_entry::main","start_timestamp_micros":null,"duration_micros":0,"event_count":2,"capability_counts":{},"operation_counts":{},"capability_durations_micros":{},"operation_durations_micros":{},"spawned_tasks":0}],"summary":{"total_tasks":1,"total_events":2,"spawned_tasks":0,"capability_counts":{},"operation_counts":{},"capability_durations_micros":{},"operation_durations_micros":{}}}
+```
+
