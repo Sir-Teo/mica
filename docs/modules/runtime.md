@@ -12,13 +12,16 @@ requested capabilities match what the compiler declared.
 ## Default Providers
 
 `Runtime::with_default_shims()` registers console, time, filesystem, network,
-and environment providers so examples and tests run without extra configuration.
-Each provider mirrors the capability rows emitted by the compiler:
+process, and environment providers so examples and tests run without extra
+configuration. Each provider mirrors the capability rows emitted by the
+compiler:
 
 - **Console (`io`)** – `write_line` emits message events alongside unit results.
 - **Time (`time`)** – `now_millis` returns the current wall-clock time.
 - **Filesystem (`fs`)** – `read_to_string` and `write_string` transfer file
   contents while producing confirmation events.
+- **Process (`process`)** – `spawn` executes host binaries, returning exit codes
+  and emitting stdout/stderr as capability events.
 - **Environment (`env`)** – `get`, `set`, and `unset` expose environment
   variable access with predictable clean-up semantics.
 - **Network (`net`)** – `fetch` resolves requests against pre-registered
@@ -39,6 +42,8 @@ capabilities without touching the host environment:
   methods to seed fixtures.
 - **Deterministic clock** returns scripted or monotonic timestamps, making it
   trivial to assert on runtime telemetry.
+- **Scripted process orchestration** replays queued subprocess runs and records
+  stdout/stderr without touching the host shell.
 
 ```rust
 use mica::runtime::{Runtime, RuntimeValue, TaskPlan, TaskSpec};
@@ -97,4 +102,7 @@ assert_eq!(trace.events().len(), trace.telemetry().len());
 Serialise the trace when you need to persist telemetry or feed observability
 pipelines. The stable JSON structure makes it easy to plug into custom tools.
 Pair the deterministic shims with the JSON output to snapshot runtime behaviour
-in tests and continuous integration.
+in tests and continuous integration. The CLI exposes the same structure via
+`mica --run --trace-json <path|- >`, and the snippet generator captures a sample
+trace so downstream tooling can diff execution metrics directly from end-to-end
+runs.

@@ -521,6 +521,16 @@ fn log(io: IO) !{io} {
 }
 
 #[test]
+fn recommended_worker_count_reserves_headroom() {
+    assert_eq!(backend::recommended_worker_count_with_available(1, 8), 1);
+    assert_eq!(backend::recommended_worker_count_with_available(2, 8), 1);
+    assert_eq!(backend::recommended_worker_count_with_available(3, 8), 2);
+    assert_eq!(backend::recommended_worker_count_with_available(8, 8), 7);
+    assert_eq!(backend::recommended_worker_count_with_available(4, 2), 2);
+    assert_eq!(backend::recommended_worker_count_with_available(4, 1), 1);
+}
+
+#[test]
 fn native_backend_emits_record_literals() {
     let src = r#"
 module backend.native_record
