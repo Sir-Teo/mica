@@ -625,12 +625,13 @@ fn parallel_backend_reports_metrics_for_many_modules() {
 
     assert_eq!(report.outputs.len(), modules.len());
     assert_eq!(report.metrics.modules.len(), modules.len());
-    
+
     // Use the actual recommended_worker_count logic which reserves headroom
     let available = std::thread::available_parallelism()
         .map(|count| count.get())
         .unwrap_or(1);
-    let expected_workers = backend::recommended_worker_count_with_available(modules.len(), available);
+    let expected_workers =
+        backend::recommended_worker_count_with_available(modules.len(), available);
     assert_eq!(report.metrics.worker_count, expected_workers);
     assert_eq!(report.metrics.scheduled_modules, modules.len());
     assert!(report.metrics.total_duration >= delay);
