@@ -2039,17 +2039,11 @@ impl ProcessProvider {
         let mut response = response;
         let stdout_text = String::from_utf8_lossy(stdout);
         for line in stdout_text.lines() {
-            if !line.is_empty() {
-                response =
-                    response.with_event(CapabilityEvent::Message(format!("stdout: {line}",)));
-            }
+            response = response.with_event(CapabilityEvent::Message(format!("stdout: {line}",)));
         }
         let stderr_text = String::from_utf8_lossy(stderr);
         for line in stderr_text.lines() {
-            if !line.is_empty() {
-                response =
-                    response.with_event(CapabilityEvent::Message(format!("stderr: {line}",)));
-            }
+            response = response.with_event(CapabilityEvent::Message(format!("stderr: {line}",)));
         }
         response
     }

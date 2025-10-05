@@ -14,7 +14,6 @@ fn runtime_executes_default_shims() {
 
     runtime.spawn(spec, plan);
     let events = runtime.run().expect("runtime events");
-
     assert!(matches!(events[0], RuntimeEvent::TaskStarted { ref task } if task == "main"));
     assert!(matches!(
         events[1],
@@ -196,6 +195,26 @@ fn process_provider_executes_host_commands() {
             event: CapabilityEvent::Message(message),
             ..
         } => capability == "process" && message.contains("stdout: process-runtime"),
+        _ => false,
+    }));
+}
+
+#[cfg(unix)]
+#[test]
+fn process_provider_captures_blank_stdout_lines() {
+    let runtime = Runtime::with_default_shims().expect("runtime setup");
+    let spec = TaskSpec::new("main").with_capabilities(["process"]);
+    let plan = TaskPlan::new().invoke("process", "spawn", Some(RuntimeValue::from("/bin/echo")));
+
+    runtime.spawn(spec, plan);
+    let events = runtime.run().expect("runtime events");
+
+    assert!(events.iter().any(|event| match event {
+        RuntimeEvent::CapabilityEvent {
+            capability,
+            event: CapabilityEvent::Message(message),
+            ..
+        } => capability == "process" && message == "stdout: ",
         _ => false,
     }));
 }

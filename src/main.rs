@@ -498,7 +498,7 @@ fn build_trace_json(task: &str, stdout: &str, stderr: &str) -> String {
     ));
 
     let mut capability_invocations = 0usize;
-    for line in stdout.lines().filter(|line| !line.is_empty()) {
+    for line in stdout.lines() {
         events.push(format!(
             "{{\"type\":\"capability_invoked\",\"task\":{task},\"capability\":\"io\",\"operation\":\"write_line\"}}",
             task = json_string(task)
@@ -511,7 +511,7 @@ fn build_trace_json(task: &str, stdout: &str, stderr: &str) -> String {
         capability_invocations += 1;
     }
 
-    for line in stderr.lines().filter(|line| !line.is_empty()) {
+    for line in stderr.lines() {
         events.push(format!(
             "{{\"type\":\"capability_event\",\"task\":{task},\"capability\":\"io\",\"event\":{{\"type\":\"message\",\"value\":{value}}}}}",
             task = json_string(task),
@@ -1204,5 +1204,16 @@ mod cli_tests {
         assert!(json.contains("\"capability_counts\":{}"));
         assert!(json.contains("\"operation_counts\":{}"));
         assert!(json.contains("\"event_count\":3"));
+    }
+
+    #[test]
+    fn build_trace_json_preserves_blank_lines() {
+        let json = build_trace_json("demo::main", "first\n\nthird\n", "\n");
+
+        assert!(json.contains("\"capability_counts\":{\"io\":3}"));
+        assert!(json.contains("\"operation_counts\":{\"io::write_line\":3}"));
+        assert!(json.contains("\"value\":\"\""));
+        assert!(json.contains("\"value\":\"stderr: \""));
+        assert!(json.contains("\"event_count\":9"));
     }
 }
