@@ -174,6 +174,7 @@ cargo run --bin mica -- --ir examples/methods.mica       # Dump the typed SSA IR
 cargo run --bin mica -- --llvm examples/methods.mica     # Emit the LLVM scaffolding preview
 cargo run --bin mica -- --build examples/methods.mica    # Produce a native binary next to the source
 cargo run --bin mica -- --run examples/methods.mica      # Compile + run via the native backend
+cargo run --bin mica -- --run --trace-json - examples/methods.mica # Run and emit a runtime trace to stdout
 ```
 
 CLI output snapshots are maintained in [`docs/snippets.md`](docs/snippets.md).
